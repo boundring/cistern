@@ -19,7 +19,14 @@ DEFERRED (spec §6).
 
 **Goal.** The pure domain layer exists and is headless-provable:
 `cistern-domain.el` with the tile reference table (R3), state structs with
-new fields stubbed, grid primitives, seed-driven procgen map generator.
+new fields stubbed, grid primitives, seed-driven procgen map generator —
+and, because the tick pipeline is domain (spec §3.2 puts sim phases +
+connection logic in `cistern-domain.el`, and Phase 1's own done-when runs
+a full tick headless), the **whole pure sim core**: worker lifecycle, the
+one flood primitive and connection functions, the four sim phases, and
+`cistern--sim-tick` (four phases only — the tutorial-advance hook moves to
+the game layer). Phase 2 is verbs + orchestration + content hooks on top,
+not the phases themselves.
 
 **Inputs.** Spec §3.1–3.4 (layer map, file layout, state ownership), §4
 R3, §5.2 (determinism); legacy: state struct + LCG (cistern.el:72-99),
@@ -61,7 +68,9 @@ close, re-brief.
 ```
 # Handoff brief — <domain run id>
 Mission: R3 + R9 domain slice — cistern-domain.el with tile reference
-  table and seed-driven procgen; failing tests red-first.
+  table, seed-driven procgen, AND the pure sim core (worker lifecycle,
+  flood/connection, four sim phases, cistern--sim-tick); failing tests
+  red-first.
 Repo state: cistern @ <commit>; docs/ and legacy/ present, no src yet.
 Files to read: docs/DESIGN-SPEC.md §3, §4 R3/R9, §5; legacy/
   cistern-share/cistern-2.0.0/cistern.el lines 47-119, 200-258; legacy
@@ -99,10 +108,12 @@ blocks (:981-1001).
 1. Port verbs with pure signatures (state + intent → state + log).
 2. New demolish verb: removes pipe/toilet/tank, clears hash state, kills
    downstream connection, costs alloy, distinct from decon (R8).
-3. Tick orchestration: creators→hazards→migration→check (legacy phase
-   order preserved); no multi-tick entry point.
-4. `cistern--rewards-eval` (state) → default empty outcome; loads
-   REWARDS-DESIGN.md when present (R5 placeholder interface).
+3. Tick orchestration: game-layer `cistern--do-tick` = over-guard +
+   Phase 1's `cistern--sim-tick` (which owns creators→hazards→migration→
+   check) + tutorial advance; no multi-tick entry point.
+4. `cistern--rewards-eval` (state) → default empty outcome; the full
+   doc-§5 signature (state, tick events) → (updated state, presentation
+   intents) is consumed in 4b (R5 placeholder interface).
 5. Extended selftest/soak entry points keep legacy names.
 
 **Inherits.** R8 acceptance, R6 tick-advances-exactly-1 + no run-10
@@ -133,9 +144,10 @@ Files to read: docs/DESIGN-SPEC.md §3.3, §4 R5/R6/R8, §5; legacy
   cistern.el lines 498-551, 422-493, 846-851, 937-1001; legacy DESIGN.md
   §4 (phantom-plumbing rule), §10.
 Constraints: use cases never touch buffers/faces/keymaps — state in,
-  state out. Pin demolish economics only as "costs alloy, refund
-  DEFERRED to REWARDS-DESIGN". Red commit before green. No view/input/
-  driver files; no legacy file edits.
+  state out. Demolish costs the implementation-seed constant (3, pricing
+  DEFERRED); Phase 2 ships no refund — the refund contract is
+  REWARDS-DESIGN M1 (50%), consumed in 4b. Red commit before green. No
+  view/input/driver files; no legacy file edits.
 Done-when:
   - Demolish restores cell to floor, clears plumbing hash entry,
     costs alloy, downstream toilets become unusable; decon unchanged.
@@ -163,8 +175,9 @@ cursor commands (:853-867), `cistern--pipe-glyph` (:623-640),
 
 **Work items.**
 1. `cistern-input.el`: mouse-1 on grid cell → cursor move; with build
-   verb armed → placement at cell; arrow keys only for movement; 'r'
-   toggles a 5-ticks/s timer driving the tick use case.
+   verb armed → placement at cell, then exactly one tick (spec R6:
+   "click-with-verb advance exactly one tick"); arrow keys only for
+   movement; 'r' toggles a 5-ticks/s timer driving the tick use case.
 2. `cistern-view.el`: projection through the Phase-1 tile table; pipe
    glyphs distinguish connected-to-capacity vs isolated (shape AND face);
    toilet connection state visible; celebration rendering hook reading
@@ -206,7 +219,7 @@ Constraints: adapters are pure projection/translation — no sim rules in
   commit before green. No sim/verb changes in this phase.
 Done-when:
   - hjkl unbound; arrows + mouse move cursor; click with armed verb
-    places at the cell and spends alloy.
+    places at the cell, spends alloy, and advances exactly one tick.
   - 'r' toggles a 0.2s timer; each fire advances exactly one tick;
     toggle-off cancels.
   - Connected vs isolated pipes render with different glyph AND face;
@@ -223,7 +236,7 @@ Done-when:
 fail-first tutorial (R4) and rewards/engagement consumption (R5 full).
 
 **Inputs.** Spec §4 R4/R5, §6 (deferrals); legacy tutorial table
-(:556-599); `rewards-design/REWARDS-DESIGN.md` (BLOCKED — see below).
+(:556-599); `docs/REWARDS-DESIGN.md` (landed in-repo — see 4b).
 
 ### 4a. Tutorial (unblocked — proceeds with Phase 3 in parallel)
 
@@ -261,42 +274,43 @@ Done-when:
   - Tutorial retains predicate-table advance mechanism; T still skips.
 ```
 
-### 4b. Rewards consumption (BLOCKED by REWARDS-DESIGN.md)
+### 4b. Rewards consumption (UNBLOCKED — doc landed at docs/REWARDS-DESIGN.md)
 
-Staged at `/home/bricker/Projects/etc/20260830/rewards-design/` (NOTES.md
-exists; final doc pending). **Waits:** 4b does not start until
-`REWARDS-DESIGN.md` exists. **Proceeds in parallel meanwhile:** Phases 1–3
-and 4a; the R5 placeholder test from Phase 2 keeps failing, which is the
-required state. When the doc lands, this worker consumes its declarative
-spec (score computation, objectives with predicates over state, unlocks,
-celebration triggers/intensity) into `cistern--rewards-eval` and renders
-dancing-pixels celebrations.
+`REWARDS-DESIGN.md` is in-repo at `docs/REWARDS-DESIGN.md` (designer
+notes at `docs/rewards-notes.md`). This worker consumes its declarative
+spec — §2 MUST table (M1–M9), §4 dancing-pixels spec, §5 integration
+contract — into `cistern--rewards-eval` and the view's dancing-pixels
+celebrations. Soft ordering only: 4b's M6 render criteria want the Phase 3
+view adapter present at implementation time; the domain-side criteria
+(field, RNG, goals, reputation) depend only on Phases 1–2 state shapes.
 
-- **Fail-first order.** Red: REWARDS-DESIGN.md loads and drives a
-  non-default outcome from `cistern--rewards-eval` for a documented
-  trigger; red: celebration render on trigger. Green: implement
-  consumption only — no reward design of our own.
+- **Fail-first order.** Red: the doc drives a non-default outcome from
+  `cistern--rewards-eval` for a documented trigger (the Phase 2
+  consumption test turns green here); red: celebration render on
+  trigger. Green: implement consumption only — no reward design of our
+  own.
 - **Lesson checkpoint.** If REWARDS-DESIGN.md's predicates cannot be
   evaluated over the state object, that is a contract break: run is dead,
   harvest the mismatch into FAILURE-LEDGER.md, and route it back to the
   designer workstream rather than patching around it.
 
-- **Handoff brief (armed when unblocked).**
+- **Handoff brief (armed now — 4b unblocked).**
 
 ```
 # Handoff brief — <rewards run id>
-Mission: R5 full — consume rewards-design/REWARDS-DESIGN.md into
+Mission: R5 full — consume docs/REWARDS-DESIGN.md into
   cistern--rewards-eval + view celebrations; red-first.
 Repo state: cistern @ <commit>; Phases 1–3 landed; Phase 2 placeholder
-  test red by design.
-Files to read: /home/bricker/Projects/etc/20260830/rewards-design/
-  REWARDS-DESIGN.md; docs/DESIGN-SPEC.md §4 R5, §6.
+  consumption test red by design.
+Files to read: docs/REWARDS-DESIGN.md (§2 MUST, §4 particles, §5
+  integration contract, §6 deferrals); docs/rewards-notes.md; docs/
+  DESIGN-SPEC.md §4 R5, §6.
 Constraints: consumption only — the designer doc owns all reward
   design; any predicate the state cannot express is reported back, not
   worked around. Red commit before green.
 Done-when:
-  - REWARDS-DESIGN.md drives a non-default rewards-eval outcome for a
-    documented trigger.
+  - docs/REWARDS-DESIGN.md drives a non-default rewards-eval outcome
+    for a documented trigger.
   - Celebration (dancing pixels) renders on that trigger.
   - No reward rules invented outside the consumed document.
 ```
@@ -307,12 +321,13 @@ Done-when:
 
 ```
 Phase 1 (domain) ──► Phase 2 (use cases) ──► Phase 3 (adapters) ──► 4a (tutorial, parallel)
-                                                          └────────► 4b (rewards — BLOCKED
-                                                                     by REWARDS-DESIGN.md)
+                                                          └────────► 4b (rewards — unblocked;
+                                                                     wants Phase 3 view at impl time)
 ```
 
-4a may start once Phase 3's view contract exists; 4b starts only when
-REWARDS-DESIGN.md lands. Expansion workers inherit: the spec sections and
+4a may start once Phase 3's view contract exists; 4b is unblocked (doc at
+docs/REWARDS-DESIGN.md) with only the soft Phase 3 view ordering above.
+Expansion workers inherit: the spec sections and
 legacy line ranges named in their phase, their handoff brief above, and
 the obligation to red-commit before green. Anything their expansion finds
 ambiguous goes to DEFERRED, not into code.

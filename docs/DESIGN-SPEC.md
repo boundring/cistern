@@ -83,11 +83,11 @@ they never touch buffers. Adapters are pure projections/translations.
 
 | File | Layer | Contents |
 |---|---|---|
-| `cistern-domain.el` | domain | constants, `cistern-st`/worker structs, LCG, grid primitives, **tile tables** (R3/R7), procgen map generator, sim phases, connection/legality rules |
-| `cistern-game.el` | use cases | `cistern--cmd-*` verbs (build, **demolish**, decon, purge, cursor move, click-move), `cistern--do-tick` orchestration, tutorial table, objectives/score hooks |
-| `cistern-view.el` | adapter | glyph+face projection, pipe-connection glyphs, inspector, pressure line, header |
-| `cistern-input.el` | adapter | translate mouse/keyboard events into use-case calls; auto-run timer callback (5 ticks/s) |
-| `cistern.el` | driver | group, defcustoms, global live-state var, `cistern-mode` keymap, mouse keymap, `cistern` entry, help, autoload |
+| `src/cistern-domain.el` | domain | constants, `cistern-st`/worker structs, LCG, grid primitives, **tile tables** (R3/R7), procgen map generator, sim phases (`cistern--sim-tick`), connection/legality rules |
+| `src/cistern-game.el` | use cases | `cistern--cmd-*` verbs (build, **demolish**, decon, purge, cursor move, click-move), `cistern--do-tick` orchestration (over-guard + `cistern--sim-tick` + tutorial advance), tutorial table, objectives/score hooks |
+| `src/cistern-view.el` | adapter | glyph+face projection, pipe-connection glyphs, inspector, pressure line, header |
+| `src/cistern-input.el` | adapter | translate mouse/keyboard events into use-case calls; auto-run timer callback (5 ticks/s) |
+| `src/cistern.el` | driver | group, defcustoms, global live-state var, `cistern-mode` keymap, mouse keymap, `cistern` entry, help, autoload |
 | `tests/*.el` | test | headless deterministic tests, one per requirement + extended selftest/soak |
 
 Keep decisions minimal-sufficient (least-active-decisions): the only pinned
@@ -102,6 +102,9 @@ and the tile-table data shape (§3.4). Everything else is DEFERRED (§6).
   from legacy cistern.el:785).
 - Rendering is a pure function of state; the timer only calls
   `cistern-tick` + render.
+- The driver owns one timer-handle defvar (`cistern--auto-run-timer`) as a
+  documented exception: timer plumbing, never game state — it never enters
+  `cistern-st`.
 - Tests require only `cistern-domain.el` + `cistern-game.el` and run with
   `emacs --batch`.
 
@@ -109,10 +112,13 @@ and the tile-table data shape (§3.4). Everything else is DEFERRED (§6).
 
 One state object (legacy pattern retained): `cistern-st` holds map vector,
 toilets/tanks hashes, creators, alloy/tick/contam/over, log, cursor, RNG,
-counters, tutorial index, and new: score/objectives/unlock fields (shape
+count, tutorial index, and new: score/objectives/unlock fields (shape
 deferred to REWARDS-DESIGN consumption, §6). Cursor is in state so mouse
-and keys mutate the same thing. Seed drives procgen too (R3) — map variety
-comes from the seed, not from hardcode.
+and keys mutate the same thing; an `armed-verb` field carries the currently
+armed build verb for click-to-place. Seed drives procgen too (R3) — map
+variety comes from the seed, not from hardcode. The rewards-owned state
+shape (including REWARDS-DESIGN §4's particle field) is consumed from
+`docs/REWARDS-DESIGN.md` in Phase 4b.
 
 ---
 
@@ -156,16 +162,18 @@ scenario where the same seed's need is served with contamination staying 0.
 
 **R5 — Rewards & engagement (owner R5c).** Score, objectives, unlocks, and
 "dancing pixels" celebration feedback are implemented **as a consumer of
-`rewards-design/REWARDS-DESIGN.md`** (does not exist yet; see §6). The
-interface the rewrite commits to today: REWARDS-DESIGN supplies a
-declarative spec of (a) score computation, (b) objective list with
-predicates over state, (c) unlock conditions, (d) celebration trigger
-conditions and intensity. `cistern-game.el` exposes `cistern--rewards-eval`
-(state) → rewards outcome; the view renders celebrations.
+`docs/REWARDS-DESIGN.md`** (landed in-repo; its §2 MUST table, §4
+dancing-pixels spec, and §5 integration contract are binding acceptance
+criteria). `cistern-game.el` exposes `cistern--rewards-eval` with the
+doc's §5 signature — (state, tick events) → (updated state, presentation
+intents). The placeholder default outcome
+`(:score 0 :objectives nil :unlocks nil :celebrate nil)` with empty
+presentation intents is pinned for the Phase 2 green test; the doc's rules
+re-shape the outcome in Phase 4b. The view renders celebrations.
 *Accept:* placeholder test asserts `cistern--rewards-eval` exists, returns
-the documented empty/default outcome for a fresh state, and that
-REWARDS-DESIGN.md, when present, can be loaded and drives the outcome
-(failing until the designer doc lands).
+the default outcome for a fresh state (green in Phase 2), and a second
+consumption test asserts the doc drives a non-default outcome —
+intentionally red until Phase 4b.
 
 **R6 — Exactly one tick per action; auto-run toggle (owner R6).**
 `cistern-run-10` is removed. SPACE/RET/click-with-verb advance exactly one
@@ -187,9 +195,12 @@ renders with the isolated one; legality test asserts each (kind, cell-kind)
 pair returns a documented verdict from the placement-legality rule.
 
 **R8 — Demolish verb (owner R5a).** New verb `demolish` removes a placed
-pipe, toilet, or tank (not walls/doors/ore/gate), refunds nothing (or a
-documented fraction — deferred to REWARDS-DESIGN), costs alloy, kills
-connection state of the removed piece, and is distinct from decon.
+pipe, toilet, or tank (not walls/doors/ore/gate), costs the
+implementation-seed constant `cistern-cost-demolish` (3; final pricing
+DEFERRED to REWARDS-DESIGN), kills connection state of the removed piece,
+and is distinct from decon. Phase 2 ships no refund; the refund contract
+is designed by REWARDS-DESIGN M1 (50%) and consumed in Phase 4b on top of
+R8's removal mechanics.
 *Accept:* headless test places a tank, demolishes it, asserts cell back to
 floor, tank hash entry gone, alloy reduced by demolish cost, and toilets
 that were fed through it become unusable.
@@ -266,12 +277,17 @@ have to re-discover.
 
 ## 6. Deferred decisions (explicitly not pinned now)
 
-- **REWARDS-DESIGN.md consumption (R5):** score formula, objective list,
-  unlock tree, celebration intensity/pixels choreography — all owned by the
-  designer workstream (`rewards-design/`, currently only NOTES.md). The
-  rewrite pins only the consumption interface (`cistern--rewards-eval`)
-  and fails a placeholder test until the doc exists.
-- Demolish refund economics (exact refund fraction, demolish cost value).
+- **REWARDS-DESIGN.md consumption (R5):** the doc is landed in-repo at
+  `docs/REWARDS-DESIGN.md` and owns the rewards design: score formula,
+  goal cards, reputation, milestone ladder, celebration/particle field
+  (§4), and its own §6 deferrals (pricing, difficulty values, copy). The
+  rewrite pins only the consumption interface (`cistern--rewards-eval` §5
+  signature) and the Phase 2 default-outcome plist; 4b consumption may
+  re-shape per the doc. Terminology: the doc's in-map "coins" are the
+  sim's alloy — one currency, two names.
+- Demolish final pricing. The implementation-seed cost constant (3) is
+  pinned for testability; the refund fraction is designed (REWARDS-DESIGN
+  M1, 50%) and lands in 4b, not Phase 2.
 - Sprite/image-based rendering (SVG tiles) vs text glyphs — text glyphs
   assumed; revisit only if REWARDS-DESIGN demands richer celebration
   visuals.
