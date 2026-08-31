@@ -9,15 +9,17 @@
 | /home/bricker/Projects/cistern-share/cistern-2.0.0/DESIGN.md | legacy/cistern-share/cistern-2.0.0/DESIGN.md | v2 design notes: principles and how each became code |
 | /home/bricker/Projects/cistern-share/cistern-2.0.0/screenshot.png | legacy/cistern-share/cistern-2.0.0/screenshot.png | Screenshot of v2 running in Emacs |
 | /home/bricker/Projects/cistern-share/cistern-2.0.0.zip | legacy/cistern-share/cistern-2.0.0.zip | Packaged release archive of v2.0.0 (same 4 files) |
+| /home/bricker/Projects/cistern-share/cistern-1.0.0/cistern.el | legacy/cistern-share/cistern-1.0.0/cistern.el | v1.0.0 game source (759 lines): earlier iteration with globals-heavy design |
+| /home/bricker/Projects/cistern-share/cistern-1.0.0/README.md | legacy/cistern-share/cistern-1.0.0/README.md | v1 README |
+| /home/bricker/Projects/cistern-share/cistern-1.0.0/DESIGN.md | legacy/cistern-share/cistern-1.0.0/DESIGN.md | v1 design notes |
+| /home/bricker/Projects/cistern-share/cistern-1.0.0.zip | legacy/cistern-share/cistern-1.0.0.zip | Packaged release archive of v1.0.0 |
 
 ## Duplicates NOT moved (left in place)
 
 | Path | Reason |
 |---|---|
-| /home/bricker/.emacs.d/lisp/cistern.el | Byte-identical copy of primary cistern.el; the installed/autoloaded copy referenced by init.el:620-621 — moving it would break the user's Emacs |
+| /home/bricker/.emacs.d/lisp/cistern.el | Kept in place: byte-identical to the primary cistern.el already in the repo, and the installed/autoloaded copy referenced by init.el:620-621 — moving it would break the user's Emacs |
 | /home/bricker/.emacs.d/lisp/cistern.elc | Byte-compiled artifact of the above |
-| /home/bricker/Projects/cistern-share/cistern-1.0.0/ (cistern.el, README.md, DESIGN.md) | Older v1 release; superseded by v2 as primary (kept for history) |
-| /home/bricker/Projects/cistern-share/cistern-1.0.0.zip | Older v1 release archive |
 
 ## Notes
 
