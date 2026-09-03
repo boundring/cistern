@@ -225,6 +225,291 @@ Returns hash (X . Y) -> distance.  The seed is included regardless."
                         cistern-tank-cap))
                   (cistern--connected-tanks st x y)))))
 
+(defun cistern--free-usable-toilets (st)
+  (let ((out nil))
+    (maphash (lambda (k _v)
+               (when (cistern--toilet-usable-p st (car k) (cdr k))
+                 (push k out)))
+             (cistern-st-toilets st))
+    (sort out (lambda (a b) (< (car a) (car b))))))
+
+(defun cistern--walkable-p (st x y tx ty)
+  "Is (X,Y) enterable by a worker walking to target (TX,TY)?
+Table-passable cells always.  A toilet only when it is the target:
+entering a toilet IS seating yourself.  Toilets are rooms, not floors."
+  (let ((kind (cistern--cell st x y)))
+    (or (cistern--tile-passable-p kind)
+        (and (eq kind 'toilet) (= x tx) (= y ty)))))
+
+(defun cistern--occupied-cells (st except)
+  "Hash of cells blocked by other workers."
+  (let ((h (make-hash-table :test #'equal)))
+    (dolist (c (cistern-st-creators st))
+      (unless (eq c except)
+        (puthash (cons (cistern--worker-x c) (cistern--worker-y c)) t h)))
+    h))
+
+(defun cistern--dist-from (st tx ty blocked &optional always st-x st-y)
+  "Distance map from (TX,TY).  ALWAYS is a cell kept passable
+(a worker may always stand on / leave their own tile)."
+  (cistern--flood st tx ty
+                  (lambda (x y)
+                    (or (and always (= x st-x) (= y st-y))
+                        (and (not (gethash (cons x y) blocked))
+                             (cistern--walkable-p st x y tx ty))))))
+
+;; ---------------------------------------------------------------------------
+;; 5. Worker lifecycle (cistern.el:236-258).
+
+(defun cistern--worker-glyph (st w)
+  (let ((i (or (cl-position w (cistern-st-creators st) :test #'eq) 0)))
+    (aref cistern--worker-glyphs (mod i (length cistern--worker-glyphs)))))
+
+(defun cistern--spawn-worker (st x y)
+  (let ((w (cistern--worker-make :x x :y y :bladder 20)))
+    (setf (cistern-st-creators st)
+          (append (cistern-st-creators st) (list w)))
+    (setf (cistern-st-migrants st) (1+ (cistern-st-migrants st)))
+    w))
+
+;; ---------------------------------------------------------------------------
+;; 6. Simulation behavior — seek/step/shuffle and the four phases
+;; (cistern.el:262-493; tutorial hook moved to the game layer, Phase 2).
+
+(defun cistern--seek-work (st w)
+  (let* ((x (cistern--worker-x w)) (y (cistern--worker-y w)))
+    (if (eq (cistern--cell st x y) 'ore)
+        (progn
+          (setf (cistern--worker-mine w) (1+ (cistern--worker-mine w)))
+          (when (>= (cistern--worker-mine w)
+                    (if (> (cistern--worker-sick w) 0) 6 3))
+            (setf (cistern--worker-mine w) 0)
+            (setf (cistern-st-alloy st) (1+ (cistern-st-alloy st)))
+            (setf (cistern-st-earned st) (1+ (cistern-st-earned st)))))
+      (let ((ore nil) (i 0))
+        (while (< i (length (cistern-st-map st)))
+          (when (eq (aref (cistern-st-map st) i) 'ore)
+            (push (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st))) ore))
+          (cl-incf i))
+        (setq ore (nreverse ore))
+        (let ((best nil) (bd nil))
+          (dolist (o ore)
+            (let* ((blocked (cistern--occupied-cells st w))
+                   (d (gethash (cons x y)
+                               (cistern--dist-from st (car o) (cdr o)
+                                                   blocked 'always x y))))
+              (when (and d (or (null bd) (< d bd)))
+                (setq bd d best o))))
+          (if best
+              (cistern--step-toward st w (car best) (cdr best))
+            (cistern--shuffle st w)))))))
+
+(defun cistern--step-toward (st w tx ty)
+  "One step toward (TX,TY) using the BFS gradient.  Seats the
+worker if the step lands them on a toilet target.  Updates the
+occupancy grid so two workers can never share a tile."
+  (let* ((x (cistern--worker-x w))
+         (y (cistern--worker-y w))
+         (blocked (cistern--occupied-cells st w))
+         (dist (cistern--dist-from st tx ty blocked 'always x y))
+         (d0 (gethash (cons x y) dist)))
+    (when (and d0 (> d0 0))
+      (let (best)
+        (dolist (n (cistern--neighbors st x y))
+          (let ((dd (gethash n dist)))
+            (when (and dd (= dd (1- d0))
+                       (not (gethash n blocked))
+                       (not best))
+              (setq best n))))
+        (when best
+          (setf (cistern--worker-x w) (car best))
+          (setf (cistern--worker-y w) (cdr best))
+          (when (and (eq (cistern--cell st (car best) (cdr best)) 'toilet)
+                     (= (car best) tx) (= (cdr best) ty)
+                     (>= (cistern--worker-bladder w) cistern-bladder-seek))
+            ;; stepping onto the target toilet = seating
+            (puthash best (list :busy t) (cistern-st-toilets st))
+            (setf (cistern--worker-using w) t)
+            (setf (cistern--worker-use-t w) cistern-use-ticks)
+            (setf (cistern--worker-toilet w) best))
+          t)))))
+
+(defun cistern--shuffle (st w)
+  (let* ((x (cistern--worker-x w))
+         (y (cistern--worker-y w))
+         (ns (cl-remove-if
+              (lambda (n)
+                (or (not (cistern--tile-passable-p
+                          (cistern--cell st (car n) (cdr n))))
+                    (gethash n (cistern--occupied-cells st w))))
+              (cistern--neighbors st x y))))
+    (when ns
+      (let ((n (nth (cistern--rand st (length ns)) ns)))
+        (setf (cistern--worker-x w) (car n))
+        (setf (cistern--worker-y w) (cdr n))))))
+
+(defun cistern--finish-use (st w)
+  "Release the toilet, zero the bladder, deposit waste upstream.
+The released cell is the worker's OWN recorded toilet cell — the
+bug class where plumbing state pointed elsewhere cannot exist."
+  (let* ((tp (cistern--worker-toilet w))
+         (x (cistern--worker-x w))
+         (y (cistern--worker-y w)))
+    (setf (cistern--worker-using w) nil)
+    (setf (cistern--worker-bladder w) 0)
+    (setf (cistern--worker-toilet w) nil)
+    (when tp
+      (puthash tp (list :busy nil) (cistern-st-toilets st)))
+    (let ((tanks (cistern--connected-tanks st (cistern--worker-x w)
+                                            (cistern--worker-y w))))
+      (if (null tanks)
+          (progn
+            (cistern--add-hazard st x y)
+            (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
+            (cistern--log st "SEVERED LINE AT (%d,%d) — WASTE SPILLED" x y))
+        (let ((best (car tanks)))
+          (dolist (tk tanks)
+            (when (< (plist-get (gethash tk (cistern-st-tanks st)) :load)
+                     (plist-get (gethash best (cistern-st-tanks st)) :load))
+              (setq best tk)))
+          (puthash best
+                   (list :load (+ cistern-use-load
+                                  (plist-get (gethash best
+                                                        (cistern-st-tanks st))
+                                             :load)))
+                   (cistern-st-tanks st)))))))
+
+(defun cistern--add-hazard (st x y)
+  "Contaminate (X,Y) if it is floor.  Everything else — ore,
+pipe, toilet, tank, wall — is a firebreak by rule: the resource
+base can never be destroyed by unserved need."
+  (when (and (cistern--in-bounds-p st x y)
+             (eq (cistern--cell st x y) 'floor))
+    (cistern--set-cell st x y 'hazard)
+    t))
+
+(defun cistern--accident (st w)
+  (let ((x (cistern--worker-x w)) (y (cistern--worker-y w)))
+    (setf (cistern--worker-bladder w) 0)
+    (or (cistern--add-hazard st x y)
+        (catch 'placed
+          (dolist (n (cistern--neighbors st x y))
+            (when (and (cistern--add-hazard st (car n) (cdr n))
+                       (not (gethash n (cistern--occupied-cells st w))))
+              (throw 'placed t)))))
+    (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
+    (dolist (n (cistern--neighbors st x y))
+      (dolist (o (cistern-st-creators st))
+        (when (and (not (eq o w))
+                   (= (cistern--worker-x o) (car n))
+                   (= (cistern--worker-y o) (cdr n)))
+          (setf (cistern--worker-sick o) cistern-sick-ticks))))
+    (cistern--log st "BREACH — CREATOR %s OVERFLOWED AT (%d,%d)"
+                  (cistern--worker-glyph st w) x y)))
+
+(defun cistern--seek-toilet (st w)
+  (let* ((x (cistern--worker-x w))
+         (y (cistern--worker-y w))
+         (here (cons x y))
+         (tp (cistern--worker-toilet w)))
+    (cond
+     ;; already seated on our own toilet
+     ((and tp (cistern--worker-using w)) nil)
+     ;; standing ON a free usable toilet: seat
+     ((and (eq (cistern--cell st x y) 'toilet)
+           (cistern--toilet-usable-p st x y))
+      (puthash here (list :busy t) (cistern-st-toilets st))
+      (setf (cistern--worker-using w) t)
+      (setf (cistern--worker-use-t w) cistern-use-ticks)
+      (setf (cistern--worker-toilet w) here))
+     (t
+      (let ((best nil) (bd nil))
+        (dolist (cand (cistern--free-usable-toilets st))
+          (let* ((blocked (cistern--occupied-cells st w))
+                 (d (gethash (cons x y)
+                             (cistern--dist-from st (car cand) (cdr cand)
+                                                 blocked 'always x y))))
+            (when (and d (or (null bd) (< d bd)))
+              (setq bd d best cand))))
+        (if best
+            (cistern--step-toward st w (car best) (cdr best))
+          (cistern--seek-work st w)))))))
+
+(defun cistern--phase-creators (st)
+  (dolist (w (copy-sequence (cistern-st-creators st)))
+      (if (cistern--worker-using w)
+          (progn
+            (setf (cistern--worker-use-t w)
+                  (1- (cistern--worker-use-t w)))
+            (when (<= (cistern--worker-use-t w) 0)
+              (cistern--finish-use st w)))
+        ;; sickness costs productivity, never mobility: a sick worker
+        ;; still reaches toilets in time but mines at half rate
+        (when (> (cistern--worker-sick w) 0)
+          (setf (cistern--worker-sick w) (1- (cistern--worker-sick w))))
+        (setf (cistern--worker-bladder w)
+              (+ cistern-bladder-rate (cistern--worker-bladder w)))
+        (cond
+         ((>= (cistern--worker-bladder w) cistern-bladder-burst)
+          (cistern--accident st w))
+         ((>= (cistern--worker-bladder w) cistern-bladder-seek)
+          (cistern--seek-toilet st w))
+         (t (cistern--seek-work st w))))))
+
+(defun cistern--phase-hazards (st)
+  "Spread and decay.  Spread 3%% onto clean floor (never onto a
+worker); decay 2%% back to floor.  Contamination is pressure, not
+permanent scarring: stop bleeding and the marks fade."
+  (let ((hs nil) (i 0))
+    (while (< i (length (cistern-st-map st)))
+      (when (eq (aref (cistern-st-map st) i) 'hazard)
+        (push (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st))) hs))
+      (cl-incf i))
+    (setq hs (nreverse hs))
+    (dolist (h hs)
+      (let ((roll (cistern--rand st 100)))
+        (cond
+         ((< roll cistern-spread-pct)
+          (let* ((cands (cl-remove-if
+                         (lambda (n)
+                           (or (not (eq (cistern--cell st (car n) (cdr n))
+                                        'floor))
+                               (gethash n (cistern--occupied-cells st nil))))
+                         (cistern--neighbors st (car h) (cdr h)))))
+            (when cands
+              (let ((n (nth (cistern--rand st (length cands)) cands)))
+                (cistern--add-hazard st (car n) (cdr n))))))
+         ((< roll (+ cistern-spread-pct cistern-decay-pct))
+          (cistern--set-cell st (car h) (cdr h) 'floor)))))))
+
+(defun cistern--phase-migration (st)
+  (when (and (> (cistern-st-tick st) 0)
+             (= 0 (% (cistern-st-tick st) cistern-migrant-every))
+             (< (length (cistern-st-creators st)) cistern-pop-cap))
+    (if (and (eq (cistern--cell st 1 7) 'floor)
+             (not (gethash (cons 1 7) (cistern--occupied-cells st nil))))
+        (progn
+          (cistern--spawn-worker st 1 7)
+          (cistern--log st "MIGRANT ENTERED SECTOR — POPULATION %d"
+                        (length (cistern-st-creators st))))
+      (cistern--log st "MIGRANT WAITS AT THE GATE"))))
+
+(defun cistern--phase-check (st)
+  (when (and (not (cistern-st-over st))
+             (>= (cistern-st-contam st) cistern-contam-limit))
+    (setf (cistern-st-over st) "SECTOR CONDEMNED — CONTAMINATION LIMIT")
+    (cistern--log st (cistern-st-over st))))
+
+(defun cistern--sim-tick (st)
+  "One full simulation tick: creators, hazards, migration, check.
+Exactly the four domain phases; the tutorial hook is added by the
+game layer (Phase 2)."
+  (setf (cistern-st-tick st) (1+ (cistern-st-tick st)))
+  (cistern--phase-creators st)
+  (cistern--phase-hazards st)
+  (cistern--phase-migration st)
+  (cistern--phase-check st))
+
 (defun cistern--new-game (&optional seed)
   "Build fresh state.  SEED (integer) makes the run reproducible."
   (let ((st (make-cistern-st)))
@@ -236,17 +521,6 @@ Returns hash (X . Y) -> distance.  The seed is included regardless."
     (setf (cistern-st-migrants st) 0)
     (cistern--log st "SECTOR-7 ONLINE — KEEP THE WATER MOVING")
     st))
-
-;; ---------------------------------------------------------------------------
-;; 4b. Movement rules consult the tile table.
-
-(defun cistern--walkable-p (st x y tx ty)
-  "Is (X,Y) enterable by a worker walking to target (TX,TY)?
-Table-passable cells always.  A toilet only when it is the target:
-entering a toilet IS seating yourself.  Toilets are rooms, not floors."
-  (let ((kind (cistern--cell st x y)))
-    (or (cistern--tile-passable-p kind)
-        (and (eq kind 'toilet) (= x tx) (= y ty)))))
 
 (provide 'cistern-domain)
 ;;; cistern-domain.el ends here

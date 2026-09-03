@@ -102,3 +102,31 @@ One entry per dead/failed/retried run.
   (`--walkable-p` consumers, occupancy, seek/step/shuffle) and the four
   phases; re-use `cistern--flood` as-is (single primitive, already
   landed).
+
+---
+
+## L-005 (2026-09-03, run: impl-phase1 — Pair 4, R9 domain tick headless)
+
+- Attempt: Red test `tests/domain-tick.el :: cistern-test-tick-headless`
+  (red commit; red run: `Symbol's function definition is void:
+  cistern--sim-tick`). Green = verbatim port of worker lifecycle
+  (:236-258), occupancy/dist-from/free-usable-toilets (:149-195),
+  seek/step/shuffle/finish-use/add-hazard/accident (:262-420), four
+  phases (:422-485), and `cistern--sim-tick` (:487-493 minus the
+  tutorial hook). One RETRY inside the cycle: the apply-patch insertion
+  landed the sim block after `cistern--toilet-usable-p`, duplicating
+  `cistern--walkable-p` (Pair 2 already created the table-driven one) and
+  leaving a stale trailing section; duplicate deleted before first run.
+- Outcome: GREEN (tick counter = 1 after one `cistern--sim-tick`, = 21
+  after 21; map-integrity regression re-run green).
+- Evidence: batch `emacs -Q --batch -l src/cistern-domain.el -l
+  tests/domain-tick.el -f cistern-test-tick-headless` exited 0, silent.
+- Lesson: growing one file across five pairs makes duplicate-definition
+  drift the top mechanical hazard — before committing, `grep '^defun'`
+  for duplicates. Second: the tutorial hook's removal is clean because
+  the phase list is explicit in `cistern--sim-tick`; keep it that way in
+  Phase 2 (game layer wraps, domain never references tutorial state).
+- Change for next attempt: Pair 5 must exercise determinism over the NEW
+  procgen maps (not the legacy hardcoded layout) — sorted hash outputs
+  already in place (`--connected-tanks`, `--free-usable-toilets`); audit
+  any new hash iteration for state-affecting order.
