@@ -31,6 +31,35 @@
 (defconst cistern--worker-glyphs ["α" "β" "γ" "δ" "ε" "ζ" "η" "θ"])
 
 ;; ---------------------------------------------------------------------------
+;; 1b. Reference tile table — the SOLE source for glyph choice and
+;; passability (R3b).  Exactly the legacy kinds; shape pinned in plan 01
+;; §1.3.  :conn is data-only for now; per-connection-state glyph choices
+;; are the Phase 3 view's job (R7).
+
+(defconst cistern--tile-table
+  '((floor  :glyph "·" :passable t   :buildable t   :firebreak nil :conn nil)
+    (wall   :glyph "▓" :passable nil :buildable nil :firebreak t   :conn nil)
+    (door   :glyph "+" :passable t   :buildable nil :firebreak t   :conn nil)
+    (ore    :glyph "◆" :passable t   :buildable nil :firebreak t   :conn nil)
+    (hazard :glyph "▒" :passable nil :buildable nil :firebreak nil :conn nil)
+    (pipe   :glyph "·" :passable t   :buildable nil :firebreak t   :conn nil)
+    (toilet :glyph "Ω" :passable nil :buildable nil :firebreak t   :conn nil)
+    (tank   :glyph "▣" :passable nil :buildable nil :firebreak t   :conn nil))
+  "One entry per cell kind.  No cell-kind pcase/case may exist
+outside this table (the connection-dependent pipe glyph is computed
+by the view, not here).")
+
+(defun cistern--tile (kind) (cdr (assq kind cistern--tile-table)))
+
+(defun cistern--tile-glyph (kind)
+  "Glyph for KIND, resolved through the tile table."
+  (plist-get (cistern--tile kind) :glyph))
+
+(defun cistern--tile-passable-p (kind)
+  "Passability for KIND, resolved through the tile table."
+  (plist-get (cistern--tile kind) :passable))
+
+;; ---------------------------------------------------------------------------
 ;; 2. State — one object, threaded everywhere.
 
 (cl-defstruct (cistern--worker (:constructor cistern--worker-make))
@@ -89,6 +118,14 @@
 
 (defconst cistern--procgen-spawns '((12 6) (14 7) (11 9) (15 6)))
 
+(defun cistern--procgen-place (st x y kind)
+  "Table-validated placement of KIND at (X,Y): allowed only
+in-bounds and where the current cell's table entry says :buildable."
+  (when (and (cistern--in-bounds-p st x y)
+             (plist-get (cistern--tile (cistern--cell st x y)) :buildable))
+    (cistern--set-cell st x y kind)
+    t))
+
 (defun cistern--gen-map (st seed)
   "Fill ST with a seed-generated sector.  Same SEED ⇒ same map,
 plumbing hashes, and LCG residue."
@@ -123,7 +160,7 @@ plumbing hashes, and LCG residue."
     (dotimes (_ n)
       (let ((x (+ 2 (cistern--rand st (- cistern-w 4))))
             (y (+ 2 (cistern--rand st (- cistern-h 4)))))
-        (cistern--set-cell st x y 'ore))))
+        (cistern--procgen-place st x y 'ore))))
   ;; starter plumbing: tank (5,2) - pipe (4,2) - pipe (3,2) - toilet (3,3)
   (cistern--set-cell st 5 2 'tank)
   (cistern--set-cell st 4 2 'pipe)
@@ -143,6 +180,17 @@ plumbing hashes, and LCG residue."
     (setf (cistern-st-migrants st) 0)
     (cistern--log st "SECTOR-7 ONLINE — KEEP THE WATER MOVING")
     st))
+
+;; ---------------------------------------------------------------------------
+;; 4b. Movement rules consult the tile table.
+
+(defun cistern--walkable-p (st x y tx ty)
+  "Is (X,Y) enterable by a worker walking to target (TX,TY)?
+Table-passable cells always.  A toilet only when it is the target:
+entering a toilet IS seating yourself.  Toilets are rooms, not floors."
+  (let ((kind (cistern--cell st x y)))
+    (or (cistern--tile-passable-p kind)
+        (and (eq kind 'toilet) (= x tx) (= y ty)))))
 
 (provide 'cistern-domain)
 ;;; cistern-domain.el ends here

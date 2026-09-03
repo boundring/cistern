@@ -47,3 +47,28 @@ One entry per dead/failed/retried run.
   formalized in Pair 3).
 - Change for next attempt: all later signature checks (map hash in Pairs 3
   and 5) use `secure-hash` over printed content, never bare `sxhash`.
+
+---
+
+## L-003 (2026-09-03, run: impl-phase1 — Pair 2, R3 tile table sole source)
+
+- Attempt: Red test `tests/domain-tile-table.el :: cistern-test-table-sourcing`
+  (red commit; red run failed `Symbol's value as variable is void:
+  cistern--tile-table`), then green: `cistern--tile-table` defconst (pinned
+  shape, plist `(:glyph :passable :buildable :firebreak :conn)`),
+  `cistern--tile-glyph` / `cistern--tile-passable-p` accessors, procgen ore
+  placement and `cistern--walkable-p` routed through the table
+  (`cistern--procgen-place` added; the passability membership list died).
+- Outcome: GREEN on first implementation run; pair-1 test re-run green.
+- Evidence: batch `emacs -Q --batch -l src/cistern-domain.el -l
+  tests/domain-tile-table.el -f cistern-test-table-sourcing` exited silent;
+  red run output captured above.
+- Lesson: the pinned table shape survived first procgen contact with no
+  field added/renamed — `:buildable` was already anticipated by plan 01 and
+  sufficed for table-validated placement. The static no-pcase check reads
+  forms with `read` after stripping the table defconst, so comments and
+  strings can never false-positive.
+- Change for next attempt: plumbing membership (`memq '(toilet pipe tank)`,
+  needed by Pair 4's flood) is NOT expressible via the pinned table fields
+  without overloading `:conn`; keep it a list until R7 gives `:conn` its
+  real representation.
