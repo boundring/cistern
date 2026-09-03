@@ -148,6 +148,8 @@ Constraints: use cases never touch buffers/faces/keymaps — state in,
   DEFERRED); Phase 2 ships no refund — the refund contract is
   REWARDS-DESIGN M1 (50%), consumed in 4b. Red commit before green. No
   view/input/driver files; no legacy file edits.
+Commit policy (PROCESS-RETRO P2): one red commit + one green commit
+  per pair; FAILURE-LEDGER entry appended before or with each green.
 Done-when:
   - Demolish restores cell to floor, clears plumbing hash entry,
     costs alloy, downstream toilets become unusable; decon unchanged.

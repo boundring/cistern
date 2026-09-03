@@ -220,6 +220,10 @@ cycle. Expected failure sites:
 
 Precondition: Phase 1 landed (`src/cistern-domain.el`, all five pairs green).
 
+Commit policy (PROCESS-RETRO P2): one red commit + one green commit
+per pair; the FAILURE-LEDGER entry is appended before or with each
+green commit.
+
 ### 2.1 Red/green pairs, in order
 
 **Pair 1 — R8, demolish.**
