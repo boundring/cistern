@@ -14,7 +14,9 @@ Legacy map-hash pattern, cf. cistern.el:1028-1033."
              do (push (list c (% i (cistern-st-w st))
                             (/ i (cistern-st-w st)))
                       cells))
-    (sxhash (nreverse cells))))
+    ;; ponytail note: sxhash is depth-limited for lists and collides on
+    ;; long same-prefix lists; hash the printed structure instead.
+    (secure-hash 'md5 (prin1-to-string (nreverse cells)))))
 
 (defun cistern-test-procgen-variety ()
   "R3(a): >=5 seeds yield >=3 distinct layout signatures, and the
