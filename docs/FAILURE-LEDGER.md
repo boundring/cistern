@@ -72,3 +72,33 @@ One entry per dead/failed/retried run.
   needed by Pair 4's flood) is NOT expressible via the pinned table fields
   without overloading `:conn`; keep it a list until R7 gives `:conn` its
   real representation.
+
+---
+
+## L-004 (2026-09-03, run: impl-phase1 — Pair 3, map integrity across seeds)
+
+- Attempt: Red test `tests/domain-map-integrity.el ::
+  cistern-test-map-integrity-seeds` (red commit). Red run failed with
+  `Error: void-function (cistern--connected-tanks)` — the connectivity
+  half of the flood/connection block had not been ported yet (plan 01
+  schedules it under Pair 4's green, but this test asserts connectivity;
+  the minimal `cistern--flood` / `--connected-tanks` / `--toilet-usable-p`
+  port therefore landed in Pair 3's green). A second RETRY inside the
+  cycle: the test itself used `(cdr p)` on spawn lists `(12 6)` → `y=(6)`,
+  `wrong-type-argument number-or-marker-p (6)`; fixed to `(nth 1 p)`.
+  Green = reservation discipline (`cistern--procgen-reserved-p`: 4 spawn
+  cells + 4 starter chain cells, checked inside `cistern--procgen-place`
+  and door carves) + minimal connection port. All 5 seeds green.
+- Evidence: with reservation disabled via `cl-letf` probe, the pinned
+  seed set {20260830,1,2,3,4} produced ZERO spawn-on-wall hits — the
+  predicted "spawned-on-a-wall" contact bug is probabilistic (~13% across
+  these 5 seeds given spine x∈9..32 and cross y∈3..12), not certain.
+- Lesson: the invariant must hold by construction, not by the luck of the
+  pinned seed set — reservation guarantees it for any future seed and any
+  procgen re-tuning. Second lesson: tests are also run-death territory;
+  `(car/cdr)` vs `(nth)` on coordinate lists cost one retry — assert
+  helpers should unpack coordinates once.
+- Change for next attempt: Pair 4 ports the movement half
+  (`--walkable-p` consumers, occupancy, seek/step/shuffle) and the four
+  phases; re-use `cistern--flood` as-is (single primitive, already
+  landed).

@@ -44,9 +44,10 @@ cells (spawned-on-a-wall is the classic procgen/table contact bug)."
                  nil "seed %S: starter toilet unusable" seed)
       ;; every worker spawn cell is passable floor-family
       (dolist (p '((12 6) (14 7) (11 9) (15 6)))
-        (cl-assert (cistern--tile-passable-p (cistern--cell st (car p) (cdr p)))
+        (cl-assert (cistern--tile-passable-p
+                     (cistern--cell st (nth 0 p) (nth 1 p)))
                    nil "seed %S: spawn %S sits on %S"
-                   seed p (cistern--cell st (car p) (cdr p)))))))
+                   seed p (cistern--cell st (nth 0 p) (nth 1 p)))))))
 
 (provide 'domain-map-integrity)
 ;;; domain-map-integrity.el ends here

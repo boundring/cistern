@@ -118,10 +118,18 @@ by the view, not here).")
 
 (defconst cistern--procgen-spawns '((12 6) (14 7) (11 9) (15 6)))
 
+(defun cistern--procgen-reserved-p (x y)
+  "Cells procgen must never overwrite: the four worker spawn
+cells and the starter plumbing chain."
+  (or (member (list x y) cistern--procgen-spawns)
+      (member (list x y) '((3 2) (4 2) (5 2) (3 3)))))
+
 (defun cistern--procgen-place (st x y kind)
   "Table-validated placement of KIND at (X,Y): allowed only
-in-bounds and where the current cell's table entry says :buildable."
+in-bounds, not on a reserved cell, and where the current cell's
+table entry says :buildable."
   (when (and (cistern--in-bounds-p st x y)
+             (not (cistern--procgen-reserved-p x y))
              (plist-get (cistern--tile (cistern--cell st x y)) :buildable))
     (cistern--set-cell st x y kind)
     t))
@@ -147,14 +155,17 @@ plumbing hashes, and LCG residue."
          (door1 (+ 2 (cistern--rand st (- cistern-h 4))))
          (door2 (+ 2 (cistern--rand st (- cistern-h 4)))))
     (cl-loop for y from 1 to (- cistern-h 2)
-             do (cistern--set-cell st sx y 'wall))
-    (cistern--set-cell st sx door1 'door)
-    (cistern--set-cell st sx door2 'door))
+             do (cistern--procgen-place st sx y 'wall))
+    (unless (cistern--procgen-reserved-p sx door1)
+      (cistern--set-cell st sx door1 'door))
+    (unless (cistern--procgen-reserved-p sx door2)
+      (cistern--set-cell st sx door2 'door)))
   ;; seed-driven cross wall y, spanning x=14..24, random door
   (let* ((cy (+ 3 (cistern--rand st (- cistern-h 6))))
          (cdoor (+ 15 (cistern--rand st 9))))
-    (cl-loop for x from 14 to 24 do (cistern--set-cell st x cy 'wall))
-    (cistern--set-cell st cdoor cy 'door))
+    (cl-loop for x from 14 to 24 do (cistern--procgen-place st x cy 'wall))
+    (unless (cistern--procgen-reserved-p cdoor cy)
+      (cistern--set-cell st cdoor cy 'door)))
   ;; seed-driven ore veins
   (let ((n (+ 2 (cistern--rand st 3))))
     (dotimes (_ n)
@@ -168,6 +179,51 @@ plumbing hashes, and LCG residue."
   (cistern--set-cell st 3 3 'toilet)
   (puthash (cons 3 3) (list :busy nil) (cistern-st-toilets st))
   (puthash (cons 5 2) (list :load 30) (cistern-st-tanks st)))
+
+;; ---------------------------------------------------------------------------
+;; 4c. Connection logic — ONE flood primitive serves pathing and
+;; connectivity (minimal port of cistern.el:124-195 needed by the
+;; integrity test; the movement half arrives with the tick phases).
+
+(defun cistern--flood (st sx sy pass-p)
+  "BFS distances from (SX,SY) over cells where (PASS-P X Y).
+Returns hash (X . Y) -> distance.  The seed is included regardless."
+  (let ((dist (make-hash-table :test #'equal))
+        (q (list (cons sx sy))))
+    (puthash (cons sx sy) 0 dist)
+    (while q
+      (let* ((cur (car q))
+             (d (gethash cur dist)))
+        (setq q (cdr q))
+        (dolist (n (cistern--neighbors st (car cur) (cdr cur)))
+          (when (and (not (gethash n dist))
+                     (funcall pass-p (car n) (cdr n)))
+            (puthash n (1+ d) dist)
+            (setq q (append q (list n)))))))
+    dist))
+
+(defun cistern--connected-tanks (st x y)
+  "Tanks reachable from the plumbing network containing (X,Y)."
+  (let ((seen (cistern--flood st x y
+                              (lambda (px py)
+                                (memq (cistern--cell st px py)
+                                      '(toilet pipe tank)))))
+        (tanks nil))
+    (maphash (lambda (k _)
+               (when (eq (cistern--cell st (car k) (cdr k)) 'tank)
+                 (push k tanks)))
+             seen)
+    (sort tanks (lambda (a b) (< (car a) (car b))))))
+
+(defun cistern--toilet-usable-p (st x y)
+  (let ((entry (gethash (cons x y) (cistern-st-toilets st))))
+    (and entry
+         (not (plist-get entry :busy))
+         (cl-some (lambda (tk)
+                    (<= (+ (plist-get (gethash tk (cistern-st-tanks st)) :load)
+                           cistern-use-load)
+                        cistern-tank-cap))
+                  (cistern--connected-tanks st x y)))))
 
 (defun cistern--new-game (&optional seed)
   "Build fresh state.  SEED (integer) makes the run reproducible."
