@@ -130,3 +130,40 @@ One entry per dead/failed/retried run.
   procgen maps (not the legacy hardcoded layout) — sorted hash outputs
   already in place (`--connected-tanks`, `--free-usable-toilets`); audit
   any new hash iteration for state-affecting order.
+
+---
+
+## L-006 (2026-09-03, run: impl-phase1 — Pair 5, determinism)
+
+- Attempt: Red test `tests/domain-determinism.el :: cistern-test-determinism`
+  (red commit `test: R9 failing — determinism`). RED RUN UNEXPECTEDLY
+  PASSED: same seed twice already gave identical map hash and identical
+  50-tick trajectory (alloy, contam, rng, full map, worker states). Per
+  protocol the premise was stopped and corrected before any green: the
+  test now also runs `cistern-test-determinism-order`, which builds two
+  logically identical states whose plumbing hashes are filled in opposite
+  insertion orders (the plan 01 §1.5 suspect: hash-iteration-order leaks)
+  and asserts identical trajectories. Two further in-cycle RETRYs were
+  test-machinery only: `sxhash`-style depth issue avoided (L-002 lesson
+  applied — secure-hash used from the start), but `equal<` does not exist
+  in Emacs 31.1 batch → replaced with an explicit key-less comparator;
+  the floor-triple scan originally required x=0 row starts (always border
+  wall) → fixed to `(% i w) <= w-3`.
+- Outcome: GREEN with NO implementation change — the verbatim port
+  inherited legacy determinism; the order-stressor also passes because
+  `cistern--connected-tanks` and `cistern--free-usable-toilets` sort
+  their maphash outputs and every other choice scans by index or uses
+  strict-< selection.
+- Evidence: batch runs of both entry functions exited 0 (silent); the
+  first red-run output was empty success, not a failure — recorded here
+  verbatim as the honest R10 deviation for this pair: the failing-first
+  ritual found no bug because none existed; the assert is retained as a
+  permanent tripwire (plus a second entry for insertion-order robustness).
+- Lesson: an expected-failure checkpoint can be green on arrival when the
+  green minimum is a faithful port of proven code — the roguelike-agentic
+  move is to strengthen the probe until it discriminates (here: state
+  equivalence under opposite hash fill orders), then keep it. Do not
+  manufacture a bug to satisfy the ritual.
+- Change for next attempt: Phase 2 adds verbs (hash mutation via
+  remhash/puthash); any new maphash iteration whose order feeds state
+  must sort or index-scan — this tripwire pair will catch violations.
