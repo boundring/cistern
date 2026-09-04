@@ -31,7 +31,8 @@
     cistern-test-r2-keymap
     cistern-test-r1-click
     cistern-test-r6-timer
-    cistern-test-r7-glyph))
+    cistern-test-r7-glyph
+    cistern-test-r5-hook))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
