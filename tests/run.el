@@ -13,7 +13,7 @@
   (load (expand-file-name "src/cistern-domain.el" root) nil t)
   (load (expand-file-name "src/cistern-game.el" root) nil t)
   (dolist (f (directory-files (expand-file-name "tests" root)
-                              t "\\(domain\\|game\\)-.*\\.el\\'"))
+                              t "\\(domain\\|game\\|test\\)-.*\\.el\\'"))
     (load f nil t)))
 
 (defvar cistern-test-entries
@@ -27,7 +27,8 @@
     cistern-test-exactly-one-tick
     cistern-test-rewards-default
     cistern-test-cursor-and-click
-    cistern-test-legacy-verb-blocks))
+    cistern-test-legacy-verb-blocks
+    cistern-test-r2-keymap))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
