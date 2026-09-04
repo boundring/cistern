@@ -11,6 +11,7 @@
 (require 'cl-lib)
 (require 'cistern-game)
 (require 'cistern-input)
+(require 'cistern-view)
 
 (defconst cistern-version "3.0.0-dev")
 
@@ -27,6 +28,7 @@
     (define-key m (kbd "<down>") #'cistern-cursor-south)
     (define-key m (kbd "<left>") #'cistern-cursor-west)
     (define-key m (kbd "<right>") #'cistern-cursor-east)
+    (define-key m (kbd "<mouse-1>") #'cistern-click)
     (define-key m "t" #'cistern-build-toilet)
     (define-key m "p" #'cistern-build-pipe)
     (define-key m "K" #'cistern-build-tank)
@@ -81,13 +83,25 @@
 (defun cistern-cursor-east ()
   (interactive) (cistern-input-cursor-move cistern--st 'east))
 
+(defun cistern-click (event)
+  "Mouse-1 on a grid cell: translate buffer coordinates to (x,y)
+via the pure view geometry, then call the input adapter (unarmed =
+cursor move, no tick; armed = place at the cell + one tick)."
+  (interactive "@e")
+  (let ((xy (save-excursion
+              (goto-char (posn-point (event-start event)))
+              (cistern-view--cell-at
+               cistern--st (line-number-at-pos (point))
+               (current-column)))))
+    (when xy
+      (cistern-input-click cistern--st (car xy) (cdr xy)))))
+
 (defun cistern--arm-and-build (kind)
-  "Arm KIND in state and build it at the cursor (Pinned D3: the
-keyboard build keys keep the legacy at-cursor flow while arming the
-verb for click-to-place).  Arming has no use case in the game layer
-yet — this thin setter is driver-owned until the click adapter
-formalizes `cistern-input-arm-verb' (Pair 2)."
-  (setf (cistern-st-armed-verb cistern--st) kind)
+  "Arm KIND via the input adapter (use-case `cistern--cmd-arm-verb',
+the single arming site per L-010 pin 4) and build it at the cursor
+(Pinned D3: the keyboard build keys keep the legacy at-cursor flow
+while arming the verb for click-to-place)."
+  (cistern-input-arm-verb cistern--st kind)
   (cistern--cmd-build cistern--st kind
                       (car (cistern-st-cursor cistern--st))
                       (cdr (cistern-st-cursor cistern--st))))

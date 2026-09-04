@@ -147,6 +147,13 @@ is untouched.  The keymap half that arms verbs is Phase 3."
         (setf (cistern-st-armed-verb st) nil)
         (cistern--do-tick st)))))
 
+(defun cistern--cmd-arm-verb (st verb)
+  "Arm the build VERB in state (R1 keymap half; L-010 pin 4 — the
+armed verb is set/cleared BY USE-CASES: this sets it, cmd-click
+clears it on placement).  No arming setter may exist in the driver
+or adapter layers (L-013: no second arming site)."
+  (setf (cistern-st-armed-verb st) verb))
+
 (defun cistern--cmd-decon (st x y)
   "Clean a hazard tile (cistern.el:527-538 verbatim semantics:
 hazard tiles ONLY — R8 keeps demolish distinct from decon)."

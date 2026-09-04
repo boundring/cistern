@@ -468,3 +468,58 @@ One entry per dead/failed/retried run.
   only mapping); when `cistern-input-arm-verb` lands, migrate the
   driver's `cistern--arm-and-build` onto it (thin setter → adapter
   call) instead of keeping two arming sites.
+
+---
+
+## L-014 (2026-09-04, run: impl-phase3 — Pair 2, R1 mouse click)
+
+- Attempt: Red test `tests/test-r1-click.el :: cistern-test-r1-click`
+  (red commit `1d3423a`; red run: `void-function cistern-input-click`,
+  exit 255). Green = `cistern-input-click`/`cistern-input-arm-verb` in
+  the input adapter (both one-line delegations to use cases),
+  `cistern--cmd-arm-verb` in the game layer (L-013's queued arming
+  migration: arming is now a use-case call — L-010 pin 4; the driver's
+  Pair-1 thin setter is GONE, `cistern--arm-and-build` routes through
+  the adapter, and the R1 test grep-pins that src/cistern.el contains
+  no setter and no direct `cistern--cmd-click` bypass), the driver
+  mouse half (`<mouse-1>` bound in `cistern-mode-map` to
+  `cistern-click`, which translates the event via the pure
+  `cistern-view--cell-at` then calls the adapter), and the Pair-2
+  slice of `src/cistern-view.el` (geometry only; glyph projection
+  stays Pair 4).
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el -f
+  cistern-run-all-tests`: ALL 13 TESTS PASSED, exit 0. R2 regression
+  standalone re-run green. R9 gate re-run: non-comment grep clean on
+  domain/game; batch full tick OK (`R9-TICK-OK tick=1`).
+- Evidence: red run above (exit 255); green runs `R1-CLICK-OK` (exit
+  0) and `R2-STILL-OK`; full suite `ALL 13 TESTS PASSED` (exit 0).
+- Pinned readings:
+  1. `cistern-view--cell-at` takes (st line col), not the plan's
+     "(line col)" — bounds-clamping needs the state's w/h, and an
+     unarmed out-of-map click must be refused (cmd-click sets the
+     cursor unchecked), not land the cursor off-grid. Plan signature
+     amended accordingly; documented in the file header.
+  2. `<mouse-1>` binds directly in `cistern-mode-map` per the pair
+     directive, superseding plan 02 §2's separate
+     `cistern-mode-mouse-map` defvar (one map, one place; the plan's
+     separate map bought nothing).
+  3. Clicks outside the map (header/log lines) are ignored by the
+     handler (`when xy`), not cursor-moved.
+  4. The handler's buffer-coordinate source is
+     `posn-point` → `line-number-at-pos` + `current-column` under
+     `truncate-lines`; glyph display-width quirks (ambiguous-width
+     unicode columns) are a known ceiling — revisit only if real
+     clicks land a cell off by columns (ponytail note in cistern.el).
+  5. Adapter `cistern-input-arm-verb` arms only; the keyboard
+     build-at-cursor half of D3 stays in the driver command (adapter
+     translates, it does not bundle two use-case calls).
+- Lesson: the arming migration was cheap precisely because L-013 had
+  queued it as a named change-for-next-attempt with the target shape
+  (use-case + adapter + no second site) pinned in advance — the green
+  diff had no design decisions left to make mid-flight.
+- Change for next attempt: Pair 3's auto-run toggle must read
+  `cistern--st` ONLY inside its timer callback (D1's single
+  exception); the toggle function itself takes st like every other
+  adapter entry. Pair 4's render must keep `cistern-view--header-lines`
+  truthful — the geometry helper and the render share that constant,
+  so the first render is where a drifted origin would surface.

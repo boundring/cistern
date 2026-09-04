@@ -18,5 +18,16 @@ delegating to the cursor-move use case (up/down/left/right)."
                          ('west 'left)
                          ('east 'right))))
 
+(defun cistern-input-click (st x y)
+  "A click at grid cell (X,Y): delegate to the click use case —
+unarmed the cursor moves (no tick); armed the verb places at the
+cell and exactly one tick advances (R6)."
+  (cistern--cmd-click st x y))
+
+(defun cistern-input-arm-verb (st verb)
+  "Arm the build VERB via the arming use case — the single arming
+site (L-010 pin 4, L-013 migration)."
+  (cistern--cmd-arm-verb st verb))
+
 (provide 'cistern-input)
 ;;; cistern-input.el ends here
