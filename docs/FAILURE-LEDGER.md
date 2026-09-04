@@ -241,3 +241,45 @@ One entry per dead/failed/retried run.
 - Change for next attempt: later src/-tree static checks (R2 hjkl grep,
   R9 layer checks) use the same load-time-root defconst pattern, and
   src/ prose never quotes the forbidden symbol.
+
+---
+
+## L-009 (2026-09-04, run: impl-phase2 — Pair 3, R5 rewards placeholder)
+
+- Attempt: Red tests `tests/game-rewards.el ::
+  cistern-test-rewards-default` and `tests/game-rewards-consumption.el
+  :: cistern-test-rewards-consumption` (red commit `62d4a69`; red runs:
+  `cl-assertion-failed (fboundp 'cistern--rewards-eval)` and
+  `Symbol's function definition is void: cistern--rewards-eval`).
+  Green = `cistern--rewards-eval` placeholder in `src/cistern-game.el`
+  returning (state unchanged, default outcome plist verbatim, empty
+  intents) as a 3-list; a defconst pins the default outcome; NO
+  consumption logic (goal cards, milestones, reputation, particles)
+  pre-built — least-active-decisions.
+- Registration decision (planned deviation, documented per plan 01
+  §2.1 Pair 3): the consumption test stays INTENTIONALLY RED until
+  Phase 4b — the REWARDS-DESIGN consumption is 4b's deliverable, so a
+  lingering red is the required state, not a defect. It is therefore
+  NOT registered in tests/run.el `cistern-test-entries`; the canonical
+  runner stays green (ALL 9) for Pairs 4-5. The runner's file-load
+  glob still loads the file (defuns only, no side effects), so the red
+  is inert until 4b registers it.
+- Outcome: GREEN for the placeholder; consumption red by design.
+  Canonical suite `emacs -Q --batch -l tests/run.el -f
+  cistern-run-all-tests`: ALL 9 TESTS PASSED, exit 0; consumption
+  standalone still fails on the first M8 assert (`member 'big-cistern
+  ...`), exactly as intended.
+- Evidence: red runs above (exit 255); green prints
+  `CISTERN-REWARDS-DEFAULT-OK` (exit 0); full suite `ALL 9 TESTS
+  PASSED`; consumption run exits non-zero on the milestone assert.
+- Lesson: the bloat guard (plan 01 §2.5) held — the placeholder is one
+  defconst + one list-literal return, and the temptation to stub score
+  math or milestone tables was declined; the default outcome must
+  contain literally zero logic so 4b's consumption test can
+  discriminate real implementation from stubs. Return-shape (3-list:
+  state, outcome, intents) is pinned by the placeholder test and
+  asserted by both tests, so 4b cannot silently reshape the contract.
+- Change for next attempt: Phase 4b registers
+  `cistern-test-rewards-consumption` in `cistern-test-entries` as part
+  of its red/green pair; Pairs 4-5 must not "fix" the red consumption
+  test.

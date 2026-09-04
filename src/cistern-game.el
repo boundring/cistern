@@ -100,5 +100,21 @@ call exists at the use-case layer."
     (cistern--sim-tick st)
     (cistern--tutorial-advance st)))
 
+(defconst cistern--rewards-default-outcome
+  '(:score 0 :objectives nil :unlocks nil :celebrate nil)
+  "Pinned Phase 2 placeholder outcome (spec §4 R5; REWARDS-DESIGN
+§5).  Final values are REWARDS-DESIGN consumption, Phase 4b.")
+
+(defun cistern--rewards-eval (st events)
+  "Rewards use-case (R5): (state, tick EVENTS) → (updated state,
+outcome, presentation intents) as a 3-list.  Phase 2 placeholder:
+ST is returned unchanged with the pinned default outcome and empty
+intents.  The REWARDS-DESIGN consumption (goal cards, milestone
+ladder, reputation, particle spawns) is Phase 4b — NOT pre-built
+here.  4b's seeded garnish must draw from the seed⊕stream-id child
+stream, never ST's sim LCG (REWARDS-DESIGN §4); this placeholder
+consumes no randomness at all."
+  (list st (copy-sequence cistern--rewards-default-outcome) nil))
+
 (provide 'cistern-game)
 ;;; cistern-game.el ends here
