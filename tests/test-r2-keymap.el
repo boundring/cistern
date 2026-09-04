@@ -44,7 +44,8 @@ aliasing to hjkl remains in the driver."
   (with-temp-buffer
     (insert-file-contents
      (expand-file-name "src/cistern.el" cistern-test-r2--root))
-    (cl-assert (not (re-search-forward "define-key[^\n]*\"[hjkl]\"" nil t))
+    (cl-assert (not (let ((case-fold-search nil))
+                      (re-search-forward "define-key[^\n]*\"[hjkl]\"" nil t)))
                t "driver binds an hjkl key")))
 
 (provide 'test-r2-keymap)

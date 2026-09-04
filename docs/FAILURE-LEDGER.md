@@ -410,3 +410,61 @@ One entry per dead/failed/retried run.
      tests/game-cursor.el and tests/game-demolish.el. Accepted inward
      dependency; if the selftest ever leaves src, move the fixture to
      a tests helper. Phase 3 note only.
+
+---
+
+## L-013 (2026-09-04, run: impl-phase3 — Pair 1, R2 arrow-only keymap)
+
+- Attempt: Red test `tests/test-r2-keymap.el :: cistern-test-r2-keymap`
+  (red commit `75ca226`; red run: `Cannot open load file:
+  .../src/cistern.el` — the driver file is the deliverable, exit 255).
+  Green = new driver `src/cistern.el` (`cistern-mode` + keymap per plan
+  02 §2: SPC/RET tick, four arrows → cursor commands, t/p/K arm+build,
+  d demolish, c/x decon/purge, T/n/?/q; NO hjkl; `r` unbound until Pair
+  3) + input adapter `src/cistern-input.el`
+  `cistern-input-cursor-move` (north/south/west/east → the use case's
+  up/down/left/right). Runner glob extended to load `tests/test-*.el`.
+  Render wiring deferred to Pair 4 per plan 02 §2 (driver commands
+  mutate state only; no `cistern--refresh` yet).
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el -f
+  cistern-run-all-tests`: ALL 12 TESTS PASSED, exit 0. R9 gate re-run:
+  domain+game batch load + full tick OK (`R9-TICK-OK tick=1`); grep
+  over non-comment lines finds no driver/view/input symbol in
+  cistern-domain.el / cistern-game.el.
+- Evidence: red run above (exit 255); standalone green run
+  `R2-KEYMAP-OK` (exit 0); full suite `ALL 12 TESTS PASSED` (exit 0).
+- One in-cycle RETRY, probe-only: the grep-level hjkl tripwire matched
+  `"K"` (the build-tank key) — Emacs `re-search-forward` char classes
+  are case-insensitive by default, so `[hjkl]` matched uppercase K.
+  Probe fixed by pinning `case-fold-search nil` (guard strengthened,
+  never weakened, per L-008's probe rules). A second probe refinement
+  in the R9 gate: `cistern--step-toward` contains the `cistern--st`
+  substring, and game.el's header comment disclaims `cistern--st` in
+  prose (the L-008 prose-blindness class) — the gate strips comment
+  lines and uses symbol boundaries. Neither was adapter leakage; no
+  §5 run-death trigger fired.
+- Pinned readings (plan 02 §4 D-pins + this pair's notes):
+  1. `d` = demolish at cursor via `cistern--cmd-demolish`, NOT armed —
+     armed-verb is spec §3.4's "build verb" field and cmd-click only
+     places toilet/pipe/tank; arming 'demolish would silently degrade
+     every click to a cursor move. If armed-demolish-click is wanted,
+     cmd-click gains the branch in Pair 2 as its own pinned decision.
+  2. c/x stay immediate at-cursor use-case calls (D3's arm+build
+     applies to build keys; arming c/x would poison cmd-click's memq
+     guard the same way as (1)).
+  3. Arming t/p/K = thin driver-owned setter + `cistern--cmd-build` at
+     cursor (D3); no arm use-case exists in the game layer.
+     `cistern-input-arm-verb` (Pair 2) is where the adapter formalizes
+     it; the driver commands then route through it.
+  4. `r` unbound in Pair 1 (run-10 stays dead; the auto-run toggle
+     binding arrives with Pair 3's implementation).
+- Lesson: static probes over source text fail on case and substring —
+  any char-class probe pins `case-fold-search nil`, and any symbol
+  probe needs boundaries plus comment stripping (second L-008 corollary:
+  prose mentioning a symbol is not a reference, but probes can't tell).
+- Change for next attempt: Pair 2's click adapter keeps the
+  up/down/left/right direction vocabulary internal to the use case
+  (north/south/west/east is the adapter's translation, this pair's
+  only mapping); when `cistern-input-arm-verb` lands, migrate the
+  driver's `cistern--arm-and-build` onto it (thin setter → adapter
+  call) instead of keeping two arming sites.

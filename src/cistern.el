@@ -1,0 +1,151 @@
+;;; cistern.el --- CISTERN: driver layer — mode, keymap, commands -*- lexical-binding: t; -*-
+
+;; Driver layer (DESIGN-SPEC §3.3): exactly one global live-state var,
+;; the major-mode keymap, the interactive commands, the entry point,
+;; help.  Commands mutate state via the use cases (cursor moves route
+;; through the input adapter); rendering is the view adapter's job
+;; (Phase 3 Pair 4 — the driver wires `cistern--refresh' there).
+
+;;; Code:
+
+(require 'cl-lib)
+(require 'cistern-game)
+(require 'cistern-input)
+
+(defconst cistern-version "3.0.0-dev")
+
+;; The one module global (spec §3.3, legacy cistern.el:785 pattern).
+;; `cistern--auto-run-timer' joins it in Pair 3 as the pinned D2
+;; timer-handle exception.
+(defvar cistern--st nil)
+
+(defvar cistern-mode-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m (kbd "SPC") #'cistern-tick)
+    (define-key m (kbd "RET") #'cistern-tick)
+    (define-key m (kbd "<up>") #'cistern-cursor-north)
+    (define-key m (kbd "<down>") #'cistern-cursor-south)
+    (define-key m (kbd "<left>") #'cistern-cursor-west)
+    (define-key m (kbd "<right>") #'cistern-cursor-east)
+    (define-key m "t" #'cistern-build-toilet)
+    (define-key m "p" #'cistern-build-pipe)
+    (define-key m "K" #'cistern-build-tank)
+    (define-key m "d" #'cistern-demolish)
+    (define-key m "c" #'cistern-decon)
+    (define-key m "x" #'cistern-purge)
+    (define-key m "T" #'cistern-skip-tutorial)
+    (define-key m "n" #'cistern-new-game)
+    (define-key m "?" #'cistern-help)
+    (define-key m "q" #'quit-window)
+    m))
+
+(define-derived-mode cistern-mode special-mode "CISTERN"
+  "Major mode for the CISTERN sanitation management sim."
+  (setq-local truncate-lines t)
+  (setq-local cursor-type nil))
+
+;;;###autoload
+(defun cistern ()
+  "Open the CISTERN sanitation management sim."
+  (interactive)
+  (switch-to-buffer "*cistern*")
+  (unless (eq major-mode 'cistern-mode)
+    (cistern-mode))
+  (unless cistern--st
+    (setq cistern--st (cistern--new-game)))
+  ;; render lands with the view adapter (Pair 4)
+  cistern--st)
+
+(defun cistern-new-game ()
+  (interactive)
+  (setq cistern--st (cistern--new-game
+                     (cistern--rand cistern--st 2147483647))))
+
+(defun cistern-skip-tutorial ()
+  (interactive)
+  (setf (cistern-st-tutorial cistern--st) t)
+  (cistern--log cistern--st "TUTORIAL SKIPPED"))
+
+(defun cistern-tick ()
+  (interactive)
+  (if (cistern-st-over cistern--st)
+      (cistern--log cistern--st "SECTOR CONDEMNED — PRESS n FOR NEW GAME")
+    (cistern--do-tick cistern--st)))
+
+(defun cistern-cursor-north ()
+  (interactive) (cistern-input-cursor-move cistern--st 'north))
+(defun cistern-cursor-south ()
+  (interactive) (cistern-input-cursor-move cistern--st 'south))
+(defun cistern-cursor-west ()
+  (interactive) (cistern-input-cursor-move cistern--st 'west))
+(defun cistern-cursor-east ()
+  (interactive) (cistern-input-cursor-move cistern--st 'east))
+
+(defun cistern--arm-and-build (kind)
+  "Arm KIND in state and build it at the cursor (Pinned D3: the
+keyboard build keys keep the legacy at-cursor flow while arming the
+verb for click-to-place).  Arming has no use case in the game layer
+yet — this thin setter is driver-owned until the click adapter
+formalizes `cistern-input-arm-verb' (Pair 2)."
+  (setf (cistern-st-armed-verb cistern--st) kind)
+  (cistern--cmd-build cistern--st kind
+                      (car (cistern-st-cursor cistern--st))
+                      (cdr (cistern-st-cursor cistern--st))))
+
+(defun cistern-build-toilet ()
+  (interactive) (cistern--arm-and-build 'toilet))
+(defun cistern-build-pipe ()
+  (interactive) (cistern--arm-and-build 'pipe))
+(defun cistern-build-tank ()
+  (interactive) (cistern--arm-and-build 'tank))
+
+(defun cistern-demolish ()
+  (interactive)
+  (cistern--cmd-demolish cistern--st
+                         (car (cistern-st-cursor cistern--st))
+                         (cdr (cistern-st-cursor cistern--st))))
+
+(defun cistern-decon ()
+  (interactive)
+  (cistern--cmd-decon cistern--st
+                      (car (cistern-st-cursor cistern--st))
+                      (cdr (cistern-st-cursor cistern--st))))
+
+(defun cistern-purge ()
+  (interactive)
+  (cistern--cmd-purge cistern--st
+                      (car (cistern-st-cursor cistern--st))
+                      (cdr (cistern-st-cursor cistern--st))))
+
+(defun cistern-help ()
+  (interactive)
+  (with-output-to-temp-buffer "*cistern help*"
+    (princ (format "CISTERN v%s — sanitation protocol for Sector 7\n\n" cistern-version))
+    (princ "THE CONCEPT\n")
+    (princ "  Route need to capacity.  Convert waste to income.\n")
+    (princ "  Contamination is the clock.\n\n")
+    (princ "GLYPHS\n")
+    (princ "  ▓ wall    · floor    ◆ ore vein    ─ pipe    Ω toilet\n")
+    (princ "  ▣ tank    ▒ contamination    + gate    α..θ workers\n\n")
+    (princ "THE LOOP\n")
+    (princ "  Workers mine ◆ for alloy.  Their bladders fill.  At 60%%\n")
+    (princ "  they walk to a Ω and seat themselves — entering the toilet\n")
+    (princ "  tile IS sitting down.  A Ω works only when piped to a ▣ with\n")
+    (princ "  headroom.  Each use sends 10 units down the line.\n\n")
+    (princ "  A full ▣ backs up every Ω it feeds (red Ω).  Purge with x on\n")
+    (princ "  the ▣: free, and it PAYS 1 alloy per 3 units of waste.\n\n")
+    (princ "  At 100%% a worker breaches: the tile turns ▒, contamination\n")
+    (princ "  rises, neighbors fall sick.  ▒ spreads to adjacent floor.\n")
+    (princ "  Decon with c.  At %d the sector is condemned.\n\n" cistern-contam-limit)
+    (princ "  Every %d ticks a migrant arrives.  Population means load.\n\n" cistern-migrant-every)
+    (princ "CONTROLS\n")
+    (princ "  SPC / RET   advance one tick\n")
+    (princ "  arrows / mouse   move cursor\n")
+    (princ "  t   build toilet (12)     p   lay pipe (2)\n")
+    (princ "  K   build tank (15)       c   decontaminate (4)\n")
+    (princ "  x   purge tank (pays)     d   demolish (3)\n")
+    (princ "  T   skip tutorial         n   new game\n")
+    (princ "  ?   this briefing         q   quit\n")))
+
+(provide 'cistern)
+;;; cistern.el ends here
