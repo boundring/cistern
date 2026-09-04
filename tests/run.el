@@ -12,7 +12,7 @@
               (file-name-directory (or load-file-name buffer-file-name))))))
   (load (expand-file-name "src/cistern-domain.el" root) nil t)
   (dolist (f (directory-files (expand-file-name "tests" root)
-                              t "domain-.*\\.el\\'"))
+                              t "\\(domain\\|game\\)-.*\\.el\\'"))
     (load f nil t)))
 
 (defvar cistern-test-entries
@@ -21,7 +21,8 @@
     cistern-test-map-integrity-seeds
     cistern-test-tick-headless
     cistern-test-determinism
-    cistern-test-determinism-order))
+    cistern-test-determinism-order
+    cistern-test-demolish))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
