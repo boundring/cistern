@@ -45,6 +45,8 @@
   (`secure-hash` over `prin1-to-string`); L-002 depth-limit trap.
 - Conservative elisp only — no version-specific APIs (`equal<` does
   not exist in Emacs 31.1 batch; L-006).
+- Paren-balance before committing (check-parens or equivalent;
+  load-abort is not a red) — L-017's two load-abort authoring bugs.
 
 Probe rules:
 

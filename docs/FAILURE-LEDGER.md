@@ -723,3 +723,38 @@ One entry per dead/failed/retried run.
   happens in the domain/use-case field, NOT the view), and give the
   banner its centered-composition treatment then. Phase 4a's tutorial
   scenarios render through the unchanged `cistern-view--render`.
+
+---
+
+## L-018 (2026-09-04, run: review-phase3 — Phase 3 closing review)
+
+- Attempt: phase-closing conformance/simplification review
+  (HANDBRIEF-TEMPLATE six-item checklist). Small fixes committed
+  directly: paren-balance line added to the standing checklist (L-017's
+  two load-abort authoring bugs had no checklist item); stale
+  "Phase 3 Pair 4 wires `cistern--refresh'" driver-header comment
+  updated; plan 02 §2 annotated with the ledgered readings its text
+  still contradicted (cell-at takes st — L-014 pin 1; timer-handle
+  defvar form lives in the adapter — L-015 pin 1; only t/p/K arm,
+  c/x immediate, field named `cistern-st-armed-verb` per spec §3.4 —
+  L-013 pin 2; one keymap, no separate mouse map — L-014 pin 2);
+  plan 03's "no commits from the run" header corrected to per-pair
+  commits (PROCESS-RETRO P2 conflict class, the L-001-era lesson).
+  Ledger audit L-013..L-017: every "Change for next attempt" applied
+  in-phase or carried by design (L-017's → 4b). Deferred discipline:
+  all D1-D6 pins trace to plan 02 §4 or a ledger entry; no
+  undocumented pins found.
+- Structural findings (NOT fixed in passing; each lists its owning
+  phase):
+  1. CARRIED from L-012 finding 2: the soak bot's purge-target
+     selection (`cistern-run-soak`'s maphash over `cistern-st-tanks`)
+     still iterates unsorted. Phase 3 verified genuinely untouched
+     (the phase's only game-layer diff is `cistern--cmd-arm-verb`).
+     Next soak-touching phase: sort the keys or record the exception
+     L-011-cmd-build style. Fixing it in this review was refused —
+     any change to selection order changes the soak trajectory.
+  2. Phase 4b: the celebration intent shape pinned in
+     `cistern-view--celebration-overlay`'s docstring (L-017 pin 1) is
+     the contract the Particle field must drop into unchanged; if 4b's
+     field needs :vel/:ttl handling, that lands in the domain
+     use-case, never in the overlay mapping (L-017 change item).

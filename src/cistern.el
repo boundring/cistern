@@ -3,8 +3,8 @@
 ;; Driver layer (DESIGN-SPEC §3.3): exactly one global live-state var,
 ;; the major-mode keymap, the interactive commands, the entry point,
 ;; help.  Commands mutate state via the use cases (cursor moves route
-;; through the input adapter); rendering is the view adapter's job
-;; (Phase 3 Pair 4 — the driver wires `cistern--refresh' there).
+;; through the input adapter); rendering is the view adapter's job,
+;; inserted by the driver's `cistern--refresh'.
 
 ;;; Code:
 

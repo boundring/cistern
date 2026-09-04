@@ -157,7 +157,7 @@ mechanical form of the projection-only rule (§5).
 
 - `cistern-input-cursor-move (st dir)` — dir ∈ north/south/west/east →
   Phase-2 cursor-move use case.
-- `cistern-input-click (st x y)` — cursor move; if `cistern-st-verb` armed →
+- `cistern-input-click (st x y)` — cursor move; if `cistern-st-armed-verb` armed →
   build use case at (x,y) + exactly one tick (R6). Takes **st as a
   parameter** (batch-testable); never touches buffers, never renders.
 - `cistern-input-arm-verb (st verb)` — build keys (t/p/K/c/x) arm the verb in
@@ -183,7 +183,7 @@ mechanical form of the projection-only rule (§5).
   view-local enum→face table. No `gethash`/`plist-get` into toilets/tanks
   hashes; if a needed query function is missing from Phase 1/2, that is a
   red blocker to harvest into the ledger — never a local pcase in the view.
-- `cistern-view--cell-at (line col)` — pure buffer-geometry helper (map
+- `cistern-view--cell-at (st line col)` — pure buffer-geometry helper (map
   origin = fixed header-line count); used by the driver's mouse handler;
   batch-tested.
 - `cistern-view--celebration-overlay (st)` — reads `cistern--rewards-eval`
@@ -194,13 +194,14 @@ mechanical form of the projection-only rule (§5).
 
 ### `cistern.el` (driver — mode/keymap/mouse map/timer wiring)
 
-- Keymap rewrite of :787-809: SPC/RET tick; arrows → cursor commands; t/p/K/
-  c/x → arm-verb(+build-at-cursor); `r` → auto-run toggle (run-10 stays
+- Keymap rewrite of :787-809: SPC/RET tick; arrows → cursor commands; t/p/K
+  arm+build; c/x immediate at-cursor verbs (L-013 pin 2); `r` → auto-run toggle (run-10 stays
   dead); n/?/T/q unchanged. **No hjkl — asserted by Pair 1.**
-- `cistern-mode-mouse-map`: `<mouse-1>` → handler: parse event →
+- Mouse map (folded into `cistern-mode-map`, L-014 pin 2): `<mouse-1>` → handler: parse event →
   `cistern-view--cell-at` → `cistern-input-click`. Handler is ≤3 lines; only
   the pure translation is tested.
-- `(defvar cistern--auto-run-timer)` — driver-owned timer handle (Pinned D2).
+- `(defvar cistern--auto-run-timer)` — timer handle (Pinned D2); the defvar's
+  form lives in the adapter, not the driver (L-015 pin 1, inward dependency).
 - `cistern--refresh`: erase buffer, insert `cistern-view--render` string,
   `goto-char (point-min)`.
 - Exactly one game-state global `cistern--st` (§3.3), plus the timer handle
@@ -259,7 +260,7 @@ The view is a **dumb projection** — nothing more:
   plumbing, not game state; documented exception to the "exactly one global"
   rule (the rule counts game-state globals; a timer object never enters
   `cistern-st`).
-- **D3** Build keys arm the verb in state (new field `cistern-st-verb`) AND
+- **D3** Build keys arm the verb in state (new field `cistern-st-armed-verb`) AND
   build at cursor immediately (legacy keyboard flow preserved); click with
   armed verb = place at cell + **exactly one tick** (direct reading of R6
   "SPACE/RET/click-with-verb advance exactly one tick").

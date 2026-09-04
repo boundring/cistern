@@ -8,8 +8,8 @@ reference/roguelike-agentic.md; docs/HANDBRIEF-TEMPLATE.md.
 
 Process for every pair: red test committed first (`test: R# failing — <name>`),
 minimum implementation, green (`R#: <what>`). Lesson checkpoint after each
-cycle per roguelike-agentic / spec §5.3. No git commits from the tutorial/rewards
-run — the coherence pass commits; commits named below are message texts.
+cycle per roguelike-agentic / spec §5.3. Implementation commits per red/green
+pair (PROCESS-RETRO P2): red = `test: R# failing — <name>`, green = `R#: <what>`.
 
 ---
 
