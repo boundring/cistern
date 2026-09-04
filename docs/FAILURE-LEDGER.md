@@ -283,3 +283,48 @@ One entry per dead/failed/retried run.
   `cistern-test-rewards-consumption` in `cistern-test-entries` as part
   of its red/green pair; Pairs 4-5 must not "fix" the red consumption
   test.
+
+---
+
+## L-010 (2026-09-04, run: impl-phase2 — Pair 4, R1 cursor + click)
+
+- Attempt: Red test `tests/game-cursor.el ::
+  cistern-test-cursor-and-click` (red commit `e351d41`; red run:
+  `void-function cistern--cmd-cursor`). Green = `(armed-verb nil)`
+  slot added to the domain `cistern-st` struct (spec §3.4 pins
+  armed-verb as state; the struct is domain-owned so the field lands
+  there — smallest shape that makes "armed" legible),
+  `cistern--cmd-cursor` (st dir) — legacy :862-867's in-bounds-refuse
+  guard minus the render, with R2 arrow directions instead of dx/dy —
+  and `cistern--cmd-click` (st x y): unarmed ⇒ cursor move, no tick;
+  armed ⇒ place via cmd-build legality, on success clear the verb and
+  advance exactly one tick via `cistern--do-tick`; refusal leaves
+  state untouched. Implementation was green on the first run — no
+  in-cycle RETRYs.
+- Pinned ambiguities (spec is not explicit; minimal readings noted
+  here per the plan's pin-and-note rule):
+  1. Move-only clicks do NOT tick — R6 lists SPACE/RET/click-with-verb
+     as the ticking actions; a bare cursor-move click is not among
+     them. A click that places ticks exactly once (R6 cross-assert).
+  2. A failed (illegal/unaffordable) armed click does not tick and
+     does not clear the armed verb — "refused with state untouched".
+  3. An armed click does not move the cursor — R1's cursor-move is the
+     unarmed click's job; placement happens at the clicked cell.
+  4. The armed verb clears on successful placement (spec §3.4 "set/
+     cleared by use-cases" needs a clear site; after-place is the
+     smallest). The keymap half that arms verbs is Phase 3.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 10 TESTS PASSED, exit 0.
+- Evidence: red run `void-function cistern--cmd-cursor` (exit 255);
+  green run `PASS cistern-test-cursor-and-click` inside the suite's
+  `ALL 10 TESTS PASSED` (exit 0).
+- Lesson: cmd-build's nil-on-refusal return (inherited from legacy,
+  which logged and returned nil) made click's success detection a
+  cell comparison — `(eq (cistern--cell st x y) verb)` — rather than
+  a return-value check; safe precisely because cmd-build refuses
+  non-floor cells, so cell==verb can only mean "just placed". Callers
+  that need richer outcome info will need cmd-build to return a
+  result value; that reshaping is 4b/5 territory if it appears.
+- Change for next attempt: Pair 5's selftest port should exercise
+  click-place through the same armed-verb path (no direct cmd-build
+  bypass) so the tick-coupling invariant holds everywhere.

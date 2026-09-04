@@ -73,6 +73,7 @@ by the view, not here).")
   creators                   ; list of cistern--worker
   (alloy 20) (tick 0) (contam 0) over
   (log nil) (cursor (cons 3 6))
+  (armed-verb nil)           ; build verb armed for click-to-place (§3.4)
   (rng 1)                    ; LCG state; determinism lives here
   (purges 0) (built-pipe 0) (built-toilet 0) (built-tank 0) (earned 0) (migrants 0)
   (tutorial 0)               ; index into tutorial steps; t when done

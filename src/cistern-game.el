@@ -116,5 +116,36 @@ stream, never ST's sim LCG (REWARDS-DESIGN §4); this placeholder
 consumes no randomness at all."
   (list st (copy-sequence cistern--rewards-default-outcome) nil))
 
+(defun cistern--cmd-cursor (st dir)
+  "Move the cursor one cell in DIR (up/down/left/right), refusing
+out-of-bounds steps (cistern.el:862-867 minus the render call)."
+  (let* ((cur (cistern-st-cursor st))
+         (x (car cur)) (y (cdr cur)))
+    (pcase dir
+      ('up    (when (cistern--in-bounds-p st x (1- y))
+                (setf (cistern-st-cursor st) (cons x (1- y)))))
+      ('down  (when (cistern--in-bounds-p st x (1+ y))
+                (setf (cistern-st-cursor st) (cons x (1+ y)))))
+      ('left  (when (cistern--in-bounds-p st (1- x) y)
+                (setf (cistern-st-cursor st) (cons (1- x) y))))
+      ('right (when (cistern--in-bounds-p st (1+ x) y)
+                (setf (cistern-st-cursor st) (cons (1+ x) y)))))))
+
+(defun cistern--cmd-click (st x y)
+  "R1 use-case half: a click at (X,Y).  No build verb armed: the
+cursor moves and the clock does NOT tick (R6 names only
+SPACE/RET/click-with-verb as ticking actions).  Build verb armed:
+place via `cistern--cmd-build' legality at (X,Y); on success clear
+the armed verb and advance exactly one tick; on refusal the state
+is untouched.  The keymap half that arms verbs is Phase 3."
+  (let ((verb (cistern-st-armed-verb st)))
+    (if (not (memq verb '(toilet pipe tank)))
+        (setf (cistern-st-cursor st) (cons x y))
+      (cistern--cmd-build st verb x y)
+      ;; placed ⇔ cmd-build turned the floor cell into the verb kind
+      (when (eq (cistern--cell st x y) verb)
+        (setf (cistern-st-armed-verb st) nil)
+        (cistern--do-tick st)))))
+
 (provide 'cistern-game)
 ;;; cistern-game.el ends here
