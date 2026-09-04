@@ -11,6 +11,7 @@
              (directory-file-name
               (file-name-directory (or load-file-name buffer-file-name))))))
   (load (expand-file-name "src/cistern-domain.el" root) nil t)
+  (load (expand-file-name "src/cistern-game.el" root) nil t)
   (dolist (f (directory-files (expand-file-name "tests" root)
                               t "\\(domain\\|game\\)-.*\\.el\\'"))
     (load f nil t)))

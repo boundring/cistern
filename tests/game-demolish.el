@@ -22,14 +22,14 @@ plumbing adjacent, or nil."
     (catch 'found
       (cl-loop for y from 1 below (1- (cistern-st-h st)) do
                (cl-loop for x from 1 to (- (cistern-st-w st) 1 n) do
-                        (when (and (cl-loop for i from 0 below n
-                                            always (and (eq (cistern--cell st
-                                                             (+ x i) y)
-                                                            'floor)
-                                                        (not (gethash (cons (+ x i) y)
-                                                                      occ))))
-                                   (not (cistern-test-demolish--plumbing-nearby-p
-                                         st (+ x (1- n)) y)))
+                        (when (cl-loop for i from 0 below n
+                                       always (and (eq (cistern--cell st
+                                                        (+ x i) y)
+                                                       'floor)
+                                                   (not (gethash (cons (+ x i) y)
+                                                                 occ))
+                                                   (not (cistern-test-demolish--plumbing-nearby-p
+                                                         st (+ x i) y))))
                           (throw 'found (list x y))))))))
 
 (defun cistern-test-demolish ()
@@ -86,18 +86,22 @@ plumbing adjacent, or nil."
                                         (/ ore-idx (cistern-st-w st)))
                        'ore)
                    "ore refused"))
+      (cl-assert (= (cistern-st-alloy st) a0) "refusals cost nothing")
       ;; in-use toilet (worker seated: :busy t, as the sim sets it)
       (let* ((spot (cistern-test-demolish--floor-run st 1))
              (x (car spot)) (y (cadr spot)))
         (cistern--cmd-build st 'toilet x y)
         (puthash (cons x y) (list :busy t) (cistern-st-toilets st))
+        (let ((abefore (cistern-st-alloy st)))
+          (cistern--cmd-demolish st x y)
+          (cl-assert (= (cistern-st-alloy st) abefore)
+                     "refusing an in-use toilet is free"))
         (cistern--cmd-demolish st x y)
         (cl-assert (eq (cistern--cell st x y) 'toilet)
                    "in-use toilet refused")
         (cl-assert (plist-get (gethash (cons x y) (cistern-st-toilets st))
                               :busy)
-                   "in-use toilet entry untouched"))
-      (cl-assert (= (cistern-st-alloy st) a0) "refusals cost nothing"))
+                   "in-use toilet entry untouched")))
 
     ;; --- D: no phantom plumbing — the legacy invariant, extended to
     ;; removal: every hash key must map to a cell still of that kind.

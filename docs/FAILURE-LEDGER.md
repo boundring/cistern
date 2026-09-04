@@ -167,3 +167,41 @@ One entry per dead/failed/retried run.
 - Change for next attempt: Phase 2 adds verbs (hash mutation via
   remhash/puthash); any new maphash iteration whose order feeds state
   must sort or index-scan — this tripwire pair will catch violations.
+
+---
+
+## L-007 (2026-09-04, run: impl-phase2 — Pair 1, R8 demolish)
+
+- Attempt: Red test `tests/game-demolish.el :: cistern-test-demolish`
+  (red commit `3d83c39`; red run: `Symbol's function definition is
+  void: cistern--cmd-build` — the expected void-function red, game
+  layer absent). Green = new `src/cistern-game.el` with
+  `cistern-cost-demolish` (3), `cistern--cmd-build` ported verbatim
+  from cistern.el:498-525, and `cistern--cmd-demolish` (legality =
+  player-placed kinds only, in-use toilet refused, cell → floor,
+  remhash from BOTH hashes, no refund). The demolish implementation
+  itself was green on the first run; three RETRYs were all test-fixture
+  bugs: (1) a paren mismatch aborted the load before the first red run;
+  (2) the fixture floor-run finder checked plumbing-adjacency only for
+  the run's LAST cell — a run adjacent to the starter plumbing merged
+  the built network with the starter tank, so the demolish tank left the
+  toilet still usable via the starter tank; fixed to exclude cells
+  plumbing-adjacent for EVERY run cell; (3) two alloy-accounting asserts
+  spanned a build call (toilet build costs 10), so "refusals cost
+  nothing" compared across the build — capture moved inside the refuse
+  attempt.
+- Outcome: GREEN. Full canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 7 TESTS PASSED, exit 0.
+- Evidence: red run output `Symbol's function definition is void:
+  cistern--cmd-build` (exit 255); green run prints
+  `CISTERN-DEMOLISH-OK` (exit 0); full suite `ALL 7 TESTS PASSED`.
+- Lesson: fixture networks must be hydraulically isolated from procgen's
+  starter plumbing — flood-fill merges any 4-adjacent plumbing cells, so
+  a "closed" test network is only closed if every cell (not just the
+  endpoint) is plumbing-adjacency-free; otherwise connection assertions
+  pass/fail through the wrong network. Second: assert spans must not
+  cross cost-charging calls (build) when asserting charge-free behavior.
+- Change for next attempt: later verb tests (Pairs 4-5) reuse the
+  plumbing-adjacency-free floor-run finder pattern verbatim; any new
+  fixture network asserts its own isolation first
+  (`cistern--toilet-usable-p` on the wired toilet before mutating it).
