@@ -29,5 +29,45 @@ cell and exactly one tick advances (R6)."
 site (L-010 pin 4, L-013 migration)."
   (cistern--cmd-arm-verb st verb))
 
+(defvar cistern--auto-run-timer nil
+  "Auto-run timer handle.  Timer plumbing, never game state
+(Pinned D2 — the spec §3.3 one-global exception; it never enters
+`cistern-st').  The defvar lives in the adapter so the timer
+machinery never references the driver outward; the driver
+consumes it inward.")
+
+(defun cistern-input-auto-run-toggle (st)
+  "Toggle auto-run (5 ticks/second) for ST — the testable adapter
+unit; the driver's `cistern-auto-run-toggle' command calls this.
+On: schedule the first 0.2s chain link.  Off: cancel the live
+link.  ST is taken for adapter-signature uniformity (D1: only the
+callback reads the global); the handle is
+`cistern--auto-run-timer'."
+  (if cistern--auto-run-timer
+      (progn (cancel-timer cistern--auto-run-timer)
+             (setq cistern--auto-run-timer nil))
+    (setq cistern--auto-run-timer
+          (run-with-idle-timer 0.2 nil
+                               #'cistern-input--auto-run-callback))))
+
+(defun cistern-input--auto-run-callback ()
+  "One auto-run chain link: exactly one tick via the tick use
+case, then reschedule (self-rescheduling one-shot chain — L-015
+records the plan's REPEAT-t deviation: an explicit reschedule per
+fire is what makes every link observable and cancellable; REPEAT t
+plus an explicit reschedule would stack timers).  Reads the
+driver's `cistern--st' global — the single D1 exception (fires
+outside any command context).  A condemned sector ends the chain:
+no tick, no reschedule, handle cleared.  REWARDS-DESIGN §4 later
+adds an advance-particles step per fire here — Phase 4b wiring,
+deliberately not pre-built."
+  (when cistern--st
+    (if (cistern-st-over cistern--st)
+        (setq cistern--auto-run-timer nil)
+      (cistern--do-tick cistern--st)
+      (setq cistern--auto-run-timer
+            (run-with-idle-timer 0.2 nil
+                                 #'cistern-input--auto-run-callback)))))
+
 (provide 'cistern-input)
 ;;; cistern-input.el ends here

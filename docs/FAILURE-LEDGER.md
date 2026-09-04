@@ -523,3 +523,63 @@ One entry per dead/failed/retried run.
   adapter entry. Pair 4's render must keep `cistern-view--header-lines`
   truthful — the geometry helper and the render share that constant,
   so the first render is where a drifted origin would surface.
+
+---
+
+## L-015 (2026-09-04, run: impl-phase3 — Pair 3, R6 auto-run timer)
+
+- Attempt: Red test `tests/test-r6-timer.el :: cistern-test-r6-timer`
+  (red commit `6fc0513`; red run: `void-function
+  cistern-input-auto-run-toggle`, exit 255). Green = the timer
+  machinery in `src/cistern-input.el`: the D2 handle defvar
+  `cistern--auto-run-timer` (form lives in the ADAPTER, not the
+  driver file — see pin 1), `cistern-input-auto-run-toggle` (st)
+  scheduling/cancelling the 0.2s chain link, and
+  `cistern-input--auto-run-callback` (one `cistern--do-tick` +
+  reschedule; D1 exception — the callback alone reads the driver's
+  `cistern--st`); driver gains the `'r'` binding and the thin
+  interactive `cistern-auto-run-toggle` command. No real timers in
+  tests — schedule/cancel captured via `cl-letf` stubs (§5.2).
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 14 TESTS PASSED, exit 0. R1/R2
+  regressions re-run green standalone. R9 gate clean (non-comment
+  grep + batch tick); `cistern-run-10` absent from all of src/ (grep
+  and obarray pin).
+- Evidence: red run above (exit 255); green run `R6-TIMER-OK` (exit
+  0); full suite `ALL 14 TESTS PASSED` (exit 0).
+- Pinned readings / deviations:
+  1. The D2 handle defvar's FORM lives in cistern-input.el, not
+     cistern.el: an adapter-side callback that reschedules must
+     update the handle, and adapter→driver references are outward
+     dependencies; driver→adapter is the correct inward direction.
+     D2's substance (timer plumbing, never game state, never enters
+     cistern-st, documented exception to the one-global rule) is
+     intact — only the defvar form's home file moved.
+  2. REPEAT-t deviation from plan 02 §1 Pair 3: the schedule records
+     REPEAT nil and the callback explicitly reschedules each fire
+     (one-shot self-rescheduling chain). The pair directive's test
+     item ("the callback, invoked directly, advances exactly one
+     tick AND reschedules itself") is only observable with an
+     explicit reschedule record, and REPEAT t + an explicit
+     reschedule would stack a fresh repeating timer per fire.
+     Semantics match the plan's intent: 0.2s cadence, toggle-off
+     cancels, condemned ends the run.
+  3. The toggle takes ST per the adapter convention (L-014) but does
+     not use it — the handle and cadence are not per-state; the
+     signature keeps the adapter's (st …) uniformity and D1's
+     "only the callback reads the global" boundary honest.
+  4. Condemned-sector stop is silent (no new log line — the
+     condemned message belongs to the tick command; Pair 4's render
+     surfaces the condemned state).
+- Lesson: plan text written before the pair directive ("REPEAT t")
+  lost to the directive's observable test contract — when a plan
+  detail and a test item conflict, the test item wins and the
+  deviation is ledgered with the stacking rationale, not silently
+  reconciled.
+- Change for next attempt: Pair 4's render must (a) keep
+  `cistern-view--header-lines` truthful (L-014), (b) wire
+  `cistern--refresh` into the auto-run callback's per-fire path (the
+  callback currently advances state without a repaint — the driver
+  owns buffer mutation, so the refresh lands with the view), and (c)
+  remember the REWARDS-DESIGN §4 advance-particles pointer already
+  in the callback docstring is 4b's, not Pair 4's.

@@ -36,6 +36,7 @@
     (define-key m "c" #'cistern-decon)
     (define-key m "x" #'cistern-purge)
     (define-key m "T" #'cistern-skip-tutorial)
+    (define-key m "r" #'cistern-auto-run-toggle)
     (define-key m "n" #'cistern-new-game)
     (define-key m "?" #'cistern-help)
     (define-key m "q" #'quit-window)
@@ -131,6 +132,13 @@ while arming the verb for click-to-place)."
                       (car (cistern-st-cursor cistern--st))
                       (cdr (cistern-st-cursor cistern--st))))
 
+(defun cistern-auto-run-toggle ()
+  "Toggle the 5 ticks/second auto-run timer ('r').  Scheduling
+and the chain callback live in the input adapter; the handle is
+`cistern--auto-run-timer' (Pinned D2)."
+  (interactive)
+  (cistern-input-auto-run-toggle cistern--st))
+
 (defun cistern-help ()
   (interactive)
   (with-output-to-temp-buffer "*cistern help*"
@@ -158,6 +166,7 @@ while arming the verb for click-to-place)."
     (princ "  t   build toilet (12)     p   lay pipe (2)\n")
     (princ "  K   build tank (15)       c   decontaminate (4)\n")
     (princ "  x   purge tank (pays)     d   demolish (3)\n")
+    (princ "  r   auto-run (5 ticks/s)\n")
     (princ "  T   skip tutorial         n   new game\n")
     (princ "  ?   this briefing         q   quit\n")))
 
