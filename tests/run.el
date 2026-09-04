@@ -26,7 +26,8 @@
     cistern-test-demolish
     cistern-test-exactly-one-tick
     cistern-test-rewards-default
-    cistern-test-cursor-and-click))
+    cistern-test-cursor-and-click
+    cistern-test-legacy-verb-blocks))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
