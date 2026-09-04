@@ -328,3 +328,52 @@ One entry per dead/failed/retried run.
 - Change for next attempt: Pair 5's selftest port should exercise
   click-place through the same armed-verb path (no direct cmd-build
   bypass) so the tick-coupling invariant holds everywhere.
+
+---
+
+## L-011 (2026-09-04, run: impl-phase2 — Pair 5, R9 extended selftest/soak)
+
+- Attempt: Red test `tests/game-selftest.el ::
+  cistern-test-legacy-verb-blocks` (red commit `a0db103`; red run:
+  `cl-assertion-failed (fboundp 'cistern-run-selftest)`). Green =
+  `src/cistern-game.el` gains `cistern--cmd-decon` (:527-538, hazard
+  only) and `cistern--cmd-purge` (:540-551) — both in Phase 2's verb
+  set per plan 01 §2's goal line — plus `cistern-run-selftest`
+  (legacy :937-1035 blocks ported onto src/ layers, with seed-42
+  procgen landmarks; seating/decon/no-statue blocks pinned to
+  guaranteed-floor reserved cells — spawn cells and starter-toilet
+  floor neighbors — instead of legacy hardcoded coordinates) and
+  `cistern-run-soak` (:1037-1137 verbatim, 600 ticks, 'one breach from
+  condemnation' tuning intact). Extensions per spec §5.1: demolish
+  legality with the armed-verb click path ONLY (L-010 change applied —
+  pipe placed via `cistern--cmd-click`, assert place⇒exactly-one-tick),
+  hash-cleanup invariant, procgen variety (5 seeds, ≥3 signatures,
+  secure-hash over prin1-to-string per L-002), rewards default. One
+  in-cycle RETRY, test-only: the "refusals are free" alloy assert
+  spanned the armed toilet placement (L-007's accounting trap again) —
+  capture moved inside the refuse attempt.
+- Intentional deviation noted: the soak bot keeps direct
+  `cistern--cmd-build` calls (verbatim :1083-1137); routing them
+  through the armed-verb click path would double-tick each bot
+  iteration (click ticks + loop tick) and change the surviving-run
+  semantics. The place⇒one-tick coupling is asserted where it belongs:
+  every player-driven click-place (selftest demolish-legality block,
+  Pair 4's test).
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el -f
+  cistern-run-all-tests`: ALL 11 TESTS PASSED, exit 0. Standalone
+  batch entries: `cistern-run-selftest` → CISTERN-SELFTEST-OK (exit
+  0, 3.4s); `cistern-run-soak` → CISTERN-SOAK-OK tick=600 contam=1
+  pop=8 alloy=417 (exit 0, 48s — the per-tick full-map scans; fine
+  for a soak, noted for Phase 3 perf if invoked in-loop).
+- Lesson: porting hardcoded-coordinate test blocks onto seed-driven
+  procgen means replacing every magic coordinate with a
+  procgen-guaranteed anchor (reserved cells: spawns, starter
+  plumbing, west gate, or floor-neighbors found at runtime); a block
+  that "works" for the test seed may be sitting on a wall for seed N.
+  Second: the L-007 assert-span trap recurs under time pressure —
+  any "this operation is free" assert must have its alloy capture
+  immediately bracketing the operation.
+- Change for next attempt: Phase 3's input adapter maps keys/mouse to
+  the use-case verbs (cmd-cursor/cmd-click/cmd-build/…) — no new
+  placement legality, and the tick coupling stays inside cmd-click
+  where the tests pin it.

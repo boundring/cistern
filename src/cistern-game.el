@@ -147,5 +147,343 @@ is untouched.  The keymap half that arms verbs is Phase 3."
         (setf (cistern-st-armed-verb st) nil)
         (cistern--do-tick st)))))
 
+(defun cistern--cmd-decon (st x y)
+  "Clean a hazard tile (cistern.el:527-538 verbatim semantics:
+hazard tiles ONLY — R8 keeps demolish distinct from decon)."
+  (cond
+   ((not (and (cistern--in-bounds-p st x y)
+              (eq (cistern--cell st x y) 'hazard)))
+    (cistern--log st "NO CONTAMINANT UNDER CURSOR"))
+   ((< (cistern-st-alloy st) cistern-cost-decon)
+    (cistern--log st "INSUFFICIENT ALLOY — %d REQUIRED" cistern-cost-decon))
+   (t
+    (setf (cistern-st-alloy st) (- (cistern-st-alloy st) cistern-cost-decon))
+    (cistern--set-cell st x y 'floor)
+    (cistern--log st "DECONTAMINATED (%d,%d) — %d ALLOY"
+                  x y cistern-cost-decon))))
+
+(defun cistern--cmd-purge (st x y)
+  "Convert stored tank waste back to alloy (cistern.el:540-551)."
+  (let ((tp (gethash (cons x y) (cistern-st-tanks st))))
+    (cond
+     ((not tp) (cistern--log st "CURSOR NOT ON A TANK"))
+     ((= (plist-get tp :load) 0) (cistern--log st "TANK ALREADY CLEAR"))
+     (t
+      (let* ((load (plist-get tp :load))
+             (gain (/ load cistern-purge-rate)))
+        (puthash (cons x y) (list :load 0) (cistern-st-tanks st))
+        (setf (cistern-st-alloy st) (+ (cistern-st-alloy st) gain))
+        (setf (cistern-st-purges st) (1+ (cistern-st-purges st)))
+        (cistern--log st "TANK PURGED — RECOVERED %d ALLOY" gain))))))
+
+(defun cistern-run-selftest ()
+  "Headless proof of every rule that can break gameplay, on the
+src/ layers (cistern.el:937-1035 ported; extended per spec §5.1
+with demolish legality, armed-verb click-place, procgen variety,
+and rewards defaults)."
+  (interactive)
+  ;; --- map integrity (legacy block, new procgen landmarks)
+  (let ((st (cistern--new-game 42)))
+    (cl-assert (= (cistern-st-w st) cistern-w))
+    (cl-assert (= (length (cistern-st-map st)) (* cistern-w cistern-h)))
+    (cl-loop for x from 0 below cistern-w
+             do (cl-assert (eq (cistern--cell st x 0) 'wall)))
+    (cl-loop for y from 0 below cistern-h
+             do (cl-assert (memq (cistern--cell st 0 y) '(wall door))))
+    (cl-assert (eq (cistern--cell st 0 7) 'door))
+    (cl-assert (eq (cistern--cell st 3 3) 'toilet))
+    (cl-assert (cistern--toilet-usable-p st 3 3))
+
+    ;; --- THE TOILET LOOP (the bug that shipped v1): walk in, use,
+    ;; release, network intact, no phantom plumbing state.  Worker
+    ;; seats from a guaranteed-floor neighbor of the starter toilet.
+    (let* ((w (car (cistern-st-creators st)))
+           (spot (cl-loop for n in (cistern--neighbors st 3 3)
+                          when (and (eq (cistern--cell st (car n) (cdr n))
+                                        'floor)
+                                    (not (gethash n
+                                                  (cistern--occupied-cells
+                                                   st nil))))
+                          return (progn
+                                   (setf (cistern--worker-x w) (car n))
+                                   (setf (cistern--worker-y w) (cdr n))
+                                   n))))
+      (cl-assert spot "a floor neighbor of the starter toilet exists")
+      (setf (cistern--worker-bladder w) cistern-bladder-seek)
+      (setf (cistern--worker-sick w) 0)
+      (cistern--do-tick st)
+      (cl-assert (cistern--worker-using w) "worker should be seated")
+      (let ((tp (cistern--worker-toilet w)))
+        (cl-assert (equal tp (cons 3 3)) "seated on the start toilet")
+        (cl-assert (plist-get (gethash tp (cistern-st-toilets st)) :busy)))
+      (dotimes (_ cistern-use-ticks)
+        (cistern--do-tick st))
+      (cl-assert (not (cistern--worker-using w)) "use should complete")
+      (cl-assert (= (cistern--worker-bladder w) 0))
+      (cl-assert (= (+ 30 cistern-use-load)
+                    (plist-get (gethash (cons 5 2) (cistern-st-tanks st))
+                               :load))
+                 "waste deposited in the wired tank")
+      (cl-assert (not (plist-get (gethash (cons 3 3)
+                                          (cistern-st-toilets st)) :busy))
+                 "toilet released after use")
+      (cl-assert (cistern--toilet-usable-p st 3 3))
+      ;; plumbing state may only reference real toilet cells
+      (maphash (lambda (k _)
+                 (cl-assert (eq (cistern--cell st (car k) (cdr k)) 'toilet)))
+               (cistern-st-toilets st)))
+
+    ;; --- backed up / purge economy
+    (puthash (cons 5 2) (list :load cistern-tank-cap)
+             (cistern-st-tanks st))
+    (cl-assert (not (cistern--toilet-usable-p st 3 3)))
+    (let ((a0 (cistern-st-alloy st)))
+      (cistern--cmd-purge st 5 2)
+      (cl-assert (= (cistern-st-alloy st)
+                    (+ a0 (/ cistern-tank-cap cistern-purge-rate)))))
+    (cl-assert (cistern--toilet-usable-p st 3 3))
+
+    ;; --- breach, decon, firebreaks (worker 2 stays on its spawn cell)
+    (let ((w (nth 1 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 14)
+      (setf (cistern--worker-y w) 7)
+      (setf (cistern--worker-bladder w)
+            (- cistern-bladder-burst cistern-bladder-rate))
+      (cistern--do-tick st)
+      (cl-assert (eq (cistern--cell st 14 7) 'hazard))
+      (cl-assert (= (cistern-st-contam st) 1)))
+    (cistern--cmd-decon st 14 7)
+    (cl-assert (eq (cistern--cell st 14 7) 'floor))
+
+    ;; --- a worker ON a hazard tile can still leave (no statues)
+    (let ((w (nth 2 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 11)
+      (setf (cistern--worker-y w) 9)
+      (cistern--set-cell st 11 9 'hazard)
+      (setf (cistern--worker-bladder w) 0)
+      ;; two ticks: the worker may be sick and act only on even ticks
+      (let ((x0 (cistern--worker-x w)))
+        (dotimes (_ 2) (cistern--do-tick st))
+        (cl-assert (not (and (= (cistern--worker-x w) x0)
+                             (= (cistern--worker-y w) 9)))
+                   "worker stuck on hazard")))
+
+    ;; --- two workers never share a tile
+    (let ((a (nth 2 (cistern-st-creators st)))
+          (b (nth 3 (cistern-st-creators st))))
+      (setf (cistern--worker-bladder a) 0)
+      (setf (cistern--worker-bladder b) 0)
+      (dotimes (_ 12) (cistern--do-tick st))
+      (cl-assert (not (and (= (cistern--worker-x a) (cistern--worker-x b))
+                           (= (cistern--worker-y a) (cistern--worker-y b))))
+                 "workers stacked")))
+
+  ;; --- determinism: same seed, same trajectory
+  (let ((s1 (cistern--new-game 7)) (s2 (cistern--new-game 7)))
+    (dotimes (_ 50) (cistern--do-tick s1) (cistern--do-tick s2))
+    (cl-assert (= (cistern-st-alloy s1) (cistern-st-alloy s2)))
+    (cl-assert (= (cistern-st-contam s1) (cistern-st-contam s2)))
+    (cl-assert (equal (cistern-st-rng s1) (cistern-st-rng s2))))
+
+  ;; --- demolish legality (R8): armed-verb place, demolish, cleanup
+  (let* ((st (cistern--new-game 42))
+         (run (cistern-test-game--floor-run st 2))
+         (x (car run)) (y (cadr run)))
+    (setf (cistern-st-alloy st) 100)
+    ;; place a pipe through the ARMED-VERB click path only (L-010):
+    ;; no cmd-build bypass — the place⇒one-tick coupling must hold.
+    (setf (cistern-st-armed-verb st) 'pipe)
+    (let ((tick0 (cistern-st-tick st)))
+      (cistern--cmd-click st x y)
+      (cl-assert (eq (cistern--cell st x y) 'pipe) "click placed pipe")
+      (cl-assert (= (cistern-st-tick st) (1+ tick0))
+                 "place advanced exactly one tick"))
+    (let ((a0 (cistern-st-alloy st)))
+      (cistern--cmd-demolish st x y)
+      (cl-assert (eq (cistern--cell st x y) 'floor))
+      (cl-assert (= (cistern-st-alloy st) (- a0 cistern-cost-demolish))))
+    ;; refusals: wall, ore, in-use toilet — free of charge
+    (let ((ore-idx (cl-position 'ore (cistern-st-map st))))
+      (cistern--cmd-demolish st 0 0)
+      (cl-assert (eq (cistern--cell st 0 0) 'wall))
+      (cl-assert ore-idx)
+      (cistern--cmd-demolish st (% ore-idx (cistern-st-w st))
+                             (/ ore-idx (cistern-st-w st)))
+      (cl-assert (eq (cistern--cell st (% ore-idx (cistern-st-w st))
+                                      (/ ore-idx (cistern-st-w st)))
+                     'ore))
+      (let ((trun (cistern-test-game--floor-run st 1))
+            (tw (car (cistern-st-creators st))))
+        (setf (cistern-st-armed-verb st) 'toilet)
+        (cistern--cmd-click st (car trun) (cadr trun))
+        (let ((a0 (cistern-st-alloy st)))
+          (puthash (cons (car trun) (cadr trun)) (list :busy t)
+                   (cistern-st-toilets st))
+          (cistern--cmd-demolish st (car trun) (cadr trun))
+          (cl-assert (eq (cistern--cell st (car trun) (cadr trun)) 'toilet)
+                     "in-use toilet refused")
+          (cl-assert (= (cistern-st-alloy st) a0)
+                     "refusals are free"))))
+    ;; the hash-cleanup invariant, load-bearing (v1 phantom plumbing)
+    (maphash (lambda (k _)
+               (cl-assert (eq (cistern--cell st (car k) (cdr k)) 'toilet)))
+             (cistern-st-toilets st))
+    (maphash (lambda (k _)
+               (cl-assert (eq (cistern--cell st (car k) (cdr k)) 'tank)))
+             (cistern-st-tanks st)))
+
+  ;; --- procgen variety (R3a): ≥3 distinct signatures over 5 seeds
+  ;; (L-002: signatures hash printed content, never bare sxhash)
+  (let ((sigs nil))
+    (dolist (seed '(1 2 3 4 5))
+      (let* ((st (cistern--new-game seed))
+             (feats nil))
+        (dotimes (y (cistern-st-h st))
+          (dotimes (x (cistern-st-w st))
+            (let ((k (cistern--cell st x y)))
+              (when (memq k '(wall ore pipe toilet tank))
+                (push (list k x y) feats)))))
+        (push (secure-hash 'md5 (prin1-to-string feats)) sigs)))
+    (cl-assert (>= (length (delete-dups (copy-sequence sigs))) 3)
+               "procgen variety over seeds"))
+
+  ;; --- rewards default (R5 placeholder)
+  (let* ((st (cistern--new-game 9))
+         (result (cistern--rewards-eval st nil)))
+    (cl-assert (equal (nth 1 result)
+                      '(:score 0 :objectives nil :unlocks nil :celebrate nil)))
+    (cl-assert (null (nth 2 result)) "empty presentation intents"))
+
+  (message "CISTERN-SELFTEST-OK"))
+
+(defun cistern-test-game--floor-run (st n)
+  "L-007 fixture pattern: N consecutive unoccupied floor cells with
+no plumbing 4-adjacent, so test networks stay isolated from the
+starter plumbing."
+  (let ((occ (cistern--occupied-cells st nil)))
+    (catch 'found
+      (cl-loop for y from 1 below (1- (cistern-st-h st)) do
+               (cl-loop for x from 1 to (- (cistern-st-w st) 1 n) do
+                        (when (cl-loop for i from 0 below n
+                                       always (and (eq (cistern--cell st
+                                                        (+ x i) y)
+                                                       'floor)
+                                                   (not (gethash (cons (+ x i) y)
+                                                                 occ))
+                                                   (not (cl-some
+                                                         (lambda (nn)
+                                                           (memq (cistern--cell st
+                                                                  (car nn)
+                                                                  (cdr nn))
+                                                                 '(pipe toilet tank)))
+                                                         (cons (cons (+ x i) y)
+                                                               (cistern--neighbors
+                                                                st (+ x i) y))))))
+                          (throw 'found (list x y))))))))
+
+(defun cistern--soak-adj-floor (st)
+  "Floor cells 4-adjacent to existing plumbing: building there
+joins the network instantly (cistern.el:1037-1049)."
+  (let ((out nil))
+    (dotimes (y (cistern-st-h st))
+      (dotimes (x (cistern-st-w st))
+        (when (and (eq (cistern--cell st x y) 'floor)
+                   (cl-some (lambda (n)
+                              (memq (cistern--cell st (car n) (cdr n))
+                                    '(pipe toilet tank)))
+                            (cistern--neighbors st x y)))
+          (push (cons x y) out))))
+    (nreverse out)))
+
+(defun cistern--soak-pick-spot (st spots)
+  "The connected spot closest to any worker — the bot grows the
+network TOWARD the workforce instead of clustering it
+(cistern.el:1051-1081)."
+  (when spots
+    (let* ((workers (mapcar (lambda (w)
+                              (cons (cistern--worker-x w)
+                                    (cistern--worker-y w)))
+                            (cistern-st-creators st)))
+           (hzs nil))
+      (dotimes (y (cistern-st-h st))
+        (dotimes (x (cistern-st-w st))
+          (when (eq (cistern--cell st x y) 'hazard)
+            (push (cons x y) hzs))))
+      (setq spots (cl-remove-if
+                   (lambda (p)
+                     (cl-some (lambda (h)
+                                (<= (max (abs (- (car p) (car h)))
+                                        (abs (- (cdr p) (cdr h))))
+                                    2))
+                              hzs))
+                   spots))
+      (let (best bd)
+        (dolist (s spots)
+          (let ((d (cl-reduce #'min
+                              (mapcar (lambda (w)
+                                        (+ (abs (- (car s) (car w)))
+                                           (abs (- (cdr s) (cdr w)))))
+                                      workers))))
+            (when (or (null bd) (< d bd))
+              (setq bd d best s))))
+        best))))
+
+(defun cistern-run-soak ()
+  "600 ticks with a deterministic auto-player.  Proves a competent
+player survives: purge when tanks fill, build onto the existing
+network when population demands it (cistern.el:1083-1137; the
+'one breach from condemnation' tuning is kept intact)."
+  (interactive)
+  (let ((st (cistern--new-game 1)) (survived nil))
+    (progn
+      (dotimes (_ 600)
+        (unless (cistern-st-over st)
+          (let ((purged nil))
+            (maphash (lambda (k v)
+                       (when (and (not purged)
+                                  (>= (plist-get v :load) 40))
+                         (cistern--cmd-purge st (car k) (cdr k))
+                         (setq purged t)))
+                     (cistern-st-tanks st)))
+          (let ((pop (length (cistern-st-creators st)))
+                (spots (cistern--soak-adj-floor st))
+                (hzs nil))
+            (dotimes (y (cistern-st-h st))
+              (dotimes (x (cistern-st-w st))
+                (when (eq (cistern--cell st x y) 'hazard)
+                  (push (cons x y) hzs))))
+            (let ((spot (cistern--soak-pick-spot st spots)))
+              ;; decon a hazard when the war chest allows
+              (when (and hzs (>= (cistern-st-alloy st)
+                                 (+ cistern-cost-decon 15)))
+                (let ((h (car hzs)))
+                  (cistern--cmd-decon st (car h) (cdr h))))
+              (cond
+               ((and (>= (cistern-st-alloy st) cistern-cost-tank)
+                     (< (hash-table-count (cistern-st-tanks st))
+                        (+ 1 (/ pop 3))))
+                (when spot
+                  (cistern--cmd-build st 'tank (car spot) (cdr spot))))
+               ((and (>= (cistern-st-alloy st) cistern-cost-toilet)
+                     (< (hash-table-count (cistern-st-toilets st))
+                        (+ 1 (/ pop 2))))
+                (when spot
+                  (cistern--cmd-build st 'toilet (car spot) (cdr spot)))))
+              ;; network extension: no spot near workers means lay pipe
+              ;; toward them; pipes chain across rooms over time
+              (when (and (>= (cistern-st-alloy st) cistern-cost-pipe)
+                         (< (length spots) 4))
+                (let ((spot (car spots)))
+                  (when spot
+                    (cistern--cmd-build st 'pipe (car spot) (cdr spot)))))))
+          (cistern--do-tick st)))
+      (setq survived (not (cistern-st-over st))))
+    (unless survived
+      (error "AUTO-PLAYER DIED at tick %d contam %d"
+             (cistern-st-tick st) (cistern-st-contam st)))
+    (message "CISTERN-SOAK-OK tick=%d contam=%d pop=%d alloy=%d"
+             (cistern-st-tick st) (cistern-st-contam st)
+             (length (cistern-st-creators st)) (cistern-st-alloy st))))
+
 (provide 'cistern-game)
 ;;; cistern-game.el ends here
