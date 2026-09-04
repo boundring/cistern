@@ -2,6 +2,12 @@
 
 (require 'cl-lib)
 
+(defconst cistern-test-tick--root
+  (file-name-directory
+   (directory-file-name
+    (file-name-directory (or load-file-name buffer-file-name))))
+  "Repo root; load-file-name is only bound during load, so pin it here.")
+
 (defun cistern-test-tick--src-mentions (sym string)
   "Does the source of the (uncompiled) function SYM mention STRING?"
   (and (fboundp sym)
@@ -9,10 +15,7 @@
 
 (defun cistern-test-tick--src-mentions-file (string)
   "Does any file under src/ mention STRING?  File-level static check."
-  (let ((srcdir (expand-file-name
-                 "src" (file-name-directory
-                        (directory-file-name
-                         (file-name-directory load-file-name))))))
+  (let ((srcdir (expand-file-name "src" cistern-test-tick--root)))
     (cl-some (lambda (f)
                (with-temp-buffer
                  (insert-file-contents (expand-file-name f srcdir))

@@ -74,5 +74,31 @@ phantom-plumbing invariant, load-bearing)."
       (cistern--log st "DEMOLISHED %s AT (%d,%d) — %d ALLOY"
                     (upcase (symbol-name kind)) x y cistern-cost-demolish)))))
 
+(defun cistern--tutorial-steps ()
+  "Tutorial mechanism holder: table of (PROMPT . PREDICATE) steps,
+predicate takes ST and a non-nil result advances.  Scenario content
+is Phase 4a; the table ships empty so advance is a no-op."
+  '())
+
+(defun cistern--tutorial-advance (st)
+  "Advance the tutorial index if the current step's predicate holds
+(cistern.el:589-599 pattern, minus the nine legacy steps)."
+  (let ((steps (cistern--tutorial-steps))
+        (idx (cistern-st-tutorial st)))
+    (when (and (numberp idx)
+               (< idx (length steps))
+               (funcall (cdr (nth idx steps)) st))
+      (setf (cistern-st-tutorial st) (1+ idx))
+      (cistern--log st "TUTORIAL: OBJECTIVE COMPLETE"))))
+
+(defun cistern--do-tick (st)
+  "Exactly one tick per action (R6): over-guard, then one domain
+sim tick, then the tutorial advance.  The legacy multi-tick
+command is NOT ported — no way to advance more than one tick per
+call exists at the use-case layer."
+  (unless (cistern-st-over st)
+    (cistern--sim-tick st)
+    (cistern--tutorial-advance st)))
+
 (provide 'cistern-game)
 ;;; cistern-game.el ends here

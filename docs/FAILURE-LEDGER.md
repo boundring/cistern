@@ -205,3 +205,39 @@ One entry per dead/failed/retried run.
   plumbing-adjacency-free floor-run finder pattern verbatim; any new
   fixture network asserts its own isolation first
   (`cistern--toilet-usable-p` on the wired toilet before mutating it).
+
+---
+
+## L-008 (2026-09-04, run: impl-phase2 — Pair 2, R6 exactly one tick)
+
+- Attempt: Red test `tests/game-tick.el :: cistern-test-exactly-one-tick`
+  (red commit `e7e32ba`; red run: `Symbol's function definition is void:
+  cistern--do-tick`). Green = `cistern--do-tick` orchestrator in
+  `src/cistern-game.el` (over-guard + `cistern--sim-tick` +
+  `cistern--tutorial-advance`) plus the tutorial mechanism holder
+  (`cistern--tutorial-steps` returning `'()`, advance per
+  cistern.el:589-599 minus the nine legacy steps). Implementation was
+  green first run; two in-cycle RETRYs were test-machinery: (1) the
+  file-level static check resolved the repo root via `load-file-name`,
+  which is nil under `-f` after `-l` (it is only bound during load) —
+  wrong-type-argument stringp nil; fixed by pinning the root in a
+  defconst computed at load time, mirroring tests/run.el's pattern;
+  (2) the no-`cistern-run-10` tripwire fired with a false positive —
+  the green docstring itself contained the literal symbol as prose
+  ("`cistern-run-10' is NOT ported"). Per the probe rules the probe was
+  NOT weakened; the docstring was reworded so src/ now contains zero
+  occurrences of the symbol.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el -f
+  cistern-run-all-tests`: ALL 8 TESTS PASSED, exit 0.
+- Evidence: red run `Symbol's function definition is void:
+  cistern--do-tick` (exit 255); green prints `CISTERN-TICK-OK` (exit 0);
+  full suite `ALL 8 TESTS PASSED`.
+- Lesson: static tripwires over file text are load-bearing but blind to
+  intent — prose in comments/docstrings trips them exactly like real
+  code, so src/ files must never quote forbidden symbols, even to
+  disclaim them. Second: `load-file-name`/`buffer-file-name` are only
+  bound during load; any test needing its own location must compute it
+  at load time into a defconst.
+- Change for next attempt: later src/-tree static checks (R2 hjkl grep,
+  R9 layer checks) use the same load-time-root defconst pattern, and
+  src/ prose never quotes the forbidden symbol.
