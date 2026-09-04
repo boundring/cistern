@@ -82,6 +82,42 @@ in the creators list.")
     (aref cistern-view--worker-glyphs
           (mod i (length cistern-view--worker-glyphs)))))
 
+(defconst cistern-view--palette-faces
+  '((success . cistern-toilet) (warning . cistern-tank-high)
+    (error . cistern-toilet-down) (info . cistern-dim)
+    (bonus . cistern-tank-ok))
+  "REWARDS-DESIGN palette enums → Emacs faces (plan 02 §3.2).
+Exact colors are Phase 4b; unknown faces pass through so
+hand-built test intents can use Emacs faces directly.")
+
+(defun cistern-view--celebration-overlay (st)
+  "Dumb celebration projection (plan 02 §3): read the rewards use
+case ONCE per render and return this frame's overlay as a cons
+\(MAP-ALIST . BANNER-TEXT).  MAP-ALIST entries
+\(\(X . Y) . (GLYPH . FACE)) for non-banner intents, clipped to
+map bounds; BANNER-TEXT is the layer:banner text for the reserved
+post-map row.  Transient by construction: ST is never mutated —
+the next frame restores from state.  Empty for the Phase-2 default
+outcome (nil intents).  Intent shape pinned for 4b's particle
+field to drop in unchanged: a plist (:pos (X . Y) :glyph S :face
+FACE-OR-PALETTE-ENUM :layer sparkle|popup|banner); banner intents
+carry :text instead of :pos.  advance-particles is a use case the
+presentation timer calls (wiring point pinned in the auto-run
+callback); the view only reads, never advances."
+  (let ((map nil) (banner ""))
+    (dolist (intent (nth 2 (cistern--rewards-eval st nil)))
+      (if (eq (plist-get intent :layer) 'banner)
+          (setq banner (concat banner (plist-get intent :text)))
+        (let* ((pos (plist-get intent :pos))
+               (face (plist-get intent :face)))
+          (when (and pos (cistern--in-bounds-p st (car pos) (cdr pos)))
+            (push (cons (cons (car pos) (cdr pos))
+                        (cons (plist-get intent :glyph)
+                              (or (cdr (assq face cistern-view--palette-faces))
+                                  face)))
+                  map)))))
+    (cons map banner)))
+
 ;; ---------------------------------------------------------------------------
 ;; Cell projection: (GLYPH . FACE), tile table + query functions only.
 
@@ -204,28 +240,32 @@ variants only — base glyphs never leave the table."
          "PRESSURE RISING — LINES NEAR CAPACITY")
         (t "LINES NOMINAL — THE STRUCTURE DOES NOT CARE")))
 
-(defun cistern-view--map-rows (st)
+(defun cistern-view--map-rows (st &optional overlay)
   (let ((out ""))
     (dotimes (y (cistern-st-h st))
       (dotimes (x (cistern-st-w st))
-        (let* ((w (cl-find-if
+        (let* ((cur (equal (cons x y) (cistern-st-cursor st)))
+               (w (cl-find-if
                    (lambda (w)
                      (and (= (cistern--worker-x w) x)
                           (= (cistern--worker-y w) y)))
                    (cistern-st-creators st)))
+               ;; particle loses to cursor AND worker (D5: cursor >
+               ;; worker > particle > cell)
+               (ov (and (not cur) (not w)
+                        (cdr (assoc (cons x y) overlay))))
                (cg (cistern-view--cell-glyph st x y))
-               (glyph (if w (cistern-view--worker-glyph st w) (car cg)))
-               (face (if w
-                         (if (> (cistern--worker-sick w) 0)
-                             'cistern-worker-sick 'cistern-worker)
-                       (cdr cg))))
-          ;; D5 overlay precedence: cursor > worker > (particle, 4b) > cell
+               (glyph (cond (w (cistern-view--worker-glyph st w))
+                            (ov (car ov))
+                            (t (car cg))))
+               (base-face (cond (w (if (> (cistern--worker-sick w) 0)
+                                       'cistern-worker-sick 'cistern-worker))
+                                (ov (cdr ov))
+                                (t (cdr cg))))
+               (face (if cur (list 'cistern-cursor base-face) base-face)))
           (setq out (concat out
                             (propertize
-                             glyph 'face
-                             (if (equal (cons x y) (cistern-st-cursor st))
-                                 (list 'cistern-cursor face)
-                               face))))))
+                             glyph 'face face)))))
       (setq out (concat out "\n")))
     out))
 
@@ -248,17 +288,25 @@ variants only — base glyphs never leave the table."
 mutation, no side effects (D4) — the driver owns inserting it.
 Layout contract: exactly `cistern-view--header-lines' header
 lines precede the map rows."
-  (concat
-   (propertize (cistern-view--header-line st) 'face 'cistern-header)
-   (propertize (cistern-view--help-line) 'face 'cistern-dim)
-   (propertize (cistern-view--legend-line) 'face 'cistern-dim)
-   (cistern-view--map-rows st)
-   (propertize (concat (cistern-view--inspector st) "\n")
-               'face 'cistern-dim)
-   (propertize (concat (cistern-view--pressure-line st) "\n")
-               'face 'cistern-dim)
-   (cistern-view--tutorial-line st)
-   (cistern-view--log-tail st)))
+  (let* (;; the rewards use case is read exactly ONCE per render (§3.6)
+         (celebration (cistern-view--celebration-overlay st))
+         (overlay (car celebration))
+         ;; reserved banner row (§3.5): after the map rows, before the
+         ;; inspector; empty for the default outcome.  Banner content
+         ;; design (ceremony copy/centering) is Phase 4 — DEFERRED.
+         (banner (cdr celebration)))
+    (concat
+     (propertize (cistern-view--header-line st) 'face 'cistern-header)
+     (propertize (cistern-view--help-line) 'face 'cistern-dim)
+     (propertize (cistern-view--legend-line) 'face 'cistern-dim)
+     (cistern-view--map-rows st overlay)
+     (propertize (concat banner "\n") 'face 'cistern-header)
+     (propertize (concat (cistern-view--inspector st) "\n")
+                 'face 'cistern-dim)
+     (propertize (concat (cistern-view--pressure-line st) "\n")
+                 'face 'cistern-dim)
+     (cistern-view--tutorial-line st)
+     (cistern-view--log-tail st))))
 
 ;; ---------------------------------------------------------------------------
 ;; Buffer geometry (Pair 2 slice; shares the header-lines constant).

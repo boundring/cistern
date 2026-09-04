@@ -660,3 +660,66 @@ One entry per dead/failed/retried run.
   extend to `cistern-view.el` hash-layout access at Pair 5 (plan 02
   §R9 backstop) — the new domain query functions are the sanctioned
   access path.
+
+---
+
+## L-017 (2026-09-04, run: impl-phase3 — Pair 5, R5 celebration hook)
+
+- Attempt: Red test `tests/test-r5-hook.el :: cistern-test-r5-hook`
+  (red commit `754ccaf`; red runs: first a test-authoring bug — a
+  dotted-pair literal `(cons 999 . 999)` aborted the file load with
+  end-of-file before any assert ran, then a missing defun-closing
+  paren (the L-005/R6-RETRY class, caught by a paren-depth scan) —
+  the REAL red: `particle glyph painted on the map row`, the Pair-4
+  render ignoring celebration intents, exit 255). Green =
+  `cistern-view--celebration-overlay` (st) in the view: reads
+  `cistern--rewards-eval` exactly ONCE, returns (MAP-ALIST .
+  BANNER-TEXT); the render binds it once, feeds the map alist into
+  `cistern-view--map-rows` at the D5 precedence point (cursor >
+  worker > particle > cell; a particle loses to cursor AND worker),
+  and emits BANNER-TEXT into the reserved post-map row (between map
+  and inspector; empty by default).  Overlay is transient by
+  construction: state untouched, next frame restores; out-of-bounds
+  intents clipped via `cistern--in-bounds-p`.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 16 TESTS PASSED, exit 0. R1/R2/R6/R7
+  regressions re-run green standalone; cell-at geometry unchanged by
+  the banner row (post-map row only). Projection-only backstop
+  extended per the L-016 change item: zero gethash/maphash/
+  cistern-st-toilets/cistern-st-tanks occurrences in
+  cistern-view.el/cistern-input.el — the domain query functions are
+  the sanctioned access path.
+- Evidence: red run above (exit 255); green run `R5-HOOK-OK` (exit
+  0); full suite `ALL 16 TESTS PASSED` (exit 0).
+- Pinned readings:
+  1. Intent shape (the contract 4b's particle field drops into): a
+     plist (:pos (X . Y) :glyph S :face FACE-OR-PALETTE-ENUM :layer
+     sparkle|popup|banner); banner intents carry :text instead of
+     :pos. Faces resolve through `cistern-view--palette-faces`
+     (success/warning/error/info/bonus → Emacs faces, plan 02 §3.2);
+     unknown faces pass through (hand-built test intents use Emacs
+     faces directly). Pos is the codebase's (X . Y) cons convention.
+  2. §3.6's "rewards-eval once per render" is enforced by binding
+     the overlay result once in `cistern-view--render`; the first
+     green draft called the overlay function twice (map + banner) —
+     caught in review of my own diff, fixed before any commit.
+  3. Banner = plain text in the reserved row with the
+     `cistern-header` face; ceremony copy/centering is DEFERRED to
+     Phase 4 (plan 02 §4). Banner row always emitted (stable layout),
+     empty for the default outcome.
+  4. advance-particles wiring point stays pinned to the auto-run
+     timer callback (§3.1; docstring pointer already in the callback)
+     — nothing pre-built for Phase 4.
+- Lesson: the two aborting red runs were authoring bugs that the
+  fail-first discipline caught cheaply — a red run that dies at LOAD
+  is not the requirement's red; re-check the test parses before
+  reading anything into the failure. Paren-depth scan (python one
+  count) found the missing closer in one shot after check-parens
+  flagged it.
+- Change for next attempt: Phase 4b replaces the hand-built intents
+  with the real particle field per REWARDS-DESIGN §4 ({pos, vel, ttl,
+  glyph, face, layer}, K=64 FIFO cap) — the overlay's intent→alist
+  mapping is the consumption surface; extend it (vel/ttl handling
+  happens in the domain/use-case field, NOT the view), and give the
+  banner its centered-composition treatment then. Phase 4a's tutorial
+  scenarios render through the unchanged `cistern-view--render`.
