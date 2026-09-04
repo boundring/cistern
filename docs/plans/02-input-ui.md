@@ -14,8 +14,10 @@ Phase 2). Planning only — no game code in this plan.
 
 ## 1. Task breakdown — ordered red/green pairs
 
-Per ROADMAP fail-first order: **commit all four red tests before any green**
-(roadmap: "Green: implement 1–4"). Each green turns one already-red test.
+Per-pair cadence (PROCESS-RETRO P1/P2, superseding the planning-era
+"commit all reds first" convention): each pair commits its own red test,
+then its green implementation; the canonical runner is green after every
+pair. Each green turns that pair's red test.
 Commit messages per spec §5.1: red = `test: R# failing — <name>`, green =
 `R#: <what>`. All tests run in `emacs -Q --batch`; adapter/view tests load
 their adapter file (which depends only inward); keymap test loads `cistern.el`
