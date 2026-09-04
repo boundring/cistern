@@ -23,7 +23,8 @@
     cistern-test-tick-headless
     cistern-test-determinism
     cistern-test-determinism-order
-    cistern-test-demolish))
+    cistern-test-demolish
+    cistern-test-exactly-one-tick))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
