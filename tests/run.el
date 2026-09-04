@@ -25,7 +25,8 @@
     cistern-test-determinism-order
     cistern-test-demolish
     cistern-test-exactly-one-tick
-    cistern-test-rewards-default))
+    cistern-test-rewards-default
+    cistern-test-cursor-and-click))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
