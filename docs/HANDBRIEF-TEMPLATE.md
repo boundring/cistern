@@ -56,3 +56,35 @@ Probe rules:
 ## Done-when
 
 - <verbatim acceptance criterion from DESIGN-SPEC §4>
+
+## Phase-closing review (end of every phase)
+
+Before declaring a phase done, a reviewer with fresh eyes runs the
+six-item checklist and applies only small fixes; structural findings
+are ledgered, never fixed in passing:
+
+1. Dependency conformance (spec §3.3, semantic — beyond the mechanical
+   check): does the outer layer re-implement inner logic instead of
+   calling it? does the inner layer carry presentation concepts? judge
+   each spec-pinned state field for minimal shape.
+2. Duplication: fixtures/patterns copied per test file consolidate to
+   one shared copy; verbatim legacy ports keep only what their new
+   layer needs; deletion over addition, no abstractions for
+   single-use code.
+3. Contract check: every signature in code matches the spec/design-doc
+   sentence in element count and order; when the code is the pinned
+   reading, fix the doc, not the code.
+4. Ledger audit: every "Change for next attempt" in L-00N is applied,
+   superseded (say where), or dropped — a dropped one is a finding.
+5. Deferred discipline: every decision pinned in code traces to the
+   plan's PINNED section or a ledger entry; undocumented pins are
+   findings.
+6. Dead weight: stale comments, docstrings describing the old layer,
+   defensive checks that test nothing.
+
+Authority split: comment/docstring/test-helper/spec-wording fixes
+commit directly (`review: <what>`; suite green after each; skip the
+run for comment-only fixes). Anything changing a contract, moving code
+between layers, or reshaping state is STRUCTURAL: record it in
+`docs/FAILURE-LEDGER.md` as one consolidated L-0NN entry listing each
+finding + the phase that owns it, and leave the code alone.

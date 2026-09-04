@@ -377,3 +377,36 @@ One entry per dead/failed/retried run.
   the use-case verbs (cmd-cursor/cmd-click/cmd-build/…) — no new
   placement legality, and the tick coupling stays inside cmd-click
   where the tests pin it.
+
+---
+
+## L-012 (2026-09-04, run: review-phase2 — Phase 2 closing review)
+
+- Attempt: phase-closing conformance/simplification review (six-item
+  checklist). Small fixes committed directly: floor-run fixture
+  consolidated 3 copies → 1 (`d5d4a23`), rewards-eval 3-list named in
+  spec R5 / plan 01 §2.3 / REWARDS-DESIGN §5 wording (`9300307`), one
+  stale comment fixed (`8b4555d`). All "Change for next attempt"
+  directives in L-002..L-011 audited: applied or superseded except the
+  two structural findings below.
+- Structural findings (NOT fixed in passing; each lists its owning
+  phase):
+  1. Worker identity glyphs live in the domain layer outside the tile
+     table (`cistern--worker-glyphs` vector, `cistern--worker-glyph`,
+     consumed by the accident log line) — a presentation concept in the
+     pure-sim layer, verbatim legacy port. Phase 3 (view): decide
+     whether the view renders worker identity from a stable per-worker
+     index and the domain log carries ids instead of glyphs.
+  2. The soak bot's purge-target selection iterates
+     `(cistern-st-tanks st)` unsorted — an undocumented exception to
+     L-006's directive ("any new maphash iteration whose order feeds
+     state must sort or index-scan"). Deterministic only under
+     identical insertion history, which the seed-1 soak satisfies.
+     Next soak-touching phase: sort the keys or record the exception
+     explicitly, L-011-cmd-build style.
+  3. The L-007 floor-run fixture (`cistern-test-game--floor-run`) lives
+     in src/cistern-game.el (required by the spec §5.1-pinned
+     selftest) and, since `d5d4a23`, is also consumed by
+     tests/game-cursor.el and tests/game-demolish.el. Accepted inward
+     dependency; if the selftest ever leaves src, move the fixture to
+     a tests helper. Phase 3 note only.
