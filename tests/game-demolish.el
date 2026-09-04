@@ -6,38 +6,15 @@
 
 (require 'cl-lib)
 
-(defun cistern-test-demolish--plumbing-nearby-p (st x y)
-  "Is (X,Y) itself or any 4-neighbor of it a plumbing cell?
-The test wants fixture networks closed off from the starter plumbing,
-so flood-fill results depend only on cells the test built."
-  (let ((bad nil))
-    (dolist (n (cons (cons x y) (cistern--neighbors st x y)) bad)
-      (when (memq (cistern--cell st (car n) (cdr n)) '(pipe toilet tank))
-        (setq bad t)))))
-
-(defun cistern-test-demolish--floor-run (st n)
-  "Leftmost (X Y) of N consecutive unoccupied floor cells, with no
-plumbing adjacent, or nil."
-  (let ((occ (cistern--occupied-cells st nil)))
-    (catch 'found
-      (cl-loop for y from 1 below (1- (cistern-st-h st)) do
-               (cl-loop for x from 1 to (- (cistern-st-w st) 1 n) do
-                        (when (cl-loop for i from 0 below n
-                                       always (and (eq (cistern--cell st
-                                                        (+ x i) y)
-                                                       'floor)
-                                                   (not (gethash (cons (+ x i) y)
-                                                                 occ))
-                                                   (not (cistern-test-demolish--plumbing-nearby-p
-                                                         st (+ x i) y))))
-                          (throw 'found (list x y))))))))
+;; Fixture: `cistern-test-game--floor-run' (L-007 pattern, single copy
+;; in src/cistern-game.el beside the spec §5.1-pinned selftest).
 
 (defun cistern-test-demolish ()
   (let ((st (cistern--new-game 42)))
     (setf (cistern-st-alloy st) 100)
 
     ;; --- A: place a tank via cmd-build, demolish it back to floor
-    (let* ((spot (cistern-test-demolish--floor-run st 1))
+    (let* ((spot (cistern-test-game--floor-run st 1))
            (x (car spot)) (y (cadr spot)))
       (cl-assert (eq (cistern--cell st x y) 'floor))
       (cistern--cmd-build st 'tank x y)
@@ -53,7 +30,7 @@ plumbing adjacent, or nil."
                    "alloy reduced by exactly the demolish cost")))
 
     ;; --- B: a toilet fed through a demolished tank becomes unusable
-    (let* ((run (cistern-test-demolish--floor-run st 3))
+    (let* ((run (cistern-test-game--floor-run st 3))
            (x (car run)) (y (cadr run)))
       (cistern--cmd-build st 'toilet x y)
       (cistern--cmd-build st 'pipe (1+ x) y)
@@ -88,7 +65,7 @@ plumbing adjacent, or nil."
                    "ore refused"))
       (cl-assert (= (cistern-st-alloy st) a0) "refusals cost nothing")
       ;; in-use toilet (worker seated: :busy t, as the sim sets it)
-      (let* ((spot (cistern-test-demolish--floor-run st 1))
+      (let* ((spot (cistern-test-game--floor-run st 1))
              (x (car spot)) (y (cadr spot)))
         (cistern--cmd-build st 'toilet x y)
         (puthash (cons x y) (list :busy t) (cistern-st-toilets st))

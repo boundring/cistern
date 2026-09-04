@@ -2,30 +2,10 @@
 
 (require 'cl-lib)
 
-;; Floor-run fixture per L-007: cells must be unoccupied floor with no
-;; plumbing 4-adjacent, so test networks stay isolated from procgen's
-;; starter plumbing.
-
-(defun cistern-test-cursor--plumbing-nearby-p (st x y)
-  (let ((bad nil))
-    (dolist (n (cons (cons x y) (cistern--neighbors st x y)) bad)
-      (when (memq (cistern--cell st (car n) (cdr n)) '(pipe toilet tank))
-        (setq bad t)))))
-
-(defun cistern-test-cursor--floor-run (st n)
-  (let ((occ (cistern--occupied-cells st nil)))
-    (catch 'found
-      (cl-loop for y from 1 below (1- (cistern-st-h st)) do
-               (cl-loop for x from 1 to (- (cistern-st-w st) 1 n) do
-                        (when (cl-loop for i from 0 below n
-                                       always (and (eq (cistern--cell st
-                                                        (+ x i) y)
-                                                       'floor)
-                                                   (not (gethash (cons (+ x i) y)
-                                                                 occ))
-                                                   (not (cistern-test-cursor--plumbing-nearby-p
-                                                         st (+ x i) y))))
-                          (throw 'found (list x y))))))))
+;; Fixture: `cistern-test-game--floor-run' (L-007 pattern, single copy
+;; in src/cistern-game.el beside the spec §5.1-pinned selftest) —
+;; unoccupied floor with no plumbing 4-adjacent, so test networks stay
+;; isolated from procgen's starter plumbing.
 
 (defun cistern-test-cursor-and-click ()
   ;; --- cursor-move: direction updates cursor, clamped to bounds
@@ -62,7 +42,7 @@
 
   ;; --- click with armed verb: place + exactly one tick (R6 cross-assert)
   (let* ((st (cistern--new-game 42))
-         (spot (cistern-test-cursor--floor-run st 1))
+         (spot (cistern-test-game--floor-run st 1))
          (x (car spot)) (y (cadr spot)))
     (setf (cistern-st-alloy st) 100)
     (setf (cistern-st-armed-verb st) 'pipe)
@@ -84,7 +64,7 @@
 
   ;; --- unaffordable placement: refused, state untouched
   (let* ((st (cistern--new-game 42))
-         (spot (cistern-test-cursor--floor-run st 1))
+         (spot (cistern-test-game--floor-run st 1))
          (x (car spot)) (y (cadr spot)))
     (setf (cistern-st-alloy st) 0)
     (setf (cistern-st-armed-verb st) 'tank)
