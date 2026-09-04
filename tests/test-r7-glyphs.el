@@ -119,7 +119,13 @@ the render is a pure, propertized projection of state."
                  t "view contains no cell-kind pcase/case")
       (dolist (entry cistern--tile-table)
         (cl-assert (not (string-match-p
-                         (regexp-quote (cistern--tile-glyph (car entry)))
+                         ;; quoted string-literal form: a bare glyph in
+                         ;; code (e.g. the `1+' function) must not trip
+                         ;; the probe (L-013 probe-precision rule)
+                         (regexp-quote (concat "\""
+                                               (cistern--tile-glyph
+                                                (car entry))
+                                               "\""))
                          src))
                    t "tile glyph hardcoded in view: %s" (car entry)))))
 

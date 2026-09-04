@@ -36,6 +36,12 @@ site (L-010 pin 4, L-013 migration)."
 machinery never references the driver outward; the driver
 consumes it inward.")
 
+(defvar cistern-input--refresh nil
+  "Driver-registered refresh closure, called by the auto-run
+callback after each tick so the timer's per-fire path repaints
+(L-015 change item b).  Driver→adapter registration keeps the
+dependency inward; nil until the driver's toggle command runs.")
+
 (defun cistern-input-auto-run-toggle (st)
   "Toggle auto-run (5 ticks/second) for ST — the testable adapter
 unit; the driver's `cistern-auto-run-toggle' command calls this.
@@ -65,6 +71,8 @@ deliberately not pre-built."
     (if (cistern-st-over cistern--st)
         (setq cistern--auto-run-timer nil)
       (cistern--do-tick cistern--st)
+      (when cistern-input--refresh
+        (funcall cistern-input--refresh))
       (setq cistern--auto-run-timer
             (run-with-idle-timer 0.2 nil
                                  #'cistern-input--auto-run-callback)))))

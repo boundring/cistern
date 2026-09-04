@@ -583,3 +583,80 @@ One entry per dead/failed/retried run.
   owns buffer mutation, so the refresh lands with the view), and (c)
   remember the REWARDS-DESIGN §4 advance-particles pointer already
   in the callback docstring is 4b's, not Pair 4's.
+
+---
+
+## L-016 (2026-09-04, run: impl-phase3 — Pair 4, R7 glyphs + full render)
+
+- Attempt: Red test `tests/test-r7-glyphs.el :: cistern-test-r7-glyph`
+  (red commit `fbd9d66`; red run: `void-function
+  cistern-view--cell-glyph`, exit 255). Green = the full view
+  projection in `src/cistern-view.el` (faces ported from legacy
+  :604-621 + new `cistern-pipe-live`/`cistern-pipe-dead`; table-driven
+  legend/inspector/faces; worker identity glyphs moved here per
+  L-012 finding 1; `cistern-view--render` = pure propertized string
+  with the 3-line header contract intact), the driver's
+  `cistern--refresh` wired into every state-mutating command (entry,
+  new-game, skip-tutorial, tick, 4 cursor commands, click handler,
+  arm-and-build, demolish, decon, purge) and into the auto-run
+  callback's per-fire path via the driver-registered
+  `cistern-input--refresh` closure, and the domain query functions
+  the projection needed: `cistern--toilet-state` (busy/usable/down
+  enum), `cistern--tank-load`, `cistern--tank-load-total`,
+  `cistern--toilets-backed-p` — hash access stays in the domain; the
+  view touches state only through queries + grid primitives (D6).
+  L-012 finding 1 RESOLVED: `cistern--worker-glyphs` +
+  `cistern--worker-glyph` deleted from the domain;
+  `cistern-view--worker-glyph` renders identity from the stable
+  creators-list index; `cistern--accident` logs
+  "BREACH — CREATOR #%d OVERFLOWED AT (x,y)" — the domain log carries
+  the index, no glyph string. `cistern-version` moved to the domain
+  constants block (the view header reads it inward).
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 15 TESTS PASSED, exit 0. R1/R2/R6
+  regressions re-run green standalone (cell-at geometry unchanged).
+  R9 gate clean. No tile glyph literals and no pcase/cl-case/case in
+  view source (test-pinned).
+- Evidence: red run above (exit 255); green standalone exit 0; full
+  suite `ALL 15 TESTS PASSED` (exit 0).
+- Pinned readings:
+  1. Refresh wiring shape (L-015 change item b): adapter defvar
+     `cistern-input--refresh` (nil default) + the driver's toggle
+     command registers `#'cistern--refresh` on each toggle
+     (idempotent). Driver→adapter registration is inward; lazy
+     registration keeps the callback a no-refresh no-op under the
+     Pair-3 test's direct invocations (no test churn).
+  2. Tile-table glyph literals: the view builds the glyph legend,
+     help line, and all cell glyphs from the table; the pipe's
+     box-drawing shapes are a view-local topology table (the tile
+     table is one-glyph-per-kind; the connection VARIANT is R7's
+     view job — plan 01 §1.3 note). The static probe asserts no
+     QUOTED tile glyph literal in view source (L-013 probe-precision:
+     a bare-char regex tripped the `1+` function call — probe refined
+     to string-literal form, guard kept at full strength).
+  3. The view's kind dispatch is a `cond` selecting CONNECTION
+     variants (pipe/toilet/tank) with base glyphs/faces from tables —
+     the greppable rule (test-pinned) is "no pcase/cl-case/case and
+     no tile-glyph literals", not "no cond"; the tile table remains
+     the sole glyph source (R3b).
+  4. Legacy inspector's hardcoded "(4 alloy)" decon price dropped
+     from the hazard description (it contradicted
+     `cistern-cost-decon` = 3); prices are advertised via the
+     format-driven help line.
+  5. Header decorative ▓▓ glyphs replaced with plain text (the
+     glyph-literal probe class); tutorial line renders only when the
+     current step exists (empty Phase-2 table ⇒ no line, mechanism
+     intact for 4a).
+- One in-cycle RETRY, probe-only: the quoted-literal refinement
+  above. One apply-patch misplacement (L-005 class) introduced
+  duplicate cursor/click defuns mid-green — caught by the standing
+  duplicate-defun grep before any test run, removed in the same
+  cycle.
+- Change for next attempt: Pair 5 plugs `cistern-view--celebration-overlay`
+  into `cistern-view--map-rows` at the marked D5 precedence point
+  (cursor > worker > particle > cell) — the overlay must be empty for
+  the default outcome so render output stays byte-identical with the
+  hook short-circuited (R5 render half). The projection-only greps
+  extend to `cistern-view.el` hash-layout access at Pair 5 (plan 02
+  §R9 backstop) — the new domain query functions are the sanctioned
+  access path.

@@ -10,6 +10,9 @@
 
 (defconst cistern-w 34 "Sector width.")
 (defconst cistern-h 16 "Sector height.")
+(defconst cistern-version "3.0.0-dev"
+  "CISTERN version.  Lives in the domain constants block so both
+the view header and the driver help read it inward.")
 (defconst cistern-tank-cap 60 "Tank capacity in waste units.")
 (defconst cistern-use-load 10 "Waste units deposited per toilet use.")
 (defconst cistern-use-ticks 2 "Ticks one toilet use occupies.")
@@ -27,8 +30,6 @@
 (defconst cistern-cost-tank 15)
 (defconst cistern-cost-decon 3)
 (defconst cistern-purge-rate 3 "Waste units per recovered alloy on purge.")
-
-(defconst cistern--worker-glyphs ["α" "β" "γ" "δ" "ε" "ζ" "η" "θ"])
 
 ;; ---------------------------------------------------------------------------
 ;; 1b. Reference tile table — the SOLE source for glyph choice and
@@ -234,6 +235,41 @@ Returns hash (X . Y) -> distance.  The seed is included regardless."
              (cistern-st-toilets st))
     (sort out (lambda (a b) (< (car a) (car b))))))
 
+;; View-facing query functions (D6): the projection reads connection
+;; and load state ONLY through these enum/number queries — never via
+;; direct hash access (plan 02 §2 view item; L-016).
+
+(defun cistern--toilet-state (st x y)
+  "Connection state of the toilet at (X,Y): `busy', `usable', or
+`down' (severed, backed up, or full tanks)."
+  (let ((entry (gethash (cons x y) (cistern-st-toilets st))))
+    (cond ((not entry) 'down)
+          ((plist-get entry :busy) 'busy)
+          ((cistern--toilet-usable-p st x y) 'usable)
+          (t 'down))))
+
+(defun cistern--tank-load (st x y)
+  "Stored waste in the tank at (X,Y), or nil when absent."
+  (let ((tp (gethash (cons x y) (cistern-st-tanks st))))
+    (when tp (plist-get tp :load))))
+
+(defun cistern--tank-load-total (st)
+  "Total stored waste across all tanks."
+  (let ((total 0))
+    (maphash (lambda (_k v) (setq total (+ total (plist-get v :load))))
+             (cistern-st-tanks st))
+    total))
+
+(defun cistern--toilets-backed-p (st)
+  "True when any placed toilet is out of service while not in use
+(legacy :716-722 semantics verbatim)."
+  (let ((backed nil))
+    (maphash (lambda (k _v)
+               (when (eq (cistern--toilet-state st (car k) (cdr k)) 'down)
+                 (setq backed t)))
+             (cistern-st-toilets st))
+    backed))
+
 (defun cistern--walkable-p (st x y tx ty)
   "Is (X,Y) enterable by a worker walking to target (TX,TY)?
 Table-passable cells always.  A toilet only when it is the target:
@@ -261,10 +297,6 @@ entering a toilet IS seating yourself.  Toilets are rooms, not floors."
 
 ;; ---------------------------------------------------------------------------
 ;; 5. Worker lifecycle (cistern.el:236-258).
-
-(defun cistern--worker-glyph (st w)
-  (let ((i (or (cl-position w (cistern-st-creators st) :test #'eq) 0)))
-    (aref cistern--worker-glyphs (mod i (length cistern--worker-glyphs)))))
 
 (defun cistern--spawn-worker (st x y)
   (let ((w (cistern--worker-make :x x :y y :bladder 20)))
@@ -405,8 +437,11 @@ base can never be destroyed by unserved need."
                    (= (cistern--worker-x o) (car n))
                    (= (cistern--worker-y o) (cdr n)))
           (setf (cistern--worker-sick o) cistern-sick-ticks))))
-    (cistern--log st "BREACH — CREATOR %s OVERFLOWED AT (%d,%d)"
-                  (cistern--worker-glyph st w) x y)))
+    ;; the domain log carries the worker's stable list index; the
+    ;; identity glyph is a view concern (L-012 finding 1 resolution)
+    (cistern--log st "BREACH — CREATOR #%d OVERFLOWED AT (%d,%d)"
+                  (or (cl-position w (cistern-st-creators st) :test #'eq) 0)
+                  x y)))
 
 (defun cistern--seek-toilet (st w)
   (let* ((x (cistern--worker-x w))

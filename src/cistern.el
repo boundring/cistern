@@ -13,12 +13,18 @@
 (require 'cistern-input)
 (require 'cistern-view)
 
-(defconst cistern-version "3.0.0-dev")
-
 ;; The one module global (spec §3.3, legacy cistern.el:785 pattern).
-;; `cistern--auto-run-timer' joins it in Pair 3 as the pinned D2
-;; timer-handle exception.
+;; The D2 timer-handle exception (`cistern--auto-run-timer') lives in
+;; the input adapter (L-015 pin 1: inward dependency).
 (defvar cistern--st nil)
+
+(defun cistern--refresh ()
+  "Driver-owned buffer mutation (D4): erase and insert the view's
+pure render.  Every state-mutating command ends here."
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (insert (cistern-view--render cistern--st))
+    (goto-char (point-min))))
 
 (defvar cistern-mode-map
   (let ((m (make-sparse-keymap)))
@@ -56,33 +62,44 @@
     (cistern-mode))
   (unless cistern--st
     (setq cistern--st (cistern--new-game)))
-  ;; render lands with the view adapter (Pair 4)
+  (cistern--refresh)
   cistern--st)
 
 (defun cistern-new-game ()
   (interactive)
   (setq cistern--st (cistern--new-game
-                     (cistern--rand cistern--st 2147483647))))
+                     (cistern--rand cistern--st 2147483647)))
+  (cistern--refresh))
 
 (defun cistern-skip-tutorial ()
   (interactive)
   (setf (cistern-st-tutorial cistern--st) t)
-  (cistern--log cistern--st "TUTORIAL SKIPPED"))
+  (cistern--log cistern--st "TUTORIAL SKIPPED")
+  (cistern--refresh))
 
 (defun cistern-tick ()
   (interactive)
   (if (cistern-st-over cistern--st)
       (cistern--log cistern--st "SECTOR CONDEMNED — PRESS n FOR NEW GAME")
-    (cistern--do-tick cistern--st)))
+    (cistern--do-tick cistern--st))
+  (cistern--refresh))
 
 (defun cistern-cursor-north ()
-  (interactive) (cistern-input-cursor-move cistern--st 'north))
+  (interactive)
+  (cistern-input-cursor-move cistern--st 'north)
+  (cistern--refresh))
 (defun cistern-cursor-south ()
-  (interactive) (cistern-input-cursor-move cistern--st 'south))
+  (interactive)
+  (cistern-input-cursor-move cistern--st 'south)
+  (cistern--refresh))
 (defun cistern-cursor-west ()
-  (interactive) (cistern-input-cursor-move cistern--st 'west))
+  (interactive)
+  (cistern-input-cursor-move cistern--st 'west)
+  (cistern--refresh))
 (defun cistern-cursor-east ()
-  (interactive) (cistern-input-cursor-move cistern--st 'east))
+  (interactive)
+  (cistern-input-cursor-move cistern--st 'east)
+  (cistern--refresh))
 
 (defun cistern-click (event)
   "Mouse-1 on a grid cell: translate buffer coordinates to (x,y)
@@ -95,7 +112,8 @@ cursor move, no tick; armed = place at the cell + one tick)."
                cistern--st (line-number-at-pos (point))
                (current-column)))))
     (when xy
-      (cistern-input-click cistern--st (car xy) (cdr xy)))))
+      (cistern-input-click cistern--st (car xy) (cdr xy))
+      (cistern--refresh))))
 
 (defun cistern--arm-and-build (kind)
   "Arm KIND via the input adapter (use-case `cistern--cmd-arm-verb',
@@ -105,7 +123,8 @@ while arming the verb for click-to-place)."
   (cistern-input-arm-verb cistern--st kind)
   (cistern--cmd-build cistern--st kind
                       (car (cistern-st-cursor cistern--st))
-                      (cdr (cistern-st-cursor cistern--st))))
+                      (cdr (cistern-st-cursor cistern--st)))
+  (cistern--refresh))
 
 (defun cistern-build-toilet ()
   (interactive) (cistern--arm-and-build 'toilet))
@@ -118,25 +137,29 @@ while arming the verb for click-to-place)."
   (interactive)
   (cistern--cmd-demolish cistern--st
                          (car (cistern-st-cursor cistern--st))
-                         (cdr (cistern-st-cursor cistern--st))))
+                         (cdr (cistern-st-cursor cistern--st)))
+  (cistern--refresh))
 
 (defun cistern-decon ()
   (interactive)
   (cistern--cmd-decon cistern--st
                       (car (cistern-st-cursor cistern--st))
-                      (cdr (cistern-st-cursor cistern--st))))
+                      (cdr (cistern-st-cursor cistern--st)))
+  (cistern--refresh))
 
 (defun cistern-purge ()
   (interactive)
   (cistern--cmd-purge cistern--st
                       (car (cistern-st-cursor cistern--st))
-                      (cdr (cistern-st-cursor cistern--st))))
+                      (cdr (cistern-st-cursor cistern--st)))
+  (cistern--refresh))
 
 (defun cistern-auto-run-toggle ()
   "Toggle the 5 ticks/second auto-run timer ('r').  Scheduling
 and the chain callback live in the input adapter; the handle is
 `cistern--auto-run-timer' (Pinned D2)."
   (interactive)
+  (setq cistern-input--refresh #'cistern--refresh)
   (cistern-input-auto-run-toggle cistern--st))
 
 (defun cistern-help ()
