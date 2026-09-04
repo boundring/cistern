@@ -367,8 +367,9 @@ NOT in this file: keymap/mouse/timer (input adapter, Phase 3), glyphs/faces
    game exposes `cistern--do-tick` (over-guard + sim-tick + tutorial
    advance). Legacy's monolithic do-tick is thereby cutover'd, not aliased.
 3. `cistern--rewards-eval` signature and default outcome: signature per
-   REWARDS-DESIGN §5 — (state, tick events) → (updated state, presentation
-   intents); fresh state with no events ⇒ unchanged state + the default
+   REWARDS-DESIGN §5 — (state, tick events) → (updated state, outcome,
+   presentation intents) as a 3-list; fresh state with no events ⇒ unchanged
+   state + the default
    outcome `(:score 0 :objectives nil :unlocks nil :celebrate nil)` with
    empty presentation intents. Smallest shape the placeholder test can
    pin; 4b consumption re-shapes per the doc (spec §4 R5; same shape and

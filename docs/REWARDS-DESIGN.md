@@ -127,7 +127,10 @@ The field lives in domain state beside the sim. Its RNG stream is **derived from
 
 **`cistern--rewards-eval`** (per-tick domain use-case):
 - **Consumes:** full game state (map, workers, coins, reputation, streak, particle field, milestone progress, RNG streams, active goal card) + list of events emitted this tick (relief, burst, leak, milestone-crossed, goal-satisfied).
-- **Returns:** updated game state + presentation intents (log lines with severity, face assignments, popup/particle spawns, unlock notifications, banner, MapCompleted).
+- **Returns:** a 3-list — updated game state + the outcome record
+  (score, objectives, unlocks, celebrate) + presentation intents (log
+  lines with severity, face assignments, popup/particle spawns, unlock
+  notifications, banner, MapCompleted).
 
 **Goal-card shape:** `{map_id, goals: [{kind: relieves-served | bursts-allowed | contamination-ceiling, target, window_ticks?}], difficulty_tier}`. Max 3 goals. Evaluator runs every tick; all goals satisfied ⇒ MapCompleted.
 

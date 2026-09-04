@@ -165,8 +165,8 @@ scenario where the same seed's need is served with contamination staying 0.
 `docs/REWARDS-DESIGN.md`** (landed in-repo; its §2 MUST table, §4
 dancing-pixels spec, and §5 integration contract are binding acceptance
 criteria). `cistern-game.el` exposes `cistern--rewards-eval` with the
-doc's §5 signature — (state, tick events) → (updated state, presentation
-intents). The placeholder default outcome
+doc's §5 signature — (state, tick events) → (updated state, outcome,
+presentation intents) as a 3-list. The placeholder default outcome
 `(:score 0 :objectives nil :unlocks nil :celebrate nil)` with empty
 presentation intents is pinned for the Phase 2 green test; the doc's rules
 re-shape the outcome in Phase 4b. The view renders celebrations.
