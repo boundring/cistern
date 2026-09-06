@@ -82,7 +82,9 @@ by the view, not here).")
   score objectives unlocks   ; rewards-owned; shape DEFERRED to REWARDS-DESIGN
   (rewards-events nil)       ; events emitted since the last rewards-eval read (§5)
   (particle-rng 0)           ; the particle field's child-stream position (§4 ParticleField.rng)
-  (goal-card nil))           ; active goal card (§5): (:map-id :tier :goals :completed)
+  (goal-card nil)            ; active goal card (§5): (:map-id :tier :goals :completed)
+  (reputation 0)             ; 0-100 clamped; M4 deltas: +1 relief −5 burst −2 leak
+  (rewards-outcome nil))     ; stored per-tick (outcome . intents) 2-list; the view reads it
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -424,6 +426,7 @@ bug class where plumbing state pointed elsewhere cannot exist."
           (progn
             (cistern--add-hazard st x y)
             (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
+            (push 'leak (cistern-st-rewards-events st)) ; severed line: leak (M4)
             (cistern--log st "SEVERED LINE AT (%d,%d) — WASTE SPILLED" x y))
         (let ((best (car tanks)))
           (dolist (tk tanks)
@@ -435,7 +438,8 @@ bug class where plumbing state pointed elsewhere cannot exist."
                                   (plist-get (gethash best
                                                         (cistern-st-tanks st))
                                              :load)))
-                   (cistern-st-tanks st)))))))
+                  (cistern-st-tanks st))
+          (push 'relief (cistern-st-rewards-events st))))))) ; clean relieve (M4)
 
 (defun cistern--add-hazard (st x y)
   "Contaminate (X,Y) if it is floor.  Everything else — ore,
@@ -456,6 +460,7 @@ base can never be destroyed by unserved need."
                        (not (gethash n (cistern--occupied-cells st w))))
               (throw 'placed t)))))
     (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
+    (push 'burst (cistern-st-rewards-events st)) ; breach (M4)
     (dolist (n (cistern--neighbors st x y))
       (dolist (o (cistern-st-creators st))
         (when (and (not (eq o w))

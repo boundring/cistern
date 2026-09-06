@@ -372,7 +372,7 @@ neutral enum pending the L-024 ruling.")
     (setf (cistern-st-cursor st) (cons 0 0))
     (let ((r-default (cistern-view--render st)))
       (setf (cistern-st-rewards-outcome st)
-            (list cistern--rewards-default-outcome nil))
+            (cons cistern--rewards-default-outcome nil))
       (cl-assert (equal r-default (cistern-view--render st))
                  nil "default stored outcome renders byte-identical")))
   ;; (4b) demolish dust through the wired path: the tick drains the

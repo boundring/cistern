@@ -91,8 +91,10 @@ Exact colors are Phase 4b; unknown faces pass through so
 hand-built test intents can use Emacs faces directly.")
 
 (defun cistern-view--celebration-overlay (st)
-  "Dumb celebration projection (plan 02 §3): read the rewards use
-case ONCE per render and return this frame's overlay as a cons
+  "Dumb celebration projection (plan 02 §3): read the STORED
+outcome+intents from state (L-027: rewards-eval runs once per tick
+inside do-tick and stores them; the view reads, never advances —
+spec §3.3) and return this frame's overlay as a cons
 \(MAP-ALIST . BANNER-TEXT).  MAP-ALIST entries
 \(\(X . Y) . (GLYPH . FACE)) for non-banner intents, clipped to
 map bounds; BANNER-TEXT is the layer:banner text for the reserved
@@ -104,8 +106,9 @@ FACE-OR-PALETTE-ENUM :layer sparkle|popup|banner); banner intents
 carry :text instead of :pos.  advance-particles is a use case the
 presentation timer calls (wiring point pinned in the auto-run
 callback); the view only reads, never advances."
-  (let ((map nil) (banner ""))
-    (dolist (intent (nth 2 (cistern--rewards-eval st nil)))
+  (let ((map nil) (banner "")
+        (intents (cdr (cistern-st-rewards-outcome st))))
+    (dolist (intent intents)
       (if (eq (plist-get intent :layer) 'banner)
           (setq banner (concat banner (plist-get intent :text)))
         (let* ((pos (plist-get intent :pos))

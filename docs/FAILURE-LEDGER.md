@@ -1230,3 +1230,64 @@ One entry per dead/failed/retried run.
   field rides the same state-shape addition. Suggest adding a
   reader-based form-integrity check to the canonical runner
   (director's call — runner is shared infrastructure).
+
+---
+
+## L-027 (2026-09-06, run: impl-phase4 — 4b Pair 5, R5 M4 reputation + per-tick wiring)
+
+- Attempt: Red test `tests/test-4b-rewards.el ::
+  cistern-test-4b-m4-reputation` (red commit `62a5b9b`; red run:
+  `void-function cistern-st-reputation`, 1/26, exit 1). Green:
+  `reputation` + `rewards-outcome` slots on `cistern-st`;
+  `cistern--reputation-tier` (§5: 0–39 T1 / 40–69 T2 / 70–100 T3 —
+  the pay-forward function M3's card constructor consumes); M4
+  deltas verbatim (+1 relief / −5 burst / −2 leak, clamped 0–100)
+  consumed in `cistern--rewards-eval`; per-tick wiring.
+- EVENT-TRANSPORT RECONCILIATION (the L-026 contract step, per the
+  director's ruling): `cistern--rewards-eval` runs ONCE PER TICK
+  inside `cistern--do-tick` — after the sim phases, BEFORE the
+  tutorial advance (pinned). It STORES the outcome+intents into
+  `cistern-st-rewards-outcome` (a cons `(outcome . intents)`);
+  `cistern-view--celebration-overlay` READS the stored slot and
+  NEVER calls rewards-eval. THE L-017 PIN "rewards-eval once per
+  render" IS SUPERSEDED (recorded here per the ruling); the view
+  still reads and never advances (spec §3.3). test-r5-hook's
+  rewards-eval mocks migrated to stored-slot setfs; its
+  celebration-overlay short-circuit mocks remain valid.
+- M4 event-site mapping (sim phase → §5 event, all pushed onto the
+  `rewards-events` state slot by the domain, drained once per tick
+  by the rewards evaluation): relief = `cistern--finish-use`
+  deposit path (waste deposited into a connected tank); leak =
+  `cistern--finish-use` severed path (no connected tank → hazard +
+  "SEVERED LINE"); burst = `cistern--accident`. Payloadless symbol
+  events per the §5 vocabulary; payload lists (demolish) ride the
+  same slot.
+- Determinism: the 4a byte-identical tripwires stay green with the
+  wired path active — reputation and the stored outcome are
+  symmetric across replays and ride the full-state hash.
+- Source-integrity entry (director decision 1, shared infra):
+  `tests/test-source-integrity.el ::
+  cistern-test-source-integrity` — reader-loads every src/*.el,
+  walks top-level forms, asserts span ≤ 10000 chars (legitimate max
+  8822 = the selftest defun; the L-026 incident form was 25k) and
+  heads ∈ {defun defconst defvar defcustom defface defgroup
+  define-derived-mode require provide cl-defstruct}. Joins the
+  standing checklist: run it (or the canonical suite containing it)
+  before every commit; check-parens is NOT sufficient.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 26 TESTS PASSED, exit 0.
+- Incidents this pair (both caught by the integrity flow + direct
+  probing, before any false green): (1) the finish-use edit left the
+  deposit `puthash` writing into the rewards-events slot (nil) —
+  symptom was `hash-table-p nil` at the first finish tick, located
+  by direct `finish-use` invocation, fixed by restoring the tanks
+  hash argument; (2) a rewards-outcome shape mismatch — the slot
+  stores a CONS `(outcome . intents)` and every consumer (overlay,
+  tests) reads `(cdr ...)`; an intermediate `(list outcome intents)`
+  store wrapped the intents in an extra layer and the r5-hook
+  migration briefly painted nothing.
+- Change for next attempt: M5/M6 — dust/popup intents now FLOW
+  per tick through the stored slot; the M6 particle field (domain
+  state, TTL/vel/FIFO) replaces the transient intent spawns per the
+  §4 trigger table. M5's relieve-pay needs the relief event site
+  (already pinned here) plus the M4 reputation counters it updates.

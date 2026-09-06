@@ -193,6 +193,10 @@ command is NOT ported — no way to advance more than one tick per
 call exists at the use-case layer."
   (unless (cistern-st-over st)
     (cistern--sim-tick st)
+    ;; per-tick rewards evaluation (L-027 wiring): runs ONCE per
+    ;; tick, after the sim phases and before the tutorial advance;
+    ;; stores outcome+intents in state for the view to read
+    (cistern--rewards-eval st nil)
     (cistern--tutorial-advance st)))
 
 (defconst cistern--rewards-default-outcome
@@ -200,17 +204,20 @@ call exists at the use-case layer."
   "Pinned Phase 2 placeholder outcome (spec §4 R5; REWARDS-DESIGN
 §5).  Final values are REWARDS-DESIGN consumption, Phase 4b.")
 
-(defun cistern--rewards-eval (st events)
+(defun cistern--rewards-eval (st raw-events)
   "Rewards use-case (R5): (state, tick EVENTS) → (updated state,
 outcome, presentation intents) as a 3-list.  Consumes the events
 emitted since the last read — ST's pending list (drained here)
-plus EVENTS.  Consumption per REWARDS-DESIGN, mechanic by
+plus RAW-EVENTS.  Consumption per REWARDS-DESIGN, mechanic by
 mechanic: M1 dust — a successful demolish spawns 3–5 sparkle
 intents at the demolished tile, count and glyphs drawn from the
-particle field's child stream (§4), never the sim LCG.  The
-outcome stays the pinned default until the M3/M4/M5 pairs land."
-  (let ((intents nil))
-    (dolist (ev (append (cistern-st-rewards-events st) events))
+particle field's child stream (§4), never the sim LCG.  M4
+reputation accrues from the relief/burst/leak symbols.  The
+outcome stays the pinned default until later pairs re-shape it."
+  (let ((intents nil)
+        ;; the tick's events: pending list + caller arguments, merged
+        (events (append (cistern-st-rewards-events st) raw-events)))
+    (dolist (ev events)
       ;; §5's event vocabulary is bare symbols (relief, burst, …);
       ;; payload-carrying events (demolish) are lists.  Symbols pass.
       (when (and (listp ev) (eq (car ev) 'demolish))
@@ -234,8 +241,7 @@ outcome stays the pinned default until the M3/M4/M5 pairs land."
     ;; M9 consumes the flag).
     (let ((card (cistern-st-goal-card st)))
       (when card
-        (let* ((events (append (cistern-st-rewards-events st) events))
-               (relieves (+ (length (cl-remove-if-not
+        (let* ((relieves (+ (length (cl-remove-if-not
                                      (lambda (e) (eq e 'relief)) events))
                             (or (plist-get card :relieves) 0)))
                (bursts (+ (length (cl-remove-if-not
@@ -267,9 +273,25 @@ outcome stays the pinned default until the M3/M4/M5 pairs land."
             (setq card (plist-put card :completed t))
             (push (list :layer 'banner :text "MAP COMPLETED") intents))
           (setf (cistern-st-goal-card st) card))))
+    ;; M4 reputation: deltas per §2 M4 verbatim (+1 relief, −5 burst,
+    ;; −2 leak), clamped 0–100.
+    (let* ((reliefs (length (cl-remove-if-not
+                             (lambda (e) (eq e 'relief)) events)))
+           (bursts (length (cl-remove-if-not
+                            (lambda (e) (eq e 'burst)) events)))
+           (leaks (length (cl-remove-if-not
+                           (lambda (e) (eq e 'leak)) events)))
+           (delta (+ reliefs (* -5 bursts) (* -2 leaks))))
+      (unless (= delta 0)
+        (setf (cistern-st-reputation st)
+              (min 100 (max 0 (+ delta (cistern-st-reputation st)))))))
     (setf (cistern-st-rewards-events st) nil)
-    (list st (copy-sequence cistern--rewards-default-outcome)
-          (nreverse intents))))
+    ;; store the outcome+intents in state (§5/L-027): the view reads
+    ;; the stored 2-list and never calls rewards-eval itself
+    (let ((outcome (copy-sequence cistern--rewards-default-outcome))
+          (final (nreverse intents)))
+      (setf (cistern-st-rewards-outcome st) (cons outcome final))
+      (list st outcome final))))
 
 (defun cistern--particle-draw (st)
   "Advance ST's particle child stream by one raw step, returning
@@ -280,6 +302,11 @@ it.  The stream position lives in state (§4 ParticleField.rng)."
 (defconst cistern--goal-kinds
   '(relieves-served bursts-allowed contamination-ceiling)
   "Goal kinds per REWARDS-DESIGN §5.")
+
+(defun cistern--reputation-tier (rep)
+  "Reputation tier (§5): 0–39 Tier 1, 40–69 Tier 2, 70–100
+Tier 3.  The pay-forward function M3's card constructor consumes."
+  (cond ((< rep 40) 1) ((< rep 70) 2) (t 3)))
 
 (defun cistern--goal-target (kind target tier)
   "Tier-adjusted TARGET (§5 pay-forward: Tier1 −25%, Tier3 +25%

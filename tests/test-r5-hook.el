@@ -35,16 +35,20 @@ the hook renders nothing (byte-identical)."
                         :face 'cistern-tank-full :layer 'sparkle))
           r0 r1 r2)
       ;; --- (b) a synthetic non-default intent paints a transient
-      ;; glyph at the particle cell — ON TOP, nothing else moves
-      (setq r0 (cl-letf (((symbol-function 'cistern--rewards-eval)
-                          (lambda (_s _e)
-                            (list st '(:score 0 :objectives nil :unlocks nil
-                                       :celebrate t)
-                                  (list intent)))))
-                    (cistern-view--render st)))
+      ;; glyph at the particle cell — ON TOP, nothing else moves.
+      ;; Transport migrated (L-027): intents are STORED in state by
+      ;; the per-tick evaluation; the view reads, never calls
+      ;; rewards-eval.
+      (setq r0 (progn
+                 (setf (cistern-st-rewards-outcome st)
+                       (cons '(:score 0 :objectives nil :unlocks nil
+                                      :celebrate t)
+                             (list intent)))
+                 (cistern-view--render st)))
       (setq r1 (cl-letf (((symbol-function 'cistern-view--celebration-overlay)
                           (lambda (_s) '(nil . ""))))
                  (cistern-view--render st)))
+      (setf (cistern-st-rewards-outcome st) nil)
       (setq r2 (cistern-view--render st))
       ;; transient: hook off, and the next live (default) frame,
       ;; restore the original projection byte-for-byte
@@ -73,23 +77,22 @@ the hook renders nothing (byte-identical)."
                  t "sim cell untouched by the overlay")
       (cl-assert (null (cistern-st-armed-verb st)) t "state untouched")
       ;; out-of-bounds particles are clipped from output
-      (let ((r3 (cl-letf (((symbol-function 'cistern--rewards-eval)
-                           (lambda (_s _e)
-                             (list st cistern-test-r5--default-outcome
-                                   (list (list :pos (cons 999 999)
-                                               :glyph "*"
-                                               :face 'cistern-tank-full
-                                               :layer 'sparkle))))))
-                      (cistern-view--render st))))
+      (let ((r3 (progn
+                  (setf (cistern-st-rewards-outcome st)
+                        (cons cistern-test-r5--default-outcome
+                              (list (list :pos (cons 999 999)
+                                          :glyph "*"
+                                          :face 'cistern-tank-full
+                                          :layer 'sparkle))))
+                  (cistern-view--render st))))
         (cl-assert (equal r3 r1) t "out-of-bounds particle clipped"))
 
       ;; --- (c) D5 precedence: cursor > worker > particle > cell — a
       ;; particle under the cursor does not paint
       (setf (cistern-st-cursor st) (cons px py))
-      (let* ((rc (cl-letf (((symbol-function 'cistern--rewards-eval)
-                            (lambda (_s _e)
-                              (list st cistern-test-r5--default-outcome
-                                    (list intent)))))
+      (let* ((rc (progn
+                   (setf (cistern-st-rewards-outcome st)
+                         (cons cistern-test-r5--default-outcome (list intent)))
                    (cistern-view--render st)))
              (row (nth (+ 3 py) (split-string rc "\n")))
              (face (get-text-property px 'face row)))
@@ -100,6 +103,7 @@ the hook renders nothing (byte-identical)."
 
       ;; --- (a) default outcome: the hook is a no-op by construction —
       ;; byte-identical to the short-circuited render
+      (setf (cistern-st-rewards-outcome st) nil)
       (let ((a (cistern-view--render st))
             (b (cl-letf (((symbol-function 'cistern-view--celebration-overlay)
                           (lambda (_s) '(nil . ""))))
@@ -109,15 +113,13 @@ the hook renders nothing (byte-identical)."
 
       ;; --- (d) banner: reserved post-map row, before the inspector,
       ;; never the header/status lines
+      (setf (cistern-st-rewards-outcome st)
+            (cons '(:score 0 :objectives nil :unlocks nil :celebrate :map-complete)
+                  (list (list :layer 'banner :text "SECTOR CLEARED"))))
       (let* ((h (cistern-st-h st))
-             (rb (cl-letf (((symbol-function 'cistern--rewards-eval)
-                            (lambda (_s _e)
-                              (list st '(:score 0 :objectives nil :unlocks nil
-                                         :celebrate :map-complete)
-                                    (list (list :layer 'banner
-                                                :text "SECTOR CLEARED"))))))
-                      (cistern-view--render st)))
+             (rb (cistern-view--render st))
              (rows (split-string rb "\n"))
+             (_ (setf (cistern-st-rewards-outcome st) nil))
              (rd (cistern-view--render st))
              (rowsd (split-string rd "\n")))
         (cl-assert (string-match-p "SECTOR CLEARED" (nth (+ 3 h) rows))
