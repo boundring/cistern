@@ -1154,3 +1154,14 @@ One entry per dead/failed/retried run.
   map-id field; if the evaluator needs it, that is a §5 state-shape
   addition to pin in the ledger (or seed doubles as map id — route
   before inventing).
+  RULINGS (director, 2026-09-06): (1) Bounded-retry predicate
+  DEFERRED, do not implement — the doc's contract is "every
+  generated map valid"; reservation discipline guarantees it by
+  construction, so a retry loop today is unreachable code (deletion
+  over addition). The property test is the permanent tripwire: a
+  violating seed names itself and the bounded retry gets implemented
+  THEN (documented upgrade path — add to spec §6 deferred list).
+  (2) map_id: the SEED doubles as map_id (already state, already
+  the scenario/procgen identity; themes are a level parameter riding
+  the seed). A distinct id field is deferred until something needs
+  to address two maps with the same seed.
