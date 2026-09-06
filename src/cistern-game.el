@@ -216,6 +216,7 @@ reputation accrues from the relief/burst/leak symbols.  The
 outcome stays the pinned default until later pairs re-shape it."
   (let ((intents nil)
         (celebrate nil)
+        (ceremony-p nil)
         ;; the tick's events: pending list + caller arguments, merged
         (events (append (cistern-st-rewards-events st) raw-events)))
     (dolist (ev events)
@@ -275,8 +276,29 @@ outcome stays the pinned default until later pairs re-shape it."
                      (cl-every (lambda (g) (plist-get g :satisfied))
                                (plist-get card :goals)))
             (setq card (plist-put card :completed t))
+            ;; M9 commit-first: the trophy (the completed map's seed —
+            ;; §5 "visited seeds") commits AT TRIGGER TIME, zero
+            ;; ticks; the ceremony that follows is pure presentation
+            (push (plist-get card :map-id) (cistern-st-trophies st))
+            (setq ceremony-p t)
             (push (list :layer 'banner :text "MAP COMPLETED") intents))
           (setf (cistern-st-goal-card st) card))))
+    ;; M9 ceremony fill (§4 M9 row): up to K=64 ttl-6 static sparkles
+    ;; across the map, glyphs from the M9 row — spawned at the trigger
+    ;; evaluation; the ttl-6 decay IS the ceremony duration (no
+    ;; separate timer), and no modal state exists (commit-first: input
+    ;; works throughout, skipping forfeits nothing)
+    (when ceremony-p
+      (let ((room (- cistern--field-cap (length (cistern-st-particles st)))))
+        (dotimes (_ room)
+          (let* ((x (+ 1 (mod (cistern--particle-draw st) (- cistern-w 2))))
+                 (y (+ 1 (mod (cistern--particle-draw st) (- cistern-h 2))))
+                 (g (mod (cistern--particle-draw st) 6))
+                 (glyph (cond ((= g 0) "*") ((= g 1) "!") ((= g 2) "·")
+                              ((= g 3) "§")
+                              (t (number-to-string (mod (cistern--particle-draw st) 10))))))
+            (cistern--field-spawn st (cons x y) (cons 0 0) 6
+                                  glyph 'info 'sparkle)))))
     ;; M4 reputation: deltas per §2 M4 verbatim (+1 relief, −5 burst,
     ;; −2 leak), clamped 0–100.
     (let* ((reliefs (length (cl-remove-if-not

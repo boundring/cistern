@@ -1511,3 +1511,45 @@ One entry per dead/failed/retried run.
   goes green with M9). The consumption test's M5 block still uses a
   bare 'relief symbol for the pay assert — migrate it to the
   payload vocabulary ((relief 70 3 3)) when registering, L-028.
+
+---
+
+## L-032 (2026-09-06, run: impl-phase4 — 4b Pair 10, R5 M9 ceremony; 4b CLOSED)
+
+- Attempt: Red test `tests/test-4b-rewards.el ::
+  cistern-test-4b-m9-ceremony` (red commit `85c9da2`; red run:
+  `void-function cistern-st-trophies`, 1/32, exit 1) PLUS the
+  L-009 consumption test REGISTERED in this pair's red commit per
+  its contract — and it ran GREEN on first registration (its M8/M5
+  asserts were satisfied by the landed M8/M5 work; the "final
+  celebration assert" — :celebrate on the ladder-top crossing —
+  went green with M8's celebrate flag). L-009's intentional-red
+  cycle is CLOSED: the consumption test discriminated placeholder
+  from consumption exactly as designed.
+- Green: `trophies` slot (the completed map's seed list — §5
+  "visited seeds"; persist-across-maps DEFERRED per the L-031
+  ruling, REWARDS-DESIGN §6 item 10); commit-first — the goal
+  evaluator pushes the trophy AT TRIGGER TIME (zero ticks) when it
+  sets :completed; the ceremony fill spawns the buffer up to K=64
+  ttl-6 static sparkles across the map, glyphs from the M9 row
+  (* ! · § + digits), in the SAME evaluation; exactly-once via the
+  :completed guard (no re-commit, no re-fill); no modal state —
+  input works throughout, skipping forfeits nothing (asserted by
+  behavior: cursor + tick + trophy survive); determinism asserted.
+  The ttl-6 decay IS the ceremony duration — no separate timer.
+- Ceremony duration/no-modal reading pinned: the ceremony never
+  blocks input (state is committed before presentation; any player
+  action just refreshes, advancing the field normally). Banner
+  copy/centering remains DEFERRED (§6 open).
+- Authoring incident: an inexact patch edit garbled the (b)
+  full-buffer block mid-rewrite — caught by reading the edited
+  region, fixed by line-precise rewrite; zero false greens.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 32 TESTS PASSED, exit 0. 4b is
+  functionally complete; the phase proceeds to the verifier gate.
+- Change for next attempt (closing-review input): the
+  multi-char '+N' popup glyph still renders in one cell (carried
+  from L-028; per-cell digit placement is now possible over the
+  field); banner centering/copy remains §6-open; cross-map
+  traversal (unlocks/trophies persistence) is next-map-mechanics
+  territory (§6 item 10).

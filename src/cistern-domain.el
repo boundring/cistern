@@ -86,7 +86,8 @@ by the view, not here).")
   (reputation 0)             ; 0-100 clamped; M4 deltas: +1 relief −5 burst −2 leak
   (rewards-outcome nil)      ; stored per-tick (outcome . intents) 2-list; the view reads it
   (particles nil)            ; the particle field (§4): newest-first plist list, K=64 FIFO cap
-  (relieves 0))              ; cumulative relieves counter (M8 ladder; approval L-031)
+  (relieves 0)               ; cumulative relieves counter (M8 ladder; approval L-031)
+  (trophies nil))            ; completed map seeds, committed at trigger time (M9; §5 ledger 2)
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
