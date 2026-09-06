@@ -1102,3 +1102,55 @@ One entry per dead/failed/retried run.
   palette table — the doc's "gray" was a prose hint, not a contract.
   (3) Refund arithmetic: 50% of the CURRENT pinned build costs
   (floor), as taken.
+
+---
+
+## L-025 (2026-09-06, run: impl-phase4 — 4b Pair 3, R5 M2 generation solvability)
+
+- Attempt: `tests/test-4b-rewards.el ::
+  cistern-test-4b-m2-solvability`. R10 DEVIATION, recorded honestly:
+  NO RED EVER FIRED (second of the phase, cf. L-022). The doc's M2
+  solvability property — every generated map has worker starts that
+  reach the toilet — HOLDS on the existing generator with zero new
+  code: bounded sweep over seeds 1–20 plus the plan-pinned 42, all
+  valid (starter plumbing wired+usable via `cistern--toilet-usable-p`,
+  every spawn cell passable and walkable-flood-connected to the
+  starter toilet). Same-seed identity and ≥3 layout signatures are
+  R3's tests (domain-determinism, domain-procgen) — shared per the
+  mapping table, not re-litigated.
+- ROUTED to the director (contract question, per instruction): the
+  plan's mapping row says "M2 adds the bounded-solvability retry
+  predicate" and the doc criterion says "validation retries inside
+  generation, bounded (Brogue pattern)". Empirically the reservation
+  discipline (walls/ore never overwrite reserved cells) already
+  guarantees validity across the sweep — a retry loop would be dead
+  code today. Recommendation: keep the property test as the
+  permanent tripwire; implement the bounded retry only if a
+  violating seed ever appears (the test names the seed; a violation
+  is a live contract break and re-plans per the run-death protocol).
+  Phase 1's R3 decisions are not re-opened by this pair.
+- Probe lesson (the pair's real work): the "unreachable spawn"
+  anomaly was MY probe bug, twice, chasing a phantom across three
+  probes — `(cons (car p) (cdr p))` reconstructs the LIST `(12 6)`,
+  not the DOT-CONS `(12 . 6)` the flood hash is keyed by; the
+  corrected key (`(cons (nth 0 p) (nth 1 p))`) yields zero failures.
+  The sim was never broken. Lesson: when a property as basic as
+  worker pathing — demonstrated by every 4a scenario replay —
+  appears violated, suspect the probe's key construction BEFORE the
+  sim; the 4a byte-identical replays were standing evidence the
+  workers reach toilets every run. (Same (X Y)-list vs (X . Y)-cons
+  distinction the codebase's two conventions make load-bearing.)
+- Authoring note: the test itself initially carried the same
+  `(car p)/(cdr p)` bug and died on `wrong-type-argument` — an
+  authoring red (L-017 class), fixed before commit.
+- Outcome: PASS on arrival, kept as tripwire. Canonical suite
+  `emacs -Q --batch -l tests/run.el -f cistern-run-all-tests`:
+  ALL 23 TESTS PASSED, exit 0. Green = NO code change required.
+- Change for next attempt: M3 goal cards — the consumption test
+  (L-009) still fails on its FIRST M8 assert, so M3-M4 pairs
+  register only their own tests; the consumption test remains
+  unregistered until the M9 pair. Watch: goal-card shape
+  `{map_id, goals[], difficulty_tier}` needs map_id — state has no
+  map-id field; if the evaluator needs it, that is a §5 state-shape
+  addition to pin in the ledger (or seed doubles as map id — route
+  before inventing).
