@@ -75,6 +75,7 @@ by the view, not here).")
   (alloy 20) (tick 0) (contam 0) over
   (log nil) (cursor (cons 3 6))
   (armed-verb nil)           ; build verb armed for click-to-place (§3.4)
+  (seed 0)                   ; the game seed; child streams derive from it (REWARDS-DESIGN §4)
   (rng 1)                    ; LCG state; determinism lives here
   (purges 0) (built-pipe 0) (built-toilet 0) (built-tank 0) (earned 0) (migrants 0)
   (tutorial 0)               ; index into tutorial steps; t when done
@@ -86,6 +87,23 @@ by the view, not here).")
     (setq x (mod (+ (* x 1103515245) 12345) 2147483648))
     (setf (cistern-st-rng st) x)
     (mod x n)))
+
+;; 2b. Child streams (REWARDS-DESIGN §4): reward garnish draws from
+;; seed⊕stream-id child streams, NEVER the sim LCG — sim outcomes and
+;; particle outcomes must not consume each other's randomness.  Both
+;; functions are pure: an explicit position in, an explicit position
+;; out; no state, no emacs-runtime calls.
+(defun cistern--stream-init (seed stream-id)
+  "Child-stream initial position: SEED ⊕ STREAM-ID (REWARDS-DESIGN
+§4).  STREAM-ID 0 is reserved — it would reproduce the sim LCG's
+own sequence."
+  (logxor seed stream-id))
+
+(defun cistern--stream-next (pos)
+  "One raw child-stream step from POS: the domain LCG recurrence.
+Returns the new 31-bit position; call sites mod-scope it at use.
+Pure — never touches cistern-st-rng."
+  (mod (+ (* pos 1103515245) 12345) 2147483648))
 
 (defun cistern--log (st fmt &rest args)
   (push (apply #'format fmt args) (cistern-st-log st))
@@ -143,6 +161,7 @@ plumbing hashes, and LCG residue."
         (make-vector (* (cistern-st-w st) (cistern-st-h st)) 'floor))
   (setf (cistern-st-toilets st) (make-hash-table :test #'equal))
   (setf (cistern-st-tanks st) (make-hash-table :test #'equal))
+  (setf (cistern-st-seed st) seed)
   (setf (cistern-st-rng st) seed)
   ;; outer walls
   (dotimes (y (cistern-st-h st))

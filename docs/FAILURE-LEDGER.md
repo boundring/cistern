@@ -965,3 +965,57 @@ One entry per dead/failed/retried run.
   tripwire covers the scenarios only; 4b's consumption test (still
   intentionally red, L-009) is the discriminator for rewards
   determinism.
+
+---
+
+## L-023 (2026-09-06, run: impl-phase4 — 4b Pair 1, R5 child stream + fixture)
+
+- Attempt: Red test `tests/test-4b-rewards.el ::
+  cistern-test-4b-stream-fixture` (red commit `832a592`; red run:
+  `void-function cistern--stream-init`, 1/21, exit 1). Green =
+  `cistern--stream-init` (seed ⊕ stream-id) + `cistern--stream-next`
+  (the domain LCG recurrence) in `src/cistern-domain.el` — both
+  pure, explicit position in/out, no state, no emacs-runtime calls —
+  plus a `seed` slot on `cistern-st`, set by `gen-map`.
+- Contract check (director-requested, death-rule review): §4
+  promises the "first 100 stream values pinned as a fixture" but
+  NEITHER `REWARDS-DESIGN.md` nor `rewards-notes.md` contains the
+  values. NOT ruled a contract break: §6 explicitly defers
+  "implementation (with seeded fixtures)", and notes:218 states the
+  fixture's purpose — drift detection ("so a stream change fails
+  loudly", §4 failure mode 2). Doc-grounded resolution: the
+  implementation pins the fixture as test literals, generated once
+  from the §4-pinned derivation BEFORE the implementation existed
+  (so the literals are not the implementation grading itself).
+  FLAGGED to the director/designer: if the doc should pin specific
+  values by fiat, the fixture mechanism makes any such pinning
+  verifiable in one batch run.
+- Derivation pins (doc-grounded, minimal): ⊕ = XOR (the doc's own
+  operator); recurrence = the domain LCG
+  (x·1103515245+12345 mod 2^31 — the only RNG in the codebase; the
+  doc names no recurrence, so reusing the existing one is the only
+  non-invented choice). Fixture pinned at (seed 42, stream-id 1) —
+  42 is the plan-pinned scenario seed; the particle field's
+  stream-id naming lands with the M6 field pair. STREAM-ID 0 IS
+  RESERVED: it reproduces the sim LCG's own sequence (xor with 0 is
+  identity), the one way garnish could silently consume sim
+  randomness.
+- State decision: `seed` slot added to `cistern-st` — §5's contract
+  has `rewards-eval` consuming STATE ONLY, and the child stream
+  derives from the game seed, so the seed must live in state.
+  The FIELD's persistent stream position is deliberately NOT added
+  this pair — it lands with the M6 field pair (plan 03 §4b pair-1
+  scope: mechanism + fixture only). The 4a determinism tripwire
+  stays green with the new slot (full-state hash carries it
+  identically in both runs).
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 21 TESTS PASSED, exit 0.
+- Evidence: red run above (exit 1); fixture literals generated from
+  the inline derivation formula independent of the API under test;
+  green prints `CISTERN-4B-STREAM-OK` (exit 0); parens OK on both
+  touched files; no duplicate defuns.
+- Change for next attempt: M5/M6 spawn tests consume this stream —
+  mod-scoping raw positions into range happens AT USE SITES; the
+  fixture pins raw 31-bit positions only. The consumption test
+  (L-009) stays unregistered until the M9 pair, where its final
+  assert can go green.
