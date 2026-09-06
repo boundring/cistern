@@ -34,9 +34,9 @@ Source notes: `rewards-notes.md` (turns 1–3). Consumed by the Clean Architectu
 | M4 | **Reputation** — 0–100, headline stat | Clean relieve +1, burst −5, leak −2, clamped 0–100; next map's card consumes current reputation | Domain | One number in status line |
 | M5 | **Relieve-pay + popup** — coins on timely relief | Relief within warning window pays base, near-burst pays 2x; popup entity ttl=3, drifts up 1/tick, removed at ttl 0; occasional tip VR-8 (seeded) | Domain (payout, popup list); adapter (render glyphs) | Glyph + face per popup cell; cheap |
 | M6 | **Dancing-pixels celebration** — domain-owned particle field | See §4 for full spec and seven test criteria | Domain (field, seeded); adapter (dumb renderer) | Seeded glyph particles per tick — fully feasible |
-| M7 | **Face flash + three-tier log** | Relief→minor faced line; burst→major line + error face on tile; MapCompleted→game-changing banner, cleared after N ticks | Domain (event→severity mapping); adapter (faces, banner row) | Pure faces + text (DF announcement model) |
+| M7 | **Face flash + three-tier log** | Relief→minor faced line; burst→major line + error face on tile; MapCompleted→game-changing banner, cleared on the next evaluation (N=1 pinned, L-030) | Domain (event→severity mapping); adapter (faces, banner row) | Pure faces + text (DF announcement model) |
 | M8 | **Milestone ladder** — relieves-served thresholds unlock upgrades | Threshold crossed exactly once → UnlockEmitted; unlocked upgrade purchasable; unlocks persist across maps | Domain | Status line + shop list |
-| M9 | **Map-completion ceremony** | MapCompleted ⇒ trophy persisted *before* any ceremony tick (commit-first); ceremony state: particle field + centered multi-line banner; auto-run pauses; 6 ticks, skippable with any key, no forfeit | Domain (ceremony state, trophy record); adapter | NetHack ascension precedent: centered text + M6 particles |
+| M9 | **Map-completion ceremony** | MapCompleted ⇒ trophy persisted *before* any ceremony tick (commit-first); ceremony state: particle field + banner; no modal state — input works throughout, skipping forfeits nothing; ttl-6 decay IS the duration (pinned reading, L-032) | Domain (ceremony state, trophy record); adapter | NetHack ascension precedent: centered text + M6 particles |
 
 Milestone ladder thresholds: 5 relieves → `big-cistern`; 15 → `fast-flush`; 30 → `self-clean`; 50 → `air-freshener`; 100 → `golden-pipe` + full-buffer celebration. Capability early, decor late (Cities: Skylines cadence). Pricing DEFERRED.
 
@@ -126,7 +126,7 @@ The field lives in domain state beside the sim. Its RNG stream is **derived from
 ## 5. Integration contract with the rewrite
 
 **`cistern--rewards-eval`** (per-tick domain use-case):
-- **Consumes:** full game state (map, workers, coins, reputation, streak, particle field, milestone progress, RNG streams, active goal card) + list of events emitted this tick (relief, burst, leak, milestone-crossed, goal-satisfied).
+- **Consumes:** full game state (map, workers, coins, reputation, streak, particle field, milestone progress, RNG streams, active goal card) + list of events emitted this tick (relief, burst, leak, demolish — bare symbols or payload lists; milestone crossings and goal satisfaction are derived inside the evaluator, not emitted as events).
 - **Returns:** a 3-list — updated game state + the outcome record
   (score, objectives, unlocks, celebrate) + presentation intents (log
   lines with severity, face assignments, popup/particle spawns, unlock
@@ -138,7 +138,7 @@ The field lives in domain state beside the sim. Its RNG stream is **derived from
 
 **Reputation tiers + pay-forward:** 0–39 Tier 1, 40–69 Tier 2, 70–100 Tier 3. Pay-forward rule: **the next map's goal-card difficulty is set by the reputation tier at the previous map's completion** (Tier 1: goals −25%; Tier 2: standard; Tier 3: goals +25% + bonus trophy line). One stat feeds score and difficulty — no second mechanism.
 
-**Ceremony commit-first semantics:** MapCompleted ⇒ trophy + next-map unlock committed to state *at trigger time*, zero ticks required; ceremony (6 auto-run ticks, particle field + banner) then runs; any key skips; skipping forfeits nothing because nothing is pending — state changes belong in state-machine order, celebration is presentation-side animation.
+**Ceremony commit-first semantics:** MapCompleted ⇒ trophy + next-map unlock committed to state *at trigger time*, zero ticks required; ceremony (particle field ttl-6 fill + banner; the ttl-6 decay is the duration) then runs; no modal state — input works throughout, so any key "skips" by simply playing and nothing is forfeited because nothing is pending (pinned reading, L-032) — state changes belong in state-machine order, celebration is presentation-side animation.
 
 **Theme-as-level-parameter (signed off):** a theme modifier (tight corridors, wet map with faster contamination spread) is a **level parameter**, deterministic and testable; the seed varies layout *within* the theme. A theme system beyond the parameter stays deferred.
 

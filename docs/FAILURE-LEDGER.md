@@ -1553,3 +1553,56 @@ One entry per dead/failed/retried run.
   field); banner centering/copy remains §6-open; cross-map
   traversal (unlocks/trophies persistence) is next-map-mechanics
   territory (§6 item 10).
+
+---
+
+## L-033 (2026-09-06, run: review-phase4 — Phase 4 closing review)
+
+- Attempt: phase-closing conformance/simplification review
+  (HANDBRIEF-TEMPLATE six-item checklist). Small fixes committed
+  directly: lexical-binding cookie moved onto line 1 of
+  tests/test-source-integrity.el (a cookie on line 2 is ignored —
+  the gate's finding); stale Phase-2-era docstrings/comments
+  refreshed (cistern--rewards-default-outcome placeholder wording,
+  cistern--rewards-eval docstring, the M3/M5 pair-era comments
+  inside it, cistern--reputation-tier's false "card constructor
+  consumes" claim — the pay-forward consumer is deferred with
+  cross-map mechanics, REWARDS-DESIGN §6 item 10); the five
+  duplicated event-kind counting sites consolidated into
+  `cistern--count-events`; tests/test-4b-rewards.el's
+  provide/ends-here footer moved to end of file (pairs 2-10 were
+  appended after it); REWARDS-DESIGN §2 M7/M9 rows, §5 ceremony
+  semantics and §5 event vocabulary updated to the pinned readings
+  (N=1 banner clear, L-030; no-modal ceremony, L-032; actual event
+  vocabulary relief/burst/leak/demolish). Ledger audit
+  L-019..L-032: every "Change for next attempt" applied in-phase
+  or carried (L-032's closing-review input is carried below);
+  REWARDS-DESIGN §6 items 8-10 confirmed present for the routed
+  rulings. Rewards-eval shape judged coherent as ONE straight-line
+  evaluator — the M1-M9 blocks mirror the declarative doc's own
+  order; no decomposition, no new helpers beyond the count
+  consolidation. L-018 finding 2 verified APPLIED: the overlay
+  mapping reads only :pos/:glyph/:face; vel/ttl live in the domain
+  field alone. L-020 margin note verified intact: rewards garnish
+  draws only the child stream, no scenario expect pins score or
+  reputation, so the 118/120 razor margin stays sim-pure and the
+  determinism tripwire remains the guard.
+- Structural findings (NOT fixed in passing; each lists its owning
+  phase):
+  1. CARRIED from L-012 #2 / L-018 #1 (verified, still unsorted):
+     `cistern-run-soak`'s purge-target maphash over
+     `cistern-st-tanks` iterates unsorted. Phase 4 did not edit the
+     soak (do-tick now also runs rewards-eval, but child-stream
+     isolation keeps the sim trajectory unchanged). Owning phase:
+     post-playtest tuning's first soak-touching change — sort the
+     keys or record the exception L-011-cmd-build style.
+  2. CARRIED from L-028 / L-032: the multi-char '+N' popup glyph
+     renders in one cell. Owning phase: post-playtest presentation
+     pass (per-cell digit placement over the field is now
+     possible).
+  3. The milestone unlock intent `(unlock :id ID)` carries no
+     :layer and the view renders no unlock surface — M8's "status
+     line + shop list" presentation is absent (the shop sink itself
+     is REWARDS-DESIGN §3 S2, unimplemented). State carries the
+     unlocks; only the surface is missing. Owning phase:
+     post-playtest tuning, when S2 lands.

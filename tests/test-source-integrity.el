@@ -1,5 +1,4 @@
-;;; tests/test-source-integrity.el --- shared infra: reader form-span
-;;; guard (L-026) -*- lexical-binding: t; -*-
+;;; tests/test-source-integrity.el --- shared infra: reader form-span guard (L-026) -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 

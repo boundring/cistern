@@ -201,19 +201,21 @@ call exists at the use-case layer."
 
 (defconst cistern--rewards-default-outcome
   '(:score 0 :objectives nil :unlocks nil :celebrate nil)
-  "Pinned Phase 2 placeholder outcome (spec §4 R5; REWARDS-DESIGN
-§5).  Final values are REWARDS-DESIGN consumption, Phase 4b.")
+  "Outcome skeleton (spec §4 R5; REWARDS-DESIGN §5).  4b
+consumption fills :score/:unlocks/:celebrate per tick;
+:objectives stays the pinned nil placeholder (no per-goal outcome
+surface exists — card state is read from the goal card itself).")
 
 (defun cistern--rewards-eval (st raw-events)
   "Rewards use-case (R5): (state, tick EVENTS) → (updated state,
 outcome, presentation intents) as a 3-list.  Consumes the events
 emitted since the last read — ST's pending list (drained here)
-plus RAW-EVENTS.  Consumption per REWARDS-DESIGN, mechanic by
-mechanic: M1 dust — a successful demolish spawns 3–5 sparkle
-intents at the demolished tile, count and glyphs drawn from the
-particle field's child stream (§4), never the sim LCG.  M4
-reputation accrues from the relief/burst/leak symbols.  The
-outcome stays the pinned default until later pairs re-shape it."
+plus RAW-EVENTS — mechanic by mechanic per REWARDS-DESIGN: M1
+dust (3–5 sparkles into the field, drawn from the child stream,
+never the sim LCG), M3 goal-card evaluation + MapCompleted, M9
+ceremony fill, M4 reputation, M5 relieve-pay + popups, M7 faced
+log intents, M8 milestone ladder.  Stores (outcome . intents) in
+state for the view to read (L-027); the view never calls this."
   (let ((intents nil)
         (celebrate nil)
         (ceremony-p nil)
@@ -237,20 +239,17 @@ outcome stays the pinned default until later pairs re-shape it."
                    (glyph (if (= 0 (mod g 2)) "·" ".")))
               (cistern--field-spawn st (cons x y) (cons vx vy) ttlp
                                     glyph 'info 'sparkle))))))
-    ;; M3 goal-card evaluator: re-checked on every call (headless
-    ;; stand-in for the per-tick check; tick wiring is the M4/M5
-    ;; step, split pinned in L-026).  Progress accrues from relief
-    ;; and burst events; each goal's :satisfied is written back into
+    ;; M3 goal-card evaluator: re-checked on every call (rewards-eval
+    ;; runs exactly once per tick, L-027 wiring).  Progress accrues
+    ;; from relief and burst events; each goal's :satisfied is written back into
     ;; the card in state (observable goal state); all satisfied ⇒
     ;; MapCompleted as a banner intent, exactly once (commit-first,
     ;; M9 consumes the flag).
     (let ((card (cistern-st-goal-card st)))
       (when card
-        (let* ((relieves (+ (length (cl-remove-if-not
-                                     (lambda (e) (eq (cistern--event-kind e) 'relief)) events))
+        (let* ((relieves (+ (cistern--count-events events 'relief)
                             (or (plist-get card :relieves) 0)))
-               (bursts (+ (length (cl-remove-if-not
-                                   (lambda (e) (eq (cistern--event-kind e) 'burst)) events))
+               (bursts (+ (cistern--count-events events 'burst)
                           (or (plist-get card :bursts) 0)))
                (tier (plist-get card :tier)))
           (setq card (plist-put card :relieves relieves))
@@ -301,20 +300,16 @@ outcome stays the pinned default until later pairs re-shape it."
                                   glyph 'info 'sparkle)))))
     ;; M4 reputation: deltas per §2 M4 verbatim (+1 relief, −5 burst,
     ;; −2 leak), clamped 0–100.
-    (let* ((reliefs (length (cl-remove-if-not
-                             (lambda (e) (eq (cistern--event-kind e) 'relief)) events)))
-           (bursts (length (cl-remove-if-not
-                            (lambda (e) (eq (cistern--event-kind e) 'burst)) events)))
-           (leaks (length (cl-remove-if-not
-                           (lambda (e) (eq (cistern--event-kind e) 'leak)) events)))
+    (let* ((reliefs (cistern--count-events events 'relief))
+           (bursts (cistern--count-events events 'burst))
+           (leaks (cistern--count-events events 'leak))
            (delta (+ reliefs (* -5 bursts) (* -2 leaks))))
       (unless (= delta 0)
         (setf (cistern-st-reputation st)
               (min 100 (max 0 (+ delta (cistern-st-reputation st)))))))
     ;; M5 relieve-pay: base within the warning window, 2x near-burst,
     ;; VR-8 tips (1-in-8 draws, 2-3x base) from the child stream.
-    ;; Popup intents are single-frame at the relief tile; ttl/vel
-    ;; drift belongs to the M6 particle field (L-018 finding 2).
+    ;; Popups are field particles: ttl 3, vel (0 . -1) drift up (M6).
     (dolist (e events)
       (when (and (consp e) (eq (cistern--event-kind e) 'relief))
         (let* ((bladder (nth 1 e))
@@ -351,8 +346,7 @@ outcome stays the pinned default until later pairs re-shape it."
     ;; thresholds; each unlock emitted exactly once (membership
     ;; guard) and persisted in the unlocks list (§5).  The ladder
     ;; adds no reputation — milestones count relieves, not reputation.
-    (let ((n (length (cl-remove-if-not
-                      (lambda (e) (eq (cistern--event-kind e) 'relief)) events))))
+    (let ((n (cistern--count-events events 'relief)))
       (when (> n 0)
         (setf (cistern-st-relieves st) (+ n (cistern-st-relieves st)))))
     (dolist (step cistern--milestone-ladder)
@@ -390,7 +384,10 @@ it.  The stream position lives in state (§4 ParticleField.rng)."
 
 (defun cistern--reputation-tier (rep)
   "Reputation tier (§5): 0–39 Tier 1, 40–69 Tier 2, 70–100
-Tier 3.  The pay-forward function M3's card constructor consumes."
+Tier 3.  No production consumer yet — the pay-forward that sets
+the next map's :tier from reputation is deferred with cross-map
+mechanics (REWARDS-DESIGN §6 item 10); the §5 boundaries are
+test-pinned here."
   (cond ((< rep 40) 1) ((< rep 70) 2) (t 3)))
 
 (defconst cistern-score-relief-base 10
@@ -408,6 +405,12 @@ bladder rate) before burst.")
 itself (§5's vocabulary is payloadless symbols; payload-carrying
 events — demolish, relief — are lists)."
   (if (consp e) (car e) e))
+
+(defun cistern--count-events (events kind)
+  "How many of EVENTS are of KIND (payload lists count too,
+via `cistern--event-kind')."
+  (length (cl-remove-if-not
+           (lambda (e) (eq (cistern--event-kind e) kind)) events)))
 
 (defun cistern--event-severity (event)
   "M7 three-tier announcement grammar (§2 M7, DF model): the

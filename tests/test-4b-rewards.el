@@ -80,9 +80,6 @@
              "fresh same-seed construction reproduces the stream")
   (message "CISTERN-4B-STREAM-OK"))
 
-(provide 'test-4b-rewards)
-;;; tests/test-4b-rewards.el ends here
-
 ;; ---------------------------------------------------------------------------
 ;; 4b Pair 2 — M1 demolish-with-refund (REWARDS-DESIGN §2 M1).
 
@@ -504,7 +501,8 @@ exactly base."
 ;; 4b Pair 7 — M6 particle field (REWARDS-DESIGN §4, criteria 1-6;
 ;; criterion 7 is M9's).  Field in domain state; advance-particles is
 ;; domain field mechanics; spawns migrate from transient intents into
-;; field particles; the stored intents slot keeps only banner text.
+;; field particles; at this pair the stored intents slot keeps only
+;; banner text (pair 8's M7 adds faced log lines to it).
 
 (defconst cistern-test-4b-m6--dust-fixture
   ;; L-023 provenance: generated from the §4 trigger row + the pinned
@@ -851,3 +849,6 @@ exactly base."
     (cl-assert (equal (funcall run) (funcall run))
                nil "same seed → identical trophies and ceremony field"))
   (message "CISTERN-4B-M9-OK"))
+
+(provide 'test-4b-rewards)
+;;; tests/test-4b-rewards.el ends here
