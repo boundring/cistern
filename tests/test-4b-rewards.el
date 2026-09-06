@@ -162,3 +162,33 @@ neutral enum pending the L-024 ruling.")
     (cl-assert (equal (funcall dust) (funcall dust))
                "dust draws are deterministic from the child stream"))
   (message "CISTERN-4B-M1-OK"))
+
+;; ---------------------------------------------------------------------------
+;; 4b Pair 3 — M2 seeded-generation consumption (REWARDS-DESIGN §2 M2).
+
+(defun cistern-test-4b-m2-solvability ()
+  ;; M2's solvability property, stated as an invariant on the existing
+  ;; generator (REWARDS-DESIGN §2 M2: "worker starts reach a toilet";
+  ;; the plan's mapping shares R3's tests — same-seed identity and
+  ;; ≥3 layout signatures live in domain-determinism / domain-procgen
+  ;; and are NOT re-litigated here).  Bounded sweep: 20 consecutive
+  ;; seeds plus the plan-pinned 42 — every generated map has its
+  ;; reserved starter plumbing wired+usable and every spawn cell
+  ;; passable AND walkable-connected to the starter toilet.
+  (dolist (seed (append (number-sequence 1 20) (list 42)))
+    (let* ((st (cistern--new-game seed))
+           (d (cistern--flood st 3 3
+                              (lambda (x y) (cistern--walkable-p st x y 3 3)))))
+      ;; reserved starter plumbing: wired to a tank with capacity
+      (cl-assert (cistern--toilet-usable-p st 3 3)
+                 nil "seed %S: starter toilet not wired+usable" seed)
+      ;; spawn cells: passable, and reachable from the starter toilet
+      (dolist (p '((12 6) (14 7) (11 9) (15 6)))
+        ;; spawn cells are (X Y) lists; flood keys are (X . Y) dot-conses
+        (cl-assert (cistern--tile-passable-p
+                     (cistern--cell st (nth 0 p) (nth 1 p)))
+                   nil "seed %S: spawn %S not passable" seed p)
+        (cl-assert (gethash (cons (nth 0 p) (nth 1 p)) d)
+                   nil "seed %S: spawn %S not connected to the starter toilet"
+                   seed p))))
+  (message "CISTERN-4B-M2-OK"))

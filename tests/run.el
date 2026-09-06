@@ -38,7 +38,8 @@
     cistern-test-4a-tutorial
     cistern-test-4a-deterministic
     cistern-test-4b-stream-fixture
-    cistern-test-4b-m1-demolish-refund))
+    cistern-test-4b-m1-demolish-refund
+    cistern-test-4b-m2-solvability))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
