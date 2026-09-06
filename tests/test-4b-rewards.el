@@ -396,3 +396,79 @@ neutral enum pending the L-024 ruling.")
   ;; the wired path active — full-state hash includes reputation and
   ;; the stored outcome; replays are symmetric and must stay equal.
   (message "CISTERN-4B-M4-OK"))
+
+;; ---------------------------------------------------------------------------
+;; 4b Pair 6 — M5 relieve-pay + score popups (REWARDS-DESIGN §2 M5).
+;; Score popups are single-frame intents (M1-dust pattern); ttl/vel
+;; drift lands with the M6 particle field (L-018 finding 2).
+
+(defun cistern-test-4b-m5-relieve-pay ()
+  ;; (1) base pay: the doc pins no number — the base is the
+  ;; implementation-pinned `cistern-score-relief-base' (DEFERRED-
+  ;; with-fixture per §6, L-028); relief within the warning window
+  ;; (bladder >= cistern-bladder-seek 60) pays it
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (list (list 'relief 70 3 3)))
+    (cl-assert (= (cistern-st-score st) cistern-score-relief-base)
+               nil "relief within the window pays base")
+    (cl-assert (= (plist-get (nth 1 (cistern-st-rewards-outcome st)) :score)
+                  cistern-score-relief-base)
+               nil "the stored outcome carries the live score"))
+  ;; (2) urgency scaling: near-burst (bladder >= 100) pays 2x base;
+  ;; below the window pays nothing
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (list (list 'relief 110 3 3)))
+    (cl-assert (= (cistern-st-score st) (* 2 cistern-score-relief-base))
+               nil "near-burst relief pays 2x base")
+    (cistern--rewards-eval st (list (list 'relief 50 3 3)))
+    (cl-assert (= (cistern-st-score st) (* 2 cistern-score-relief-base))
+               nil "relief below the warning window pays nothing"))
+  ;; (3) VR-8 tips: 1-in-8 relieves tip 2-3x base, drawn from the
+  ;; child stream (never the sim LCG), deterministic per seed
+  (let ((st (cistern--new-game 42))
+        (reliefs (make-list 80 (list 'relief 70 3 3))))
+    (cistern--rewards-eval st reliefs)
+    (let* ((intents (cdr (cistern-st-rewards-outcome st)))
+           (tips (cl-count-if (lambda (i) (eq (plist-get i :face) 'bonus))
+                              intents)))
+      (cl-assert (and (>= tips 8) (<= tips 14))
+                 nil "VR-8 sweep: ~12.5%% of 80 relieves tip (got %d)" tips)
+      (dolist (i intents)
+        (cl-assert (member (plist-get i :glyph)
+                           (list (format "+%d" cistern-score-relief-base)
+                                 (format "+%d" (* 2 cistern-score-relief-base))
+                                 (format "+%d" (* 3 cistern-score-relief-base))))
+                   nil "popup glyphs are +N over base/tip multiples"))
+      ;; deterministic: identical replay → identical score and tip count
+      (let* ((st2 (cistern--new-game 42)))
+        (cistern--rewards-eval st2 reliefs)
+        (cl-assert (= (cistern-st-score st) (cistern-st-score st2))
+                   nil "same seed → same pay pattern")
+        (cl-assert (= tips (cl-count-if (lambda (i) (eq (plist-get i :face) 'bonus))
+                                        (cdr (cistern-st-rewards-outcome st2))))
+                   nil "same seed → same tip count"))))    
+  ;; (4) popup intents: one '+N' popup at the relief tile, layer popup
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (list (list 'relief 70 12 6)))
+    (let ((intents (cdr (cistern-st-rewards-outcome st))))
+      (cl-assert (= 1 (length intents)) nil "one popup per paying relief")
+      (let ((i (car intents)))
+        (cl-assert (equal (plist-get i :pos) (cons 12 6))
+                   nil "popup spawns at the relief tile")
+        (cl-assert (string= (plist-get i :glyph)
+                            (format "+%d" cistern-score-relief-base))
+                   nil "popup glyph is +N")
+        (cl-assert (eq (plist-get i :layer) 'popup) nil "layer is popup")
+        (cl-assert (memq (plist-get i :face) '(success bonus))
+                   nil "popup face from the palette"))))
+  ;; sim payload: the relief event site carries urgency + tile
+  (let ((st (cistern--new-game 42)))
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 3)
+      (setf (cistern--worker-y w) 3)
+      (setf (cistern--worker-bladder w)
+            (- cistern-bladder-seek cistern-bladder-rate)))
+    (cistern--do-tick st) (cistern--do-tick st) (cistern--do-tick st)
+    (cl-assert (= (cistern-st-score st) cistern-score-relief-base)
+               nil "a real seated relief pays through do-tick"))
+  (message "CISTERN-4B-M5-OK"))
