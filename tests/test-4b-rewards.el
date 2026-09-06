@@ -192,3 +192,131 @@ neutral enum pending the L-024 ruling.")
                    nil "seed %S: spawn %S not connected to the starter toilet"
                    seed p))))
   (message "CISTERN-4B-M2-OK"))
+
+;; ---------------------------------------------------------------------------
+;; 4b Pair 4 — M3 goal cards (REWARDS-DESIGN §2 M3, §5 goal-card shape).
+;; Headless via direct rewards-eval calls; per-tick wiring is the M4/M5
+;; step (split pinned in L-026).
+
+(defconst cistern-test-4b-m3-goal-kinds
+  '(relieves-served bursts-allowed contamination-ceiling)
+  "§5 goal kinds.")
+
+(defun cistern-test-4b-m3--completions (intents)
+  "MapCompleted banner intents in INTENTS."
+  (cl-remove-if-not
+   (lambda (i) (and (eq (plist-get i :layer) 'banner)
+                    (string-match-p "MAP COMPLETED" (or (plist-get i :text) ""))))
+   intents))
+
+(defun cistern-test-4b-m3-goal-cards ()
+  ;; -- setter: shape validation, max 3 goals, known kinds, map_id = seed
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 2 :goals ((:kind relieves-served :target 3))))
+    (let ((card (cistern-st-goal-card st)))
+      (cl-assert (and card) "card set")
+      (cl-assert (= (plist-get card :map-id) 42)
+                 "map_id doubles as the game seed (L-025 ruling)")
+      (cl-assert (= (plist-get card :tier) 2) "difficulty tier in shape"))
+    (cl-assert (condition-case nil
+                   (progn (cistern--cmd-set-goal-card
+                           st '(:tier 2
+                                :goals ((:kind relieves-served :target 1)
+                                        (:kind relieves-served :target 2)
+                                        (:kind bursts-allowed :target 1)
+                                        (:kind contamination-ceiling :target 5))))
+                          nil)
+                 (error t))
+               "a 4-goal card is rejected at card-set time")
+    (cl-assert (condition-case nil
+                   (progn (cistern--cmd-set-goal-card
+                           st '(:tier 2 :goals ((:kind shrinky-dinks :target 1))))
+                          nil)
+                 (error t))
+               "unknown goal kind rejected"))
+  ;; (1) relieves-served: completes after the target, not before,
+  ;; exactly once
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 2 :goals ((:kind relieves-served :target 3))))
+    (cl-assert (null (cistern-test-4b-m3--completions
+                      (nth 2 (cistern--rewards-eval st (make-list 2 'relief)))))
+               "no completion before the target")
+    (let ((done (cistern-test-4b-m3--completions
+                 (nth 2 (cistern--rewards-eval st (make-list 2 'relief))))))
+      (cl-assert (= 1 (length done))
+                 "MapCompleted emitted when the goal satisfies")
+      (cl-assert (plist-get (car done) :text) "completion is a banner intent"))
+    (cl-assert (null (cistern-test-4b-m3--completions
+                      (nth 2 (cistern--rewards-eval st (make-list 5 'relief)))))
+               "MapCompleted emitted exactly once"))
+  ;; (2) bursts-allowed: breaches count against the window; exceeding
+  ;; fails the goal and the failure is observable in the goal's state
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 2 :goals ((:kind bursts-allowed :target 1))))
+    (cistern--rewards-eval st '(burst))
+    (cl-assert (plist-get (car (plist-get (cistern-st-goal-card st) :goals))
+                          :satisfied)
+               "one burst inside the window satisfies")
+    (cistern--rewards-eval st '(burst))
+    (cl-assert (not (plist-get (car (plist-get (cistern-st-goal-card st) :goals))
+                               :satisfied))
+               "exceeding the window fails the goal"))
+  ;; (3) contamination-ceiling: violated when contam ever exceeds it
+  ;; (the counter is monotonic, so ever-exceeded == exceeded at check)
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 2 :goals ((:kind contamination-ceiling :target 1))))
+    (cistern--rewards-eval st nil)
+    (cl-assert (plist-get (car (plist-get (cistern-st-goal-card st) :goals))
+                          :satisfied)
+               "contam inside the ceiling satisfies")
+    (setf (cistern-st-contam st) 2)
+    (cistern--rewards-eval st nil)
+    (cl-assert (not (plist-get (car (plist-get (cistern-st-goal-card st) :goals))
+                               :satisfied))
+               "contam past the ceiling fails the goal"))
+  ;; (6) re-check every tick: a card satisfied mid-run and violated
+  ;; later never completes — completion requires check-time satisfaction
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 2 :goals ((:kind relieves-served :target 2)
+                          (:kind contamination-ceiling :target 0))))
+    (cistern--rewards-eval st nil)                       ; ceiling ok, relief 0
+    (cistern--rewards-eval st (make-list 2 'relief))     ; relief ok NOW, ceiling ok
+    (setf (cistern-st-contam st) 1)                      ; ceiling violated later
+    (let ((intents (nth 2 (cistern--rewards-eval st (make-list 2 'relief)))))
+      (cl-assert (null (cistern-test-4b-m3--completions intents))
+                 "no completion after a later violation")
+      (cl-assert (not (plist-get (cistern-st-goal-card st) :completed))
+                 "card stays incomplete")))
+  ;; (5) difficulty_tier scales targets per §5 pay-forward (M1 floor
+  ;; precedent): Tier1 −25% / Tier3 +25% in the goal's difficulty
+  ;; direction; the tier input is a card-construction parameter here —
+  ;; M4's reputation feeds it (pinned L-026)
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 1 :goals ((:kind relieves-served :target 4)))) ; easier: 3
+    (cistern--rewards-eval st (make-list 3 'relief))
+    (cl-assert (plist-get (cistern-st-goal-card st) :completed)
+               "tier 1 scales a 4-relieve goal down to 3"))
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 3 :goals ((:kind relieves-served :target 4)))) ; harder: 5
+    (cistern--rewards-eval st (make-list 4 'relief))
+    (cl-assert (not (plist-get (cistern-st-goal-card st) :completed))
+               "tier 3 does not complete at the unscaled target")
+    (cistern--rewards-eval st (make-list 1 'relief))
+    (cl-assert (plist-get (cistern-st-goal-card st) :completed)
+               "tier 3 completes at 5 relieves"))
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 3 :goals ((:kind contamination-ceiling :target 8)))) ; harder: 6
+    (setf (cistern-st-contam st) 7)
+    (cistern--rewards-eval st nil)
+    (cl-assert (not (plist-get (car (plist-get (cistern-st-goal-card st) :goals))
+                               :satisfied))
+               "tier 3 tightens a ceiling goal (8 → 6)"))
+  (message "CISTERN-4B-M3-OK"))
