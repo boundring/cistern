@@ -27,5 +27,28 @@
                "lesson log entry states the infrastructure lesson"))
   (message "CISTERN-4A-LOSING-OK"))
 
+(defun cistern-test-4a-winning-clean ()
+  ;; same seed as the losing scenario — the fair before/after pair is
+  ;; the SAME seed's need served, not a different failure avoided
+  (cl-assert (boundp 'cistern-tutorial-scenario-winning)
+             "winning scenario data exists")
+  (cl-assert (= 42 (plist-get cistern-tutorial-scenario-winning :seed))
+             "winning scenario runs at the same seed 42")
+  (let* ((st (cistern-tutorial-run-scenario cistern-tutorial-scenario-winning))
+         (served (cistern--tank-load-total st)))
+    ;; the counter is monotonic (only ever incremented: accident and
+    ;; severed-finish-use), so a clean FINAL state proves contamination
+    ;; stayed 0 through and at end of the script
+    (cl-assert (= (cistern-st-contam st) 0)
+               "winning scenario keeps contamination 0")
+    (cl-assert (null (cistern-st-over st))
+               "sector survives the horizon")
+    ;; the need was actually SERVED, not avoided: waste flowed through
+    ;; the wired network after the purge reset the starter tank — four
+    ;; deposits means every original creator was relieved
+    (cl-assert (>= served 40)
+               "all four creators relieved through the wired network"))
+  (message "CISTERN-4A-WINNING-OK"))
+
 (provide 'test-4a-scenarios)
 ;;; tests/test-4a-scenarios.el ends here

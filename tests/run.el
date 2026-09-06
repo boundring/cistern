@@ -33,7 +33,8 @@
     cistern-test-r6-timer
     cistern-test-r7-glyph
     cistern-test-r5-hook
-    cistern-test-4a-losing-breach))
+    cistern-test-4a-losing-breach
+    cistern-test-4a-winning-clean))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
