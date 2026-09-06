@@ -285,8 +285,8 @@ neutral enum pending the L-024 ruling.")
      st '(:tier 2 :goals ((:kind relieves-served :target 2)
                           (:kind contamination-ceiling :target 0))))
     (cistern--rewards-eval st nil)                       ; ceiling ok, relief 0
-    (cistern--rewards-eval st (make-list 2 'relief))     ; relief ok NOW, ceiling ok
     (setf (cistern-st-contam st) 1)                      ; ceiling violated later
+    (cistern--rewards-eval st (make-list 2 'relief))     ; relief ok NOW, ceiling FAILED
     (let ((intents (nth 2 (cistern--rewards-eval st (make-list 2 'relief)))))
       (cl-assert (null (cistern-test-4b-m3--completions intents))
                  "no completion after a later violation")

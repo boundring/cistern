@@ -79,7 +79,7 @@ phantom-plumbing invariant, load-bearing)."
         (push (list 'demolish x y) (cistern-st-rewards-events st))
         (cistern--log st "DEMOLISHED %s AT (%d,%d) — %d ALLOY — %d REFUND"
                       (upcase (symbol-name kind)) x y
-                      cistern-cost-demolish refund)))))
+                      cistern-cost-demolish refund))))))
 
 (defun cistern--tutorial-steps (&optional table)
   "Tutorial mechanism holder: table of (PROMPT . PREDICATE) steps,
@@ -225,6 +225,48 @@ outcome stays the pinned default until the M3/M4/M5 pairs land."
                           :glyph (if (= 0 (mod g 2)) "·" ".")
                           :face 'info :layer 'sparkle)
                     intents))))))
+    ;; M3 goal-card evaluator: re-checked on every call (headless
+    ;; stand-in for the per-tick check; tick wiring is the M4/M5
+    ;; step, split pinned in L-026).  Progress accrues from relief
+    ;; and burst events; each goal's :satisfied is written back into
+    ;; the card in state (observable goal state); all satisfied ⇒
+    ;; MapCompleted as a banner intent, exactly once (commit-first,
+    ;; M9 consumes the flag).
+    (let ((card (cistern-st-goal-card st)))
+      (when card
+        (let* ((events (append (cistern-st-rewards-events st) events))
+               (relieves (+ (length (cl-remove-if-not
+                                     (lambda (e) (eq e 'relief)) events))
+                            (or (plist-get card :relieves) 0)))
+               (bursts (+ (length (cl-remove-if-not
+                                   (lambda (e) (eq e 'burst)) events))
+                          (or (plist-get card :bursts) 0)))
+               (tier (plist-get card :tier)))
+          (setq card (plist-put card :relieves relieves))
+          (setq card (plist-put card :bursts bursts))
+          (setq card
+                (plist-put card :goals
+                           (mapcar
+                            (lambda (g)
+                              (let* ((kind (plist-get g :kind))
+                                     (target (cistern--goal-target
+                                              kind (plist-get g :target) tier))
+                                     (value (pcase kind
+                                              (`relieves-served relieves)
+                                              (`bursts-allowed bursts)
+                                              (`contamination-ceiling
+                                               (cistern-st-contam st)))))
+                                (plist-put g :satisfied
+                                           (if (eq kind 'relieves-served)
+                                               (>= value target)
+                                             (<= value target)))))
+                            (plist-get card :goals))))
+          (when (and (not (plist-get card :completed))
+                     (cl-every (lambda (g) (plist-get g :satisfied))
+                               (plist-get card :goals)))
+            (setq card (plist-put card :completed t))
+            (push (list :layer 'banner :text "MAP COMPLETED") intents))
+          (setf (cistern-st-goal-card st) card))))
     (setf (cistern-st-rewards-events st) nil)
     (list st (copy-sequence cistern--rewards-default-outcome)
           (nreverse intents))))
@@ -234,6 +276,37 @@ outcome stays the pinned default until the M3/M4/M5 pairs land."
 it.  The stream position lives in state (§4 ParticleField.rng)."
   (setf (cistern-st-particle-rng st)
         (cistern--stream-next (cistern-st-particle-rng st))))
+
+(defconst cistern--goal-kinds
+  '(relieves-served bursts-allowed contamination-ceiling)
+  "Goal kinds per REWARDS-DESIGN §5.")
+
+(defun cistern--goal-target (kind target tier)
+  "Tier-adjusted TARGET (§5 pay-forward: Tier1 −25%, Tier3 +25%
+in the goal's own difficulty direction; floor rounding, M1
+precedent).  Tier 2 = standard."
+  (pcase tier
+    (`1 (if (eq kind 'relieves-served)          ; easier: fewer to serve
+            (floor (* 3 target) 4)
+          (floor (* 5 target) 4)))              ; easier: looser caps
+    (`3 (if (eq kind 'relieves-served)          ; harder: more to serve
+            (floor (* 5 target) 4)
+          (floor (* 3 target) 4)))              ; harder: tighter caps
+    (_ target)))
+
+(defun cistern--cmd-set-goal-card (st card)
+  "Set ST's active goal card (M3).  Validates the §5 shape — max 3
+goals, known kinds — and stamps :map-id from the game seed (the
+seed doubles as map_id, L-025 ruling).  An invalid card is an
+error: fail-first, no silent rejection."
+  (let ((goals (plist-get card :goals)))
+    (if (> (length goals) 3)
+        (error "GOAL CARD REJECTED — MAX 3 GOALS"))
+    (dolist (g goals)
+      (unless (memq (plist-get g :kind) cistern--goal-kinds)
+        (error "GOAL CARD REJECTED — UNKNOWN KIND %S" (plist-get g :kind))))
+    (setf (cistern-st-goal-card st)
+          (plist-put (copy-sequence card) :map-id (cistern-st-seed st)))))
 
 (defun cistern--cmd-cursor (st dir)
   "Move the cursor one cell in DIR (up/down/left/right), refusing
@@ -429,7 +502,7 @@ and rewards defaults)."
       (cl-assert (eq (cistern--cell st x y) 'floor))
       (cl-assert (= (cistern-st-alloy st)
                     (- (+ a0 (/ cistern-cost-pipe 2))
-                       cistern-cost-demolish)))))
+                       cistern-cost-demolish))))
     ;; refusals: wall, ore, in-use toilet — free of charge
     (let ((ore-idx (cl-position 'ore (cistern-st-map st))))
       (cistern--cmd-demolish st 0 0)

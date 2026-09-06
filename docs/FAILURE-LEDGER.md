@@ -1165,3 +1165,68 @@ One entry per dead/failed/retried run.
   the scenario/procgen identity; themes are a level parameter riding
   the seed). A distinct id field is deferred until something needs
   to address two maps with the same seed.
+
+---
+
+## L-026 (2026-09-06, run: impl-phase4 — 4b Pair 4, R5 M3 goal cards)
+
+- Attempt: Red test `tests/test-4b-rewards.el ::
+  cistern-test-4b-m3-goal-cards` (red commit `f1ca294`; red run:
+  `void-function cistern--cmd-set-goal-card`, 1/24, exit 1). Green:
+  `goal-card` slot on `cistern-st` — §5 shape (:map-id :tier :goals
+  :completed), goals carry :kind/:target/:window-ticks plus
+  evaluator-written :satisfied (the observable goal state the
+  director's criterion (2) needs); `cistern--cmd-set-goal-card`
+  (validates max-3 + known kinds, signals error fail-first, stamps
+  :map-id = seed per L-025 ruling); `cistern--goal-target` (§5
+  pay-forward: Tier1 −25% / Tier3 +25% in the goal's own difficulty
+  direction — relieves scale up, ceilings/burst-windows tighten —
+  floor rounding, M1 precedent; the tier INPUT is a card-construction
+  parameter here, M4's reputation feeds it, pinned); evaluator block
+  in `cistern--rewards-eval` — progress accrues from relief/burst
+  events, re-checked on EVERY call, all-satisfied ⇒ MapCompleted as
+  a banner intent exactly once via the one-way :completed flag
+  (commit-first, M9 consumes it).
+- SPLIT DECISION (announced pre-commit): this pair = card shape +
+  evaluator headless via direct rewards-eval calls; NO do-tick
+  wiring. A per-tick rewards-eval call would drain the same
+  pending-events slot the render-time call consumes — M1's dust
+  would race the view for events. Reconciling event transport
+  (per-frame intent persistence vs state-side fields) is the
+  contract step for the M4/M5 wiring pair. "Re-checked every tick"
+  currently means "every rewards-eval call".
+- Deferred within the pair: window_ticks? is accepted in the shape
+  but carries no semantics yet (needs M5's warning-window mechanics)
+  — §6 deferral stands.
+- Load-integrity incident (third of the phase, and the most
+  instructive): the M1 refund edit left `cmd-demolish` one close
+  short and the selftest assert migration carried a compensating
+  extra close — the file was globally paren-balanced (check-parens
+  PASSED, a paren-count scan PASSED) while the READER silently
+  merged a dozen defuns into `cmd-demolish`'s body, making them
+  unbound at load. check-parens validates LIST balance, not
+  per-form integrity; a globally-balanced file can still be a
+  structurally different program. The reliable detector is the
+  reader itself: read all top-level forms and flag any form spanning
+  multiple defuns. Fixed by matching the reader (+1 close at
+  cmd-demolish's defun tail, −1 compensating close in the selftest
+  assert), verified by a clean 30-form read.
+- Tooling note: this Emacs rejects the 3-argument `plist-get`
+  (calls the default argument as a function: `invalid-function 0`) —
+  the L-006 conservative-API rule now has a concrete instance:
+  `(or (plist-get p k) default)`, never `(plist-get p k default)`.
+  A test-design error also surfaced in the same run: test (6) let
+  the card complete BEFORE the ceiling violation; corrected so the
+  violation precedes full satisfaction (the implementation's
+  check-time completion was correct per the doc's "on a tick"
+  wording — the test was fixed, never the code).
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 24 TESTS PASSED, exit 0.
+- Change for next attempt: the M4/M5 pair wires rewards-eval into
+  do-tick — decide the event transport FIRST (the render-drain race
+  above is the constraint): either the view stops draining (intents
+  persist per frame in state) or the tick path hands events straight
+  through. M4 needs reputation (+1/−5/−2 clamped) — a reputation
+  field rides the same state-shape addition. Suggest adding a
+  reader-based form-integrity check to the canonical runner
+  (director's call — runner is shared infrastructure).

@@ -81,7 +81,8 @@ by the view, not here).")
   (tutorial 0)               ; index into tutorial steps; t when done
   score objectives unlocks   ; rewards-owned; shape DEFERRED to REWARDS-DESIGN
   (rewards-events nil)       ; events emitted since the last rewards-eval read (§5)
-  (particle-rng 0))          ; the particle field's child-stream position (§4 ParticleField.rng)
+  (particle-rng 0)           ; the particle field's child-stream position (§4 ParticleField.rng)
+  (goal-card nil))           ; active goal card (§5): (:map-id :tier :goals :completed)
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
