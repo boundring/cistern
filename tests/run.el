@@ -40,7 +40,9 @@
     cistern-test-4b-stream-fixture
     cistern-test-4b-m1-demolish-refund
     cistern-test-4b-m2-solvability
-    cistern-test-4b-m3-goal-cards))
+    cistern-test-4b-m3-goal-cards
+    cistern-test-4b-m4-reputation
+    cistern-test-source-integrity))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

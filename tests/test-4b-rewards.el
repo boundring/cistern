@@ -320,3 +320,79 @@ neutral enum pending the L-024 ruling.")
                                :satisfied))
                "tier 3 tightens a ceiling goal (8 → 6)"))
   (message "CISTERN-4B-M3-OK"))
+
+;; ---------------------------------------------------------------------------
+;; 4b Pair 5 — M4 reputation (REWARDS-DESIGN §2 M4) + per-tick rewards
+;; wiring (L-027).
+
+(defun cistern-test-4b-m4-reputation ()
+  ;; (1) deltas verbatim (§2 M4): +1 clean relieve, −5 burst, −2 leak,
+  ;; clamped at both ends
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st '(relief))
+    (cl-assert (= (cistern-st-reputation st) 1) nil "clean relieve +1")
+    (cistern--rewards-eval st '(relief relief relief relief))
+    (cl-assert (= (cistern-st-reputation st) 5) nil "relieves accumulate")
+    (cistern--rewards-eval st '(burst))
+    (cl-assert (= (cistern-st-reputation st) 0) nil "burst −5, clamped at 0")
+    (cistern--rewards-eval st '(burst))
+    (cl-assert (= (cistern-st-reputation st) 0) nil "stays clamped at 0")
+    (cistern--rewards-eval st '(relief relief relief))
+    (cistern--rewards-eval st '(leak))
+    (cl-assert (= (cistern-st-reputation st) 1) nil "leak −2")
+    (setf (cistern-st-reputation st) 99)
+    (cistern--rewards-eval st '(relief))
+    (cl-assert (= (cistern-st-reputation st) 100) nil "clamped at 100")
+    (cistern--rewards-eval st '(relief))
+    (cl-assert (= (cistern-st-reputation st) 100) nil "stays clamped at 100"))
+  ;; (2) tier boundaries (§5: 0-39 T1 / 40-69 T2 / 70-100 T3)
+  (dolist (case '((0 1) (39 1) (40 2) (69 2) (70 3) (100 3)))
+    (cl-assert (= (cistern--reputation-tier (nth 0 case)) (nth 1 case))
+               nil "tier boundary %S" case))
+  ;; (3) tick wiring: a real relief moves reputation through do-tick
+  ;; and the per-tick evaluation stores outcome+intents in state
+  (let ((st (cistern--new-game 42)))
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 3)
+      (setf (cistern--worker-y w) 3)
+      (setf (cistern--worker-bladder w)
+            (- cistern-bladder-seek cistern-bladder-rate)))
+    (cistern--do-tick st)                    ; seat on the starter toilet
+    (cistern--do-tick st)                    ; use-t 1
+    (cistern--do-tick st)                    ; finish → relief event
+    (cl-assert (= (cistern-st-reputation st) 1)
+               nil "relief through the real do-tick path pays +1")
+    (cl-assert (cistern-st-rewards-outcome st)
+               nil "the per-tick evaluation stores outcome+intents in state")
+    (cl-assert (null (cistern-st-rewards-events st))
+               nil "the tick evaluation drains the pending events"))
+  ;; (4a) overlay regression: default stored outcome renders
+  ;; byte-identical (L-017 transport migrated; view reads, never calls)
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-cursor st) (cons 0 0))
+    (let ((r-default (cistern-view--render st)))
+      (setf (cistern-st-rewards-outcome st)
+            (list cistern--rewards-default-outcome nil))
+      (cl-assert (equal r-default (cistern-view--render st))
+                 nil "default stored outcome renders byte-identical")))
+  ;; (4b) demolish dust through the wired path: the tick drains the
+  ;; events, stores the intents, the render shows them and does NOT
+  ;; re-drain (two renders byte-identical)
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-demolish st 4 2)          ; starter pipe (player-equivalent)
+    (cistern--do-tick st)
+    (cl-assert (null (cistern-st-rewards-events st))
+               nil "the tick drained the pending events")
+    (cl-assert (cdr (cistern-st-rewards-outcome st))
+               nil "dust intents stored by the tick evaluation")
+    (let* ((row (nth (+ 3 2) (split-string (cistern-view--render st) "\n")))
+           (row-again (nth (+ 3 2) (split-string (cistern-view--render st) "\n"))))
+      (cl-assert (or (string-match-p "·" row) (string-match-p "\\." row))
+                 nil "stored dust renders at the demolished tile")
+      (cl-assert (string= row row-again)
+                 nil "render reads stored intents, never re-evaluates")))
+  ;; determinism tripwires: cistern-test-4a-deterministic (registered,
+  ;; running in this suite) covers both scenarios byte-identically with
+  ;; the wired path active — full-state hash includes reputation and
+  ;; the stored outcome; replays are symmetric and must stay equal.
+  (message "CISTERN-4B-M4-OK"))
