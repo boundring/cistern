@@ -1093,3 +1093,12 @@ One entry per dead/failed/retried run.
   is single-frame intents via the existing overlay path (already
   consumes them unchanged). The consumption test (L-009) remains
   unregistered until the M9 pair.
+  RULINGS (director, 2026-09-06): (1) "adjacent contamination puff
+  if pipe was dirty" — unexpressable over state, DEFERRED per the
+  death rule, recorded in the spec §6 deferred list as an open juice
+  clause; severed-line spill noted as the natural mechanism if the
+  owner ever wants it. Do not wire it now. (2) Dust face: `info`
+  enum stands; gray-rendering, if wanted, lives in the view's
+  palette table — the doc's "gray" was a prose hint, not a contract.
+  (3) Refund arithmetic: 50% of the CURRENT pinned build costs
+  (floor), as taken.
