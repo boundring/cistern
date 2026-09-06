@@ -490,3 +490,140 @@ exactly base."
                            (* 3 cistern-score-relief-base)))
                nil "a real seated relief pays through do-tick"))
   (message "CISTERN-4B-M5-OK"))
+
+;; ---------------------------------------------------------------------------
+;; 4b Pair 7 — M6 particle field (REWARDS-DESIGN §4, criteria 1-6;
+;; criterion 7 is M9's).  Field in domain state; advance-particles is
+;; domain field mechanics; spawns migrate from transient intents into
+;; field particles; the stored intents slot keeps only banner text.
+
+(defconst cistern-test-4b-m6--dust-fixture
+  ;; L-023 provenance: generated from the §4 trigger row + the pinned
+  ;; draw order (count, then per particle: glyph, ttl, vel-x, vel-y)
+  ;; BEFORE implementation, over the pinned stream (seed 42, id 1)
+  ;; and trigger T = demolish-dust at tile (4,2).
+  '((0 . ((:pos (4 . 2) :vel (-1 . 0) :ttl 2 :glyph "." :face info :layer sparkle)
+          (:pos (4 . 2) :vel (1 . 1) :ttl 2 :glyph "." :face info :layer sparkle)
+          (:pos (4 . 2) :vel (1 . 0) :ttl 2 :glyph "." :face info :layer sparkle)
+          (:pos (4 . 2) :vel (0 . 0) :ttl 2 :glyph "." :face info :layer sparkle)))
+    (1 . ((:pos (3 . 2) :vel (-1 . 0) :ttl 1 :glyph "." :face info :layer sparkle)
+          (:pos (5 . 3) :vel (1 . 1) :ttl 1 :glyph "." :face info :layer sparkle)
+          (:pos (5 . 2) :vel (1 . 0) :ttl 1 :glyph "." :face info :layer sparkle)
+          (:pos (4 . 2) :vel (0 . 0) :ttl 1 :glyph "." :face info :layer sparkle)))
+    (3 . nil)
+    (6 . nil)))
+
+(defun cistern-test-4b-m6--field-at-n (n)
+  "Dust field at tile (4,2), seed 42, after N advances."
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-demolish st 4 2)
+    (cistern--rewards-eval st nil)                 ; trigger spawns
+    (dotimes (_ n) (cistern--advance-particles st))
+    (cistern-st-particles st)))
+
+(defun cistern-test-4b-m6-particle-field ()
+  ;; (1) fixture equality at N = 0, 1, 3, 6 — full particle list
+  (dolist (case cistern-test-4b-m6--dust-fixture)
+    (let ((got (cistern-test-4b-m6--field-at-n (car case))))
+      (cl-assert (equal got (cdr case))
+                 nil "M6 fixture N=%S: got %S" (car case) got)))
+  ;; (2) same seed twice → identical field; across seeds ≥3 distinct
+  (let ((fields (mapcar (lambda (seed)
+                          (let ((st (cistern--new-game seed)))
+                            (cistern--cmd-demolish st 4 2)
+                            (cistern--rewards-eval st nil)
+                            (secure-hash 'md5 (prin1-to-string
+                                               (cistern-st-particles st)))))
+                        '(1 2 3 4 5))))
+    (cl-assert (= (length (delete-dups (copy-sequence fields))) 3)
+               nil "field variety across seeds"))
+  ;; same-seed identity covered by the fixture equality at N=0
+  ;; (2, criterion 2 second half)
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-demolish st 4 2)
+    (cistern--rewards-eval st nil)
+    (let ((a (cistern-st-particles st)))
+      (cistern--rewards-eval st nil)                 ; no new events: no spawns
+      (cl-assert (equal a (cistern-st-particles st))
+                 nil "no events: field unchanged")))
+  ;; (3) TTL expiry: a ttl-6 particle is removed exactly at the 6th
+  ;; advance; the field is empty after max-TTL + 1
+  (let ((st (cistern--new-game 42)))
+    (cistern--field-spawn st (cons 8 8) (cons 0 -1) 6 "*" 'bonus 'sparkle)
+    (cistern--advance-particles st)
+    (cistern--advance-particles st)
+    (cistern--advance-particles st)
+    (cl-assert (= (length (cistern-st-particles st)) 1)
+               nil "ttl-6 particle alive after 3 advances")
+    (dotimes (_ 3) (cistern--advance-particles st))
+    (cl-assert (= (length (cistern-st-particles st)) 1)
+               nil "ttl-6 particle alive after 6 advances (ttl 0 now)")
+    (cistern--advance-particles st)
+    (cl-assert (null (cistern-st-particles st))
+               nil "field empty after max-TTL + 1 advances"))
+  ;; (4) K=64 FIFO cap: 70 spawns evict the 6 oldest, deterministically
+  (let ((st (cistern--new-game 42)))
+    (dotimes (i 70)
+      (cistern--field-spawn st (cons i 8) (cons 0 -1) 6
+                            (number-to-string i) 'info 'sparkle))
+    (let ((ps (cistern-st-particles st)))
+      (cl-assert (= (length ps) 64) nil "cap holds 64")
+      ;; newest-first: first is i=69, last is i=6 — the 6 oldest gone
+      (cl-assert (string= (plist-get (car ps) :glyph) "69")
+                 nil "newest particle first")
+      (cl-assert (string= (plist-get (car (last ps)) :glyph) "6")
+                 nil "oldest six evicted FIFO")))
+  ;; (5) advance-when-paused: the field animates while every sim
+  ;; counter is untouched
+  (let ((st (cistern--new-game 42)))
+    (cistern--field-spawn st (cons 8 8) (cons 0 -1) 6 "*" 'bonus 'sparkle)
+    (let ((tick0 (cistern-st-tick st))
+          (alloy0 (cistern-st-alloy st))
+          (rep0 (cistern-st-reputation st))
+          (rng0 (cistern-st-rng st)))
+      (cistern--advance-particles st)
+      (cistern--advance-particles st)
+      (cl-assert (= (cistern-st-tick st) tick0) nil "tick frozen")
+      (cl-assert (= (cistern-st-alloy st) alloy0) nil "alloy frozen")
+      (cl-assert (= (cistern-st-reputation st) rep0) nil "reputation frozen")
+      (cl-assert (= (cistern-st-rng st) rng0) nil "sim LCG frozen")))
+  ;; invalid state: ttl < 0 or |vel| > 1 raises (§4 failure mode 5)
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-particles st)
+          (list (list :pos (cons 8 8) :vel (cons 0 -1) :ttl -1
+                      :glyph "*" :face 'info :layer 'sparkle)))
+    (cl-assert (condition-case nil (progn (cistern--advance-particles st) nil)
+                 (error t))
+               nil "ttl < 0 raises"))
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-particles st)
+          (list (list :pos (cons 8 8) :vel (cons 2 . 0) :ttl 3
+                      :glyph "*" :face 'info :layer 'sparkle)))
+    (cl-assert (condition-case nil (progn (cistern--advance-particles st) nil)
+                 (error t))
+               nil "|vel| > 1 raises"))
+  ;; popup spawn shape: ttl 3, vel (0 . -1) per the §4 popup row
+  (let ((st (cistern--new-game 42)))
+    (cistern-test-4b-m5--skip-tip st)
+    (cistern--rewards-eval st (list (list 'relief 70 12 6)))
+    (let ((p (car (cistern-st-particles st))))
+      (cl-assert (and p (eq (plist-get p :layer) 'popup)) nil "popup in the field")
+      (cl-assert (= (plist-get p :ttl) 3) nil "popup ttl 3")
+      (cl-assert (equal (plist-get p :vel) (cons 0 -1)) nil "popup vel drifts up")
+      (cl-assert (equal (plist-get p :pos) (cons 12 6)) nil "popup at the relief tile")))
+  ;; (6) renderer purity: with a live field the render is
+  ;; deterministic and mutates nothing
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-demolish st 4 2)
+    (cistern--rewards-eval st nil)
+    (let* ((snapshot (prin1-to-string st))
+           (r1 (cistern-view--render st))
+           (r2 (cistern-view--render st)))
+      (cl-assert (string= r1 r2) nil "render deterministic with a live field")
+      (cl-assert (string= snapshot (prin1-to-string st))
+                 nil "render mutates nothing"))
+    ;; the dust is visible at its tiles through the render
+    (cl-assert (string-match-p "·\\|\\."
+                               (nth (+ 3 2) (split-string (cistern-view--render st) "\n")))
+               nil "dust visible at the demolished tile"))
+  (message "CISTERN-4B-M6-OK"))
