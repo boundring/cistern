@@ -896,6 +896,11 @@ One entry per dead/failed/retried run.
   its tick, not multi-step catch-up in a single tick. If the
   director wants while-loop catch-up, it is a one-line change to
   advance + test — say so before pair 4.
+  RULING (director, 2026-09-06): keep one gated step per tick —
+  legacy's "the table catches up" means already-satisfied steps
+  resolve without new player events on their successive ticks; a
+  while-loop catch-up would be a new mechanism beyond the legacy
+  port (least-active-decisions). No code change.
 - Tooling lesson (second incident this phase): apply_patch
   fuzzy-matched a hunk and replaced the losing scenario's defconst
   header with a bogus `cistern--do-tick` line (and earlier mangled
