@@ -1019,3 +1019,6 @@ One entry per dead/failed/retried run.
   fixture pins raw 31-bit positions only. The consumption test
   (L-009) stays unregistered until the M9 pair, where its final
   assert can go green.
+  RULING (director, 2026-09-06): implementation-pinned fixture
+  ACCEPTED — derivation is doc-pinned, purpose is drift detection,
+  re-pinning by fiat adds nothing. No change.
