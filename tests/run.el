@@ -46,7 +46,9 @@
     cistern-test-4b-m5-relieve-pay
     cistern-test-4b-m6-particle-field
     cistern-test-4b-m7-severity
-    cistern-test-4b-m8-milestones))
+    cistern-test-4b-m8-milestones
+    cistern-test-rewards-consumption
+    cistern-test-4b-m9-ceremony))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

@@ -769,3 +769,81 @@ exactly base."
     (cl-assert (= (cistern-st-reputation st) 100)
                nil "ladder crossing adds no reputation"))
   (message "CISTERN-4B-M8-OK")))
+
+;; ---------------------------------------------------------------------------
+;; 4b Pair 10 — M9 ceremony (REWARDS-DESIGN §2 M9, §5 ceremony
+;; semantics, criterion 7 commit-first).
+
+(defun cistern-test-4b-m9-ceremony ()
+  ;; (a) commit-first: completing the goal card commits the trophy
+  ;; (the map seed — §5 "visited seeds") to state AT TRIGGER TIME,
+  ;; zero ticks; the ceremony field fill rides the same evaluation
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card st '(:tier 2 :goals ((:kind relieves-served :target 1))))
+    (cistern--rewards-eval st (list (list 'relief 70 3 3)))
+    (cl-assert (member 42 (cistern-st-trophies st))
+               nil "trophy committed at trigger time (map seed)")
+    (cl-assert (= (cistern-st-tick st) 0)
+               nil "commit is commit-first: zero ticks required")
+    (cl-assert (plist-get (cistern-st-goal-card st) :completed)
+               nil "card marked completed at trigger"))
+  ;; (b) full-buffer fill: up to 64 ttl-6 sparkles, M9-row glyphs
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card st '(:tier 2 :goals ((:kind relieves-served :target 1))))
+    (cistern--rewards-eval st (list (list 'relief 70 3 3)))
+    (let ((ps (cistern-st-particles st)))
+      (cl-assert (and (>= (length ps) 60) (<= (length ps) 64))
+                 nil "ceremony fills the buffer (up to 64)")
+      (dolist (p ps)
+        (cl-assert (= (plist-get p :ttl) 6) nil "ceremony ttl 6")
+        (cl-assert (equal (plist-get p :vel) (cons 0 0)) nil "ceremony sparkles static")
+        (cl-assert (member (plist-get p :glyph)
+                           '("*" "!" "·" "§" "0" "1" "2" "3" "4" "5" "6" "7" "8" "9"))
+                   nil "ceremony glyphs from the M9 row")
+        (cl-assert (eq (plist-get p :layer) 'sparkle) nil "layer sparkle"))))
+  ;; (c) exactly-once: re-evaluation re-commits nothing, re-fills nothing
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card st '(:tier 2 :goals ((:kind relieves-served :target 1))))
+    (cistern--rewards-eval st (list (list 'relief 70 3 3)))
+    (let ((trophies (cistern-st-trophies st))
+          (ps (cistern-st-particles st)))
+      (cistern--rewards-eval st nil)
+      (cl-assert (equal (cistern-st-trophies st) trophies)
+                 nil "trophy not re-committed")
+      (cl-assert (equal (cistern-st-particles st) ps)
+                 nil "ceremony field not re-filled")))
+  ;; (d) banner present in the stored intents
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card st '(:tier 2 :goals ((:kind relieves-served :target 1))))
+    (cistern--rewards-eval st (list (list 'relief 70 3 3)))
+    (cl-assert (cl-some (lambda (i)
+                          (and (eq (plist-get i :layer) 'banner)
+                               (plist-get i :text)))
+                        (cdr (cistern-st-rewards-outcome st)))
+               nil "ceremony banner in the reserved row"))
+  ;; (e) skip semantics: no modal — input during the ceremony works
+  ;; (a cursor move + a tick behave normally; nothing is forfeited)
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card st '(:tier 2 :goals ((:kind relieves-served :target 1))))
+    (cistern--rewards-eval st (list (list 'relief 70 3 3)))
+    (cistern--cmd-cursor st 'right)
+    (cl-assert (equal (cistern-st-cursor st) (cons 4 6))
+               nil "cursor input works during the ceremony")
+    (cistern--do-tick st)
+    (cl-assert (= (cistern-st-tick st) 1) nil "ticks work during the ceremony")
+    (cl-assert (member 42 (cistern-st-trophies st))
+               nil "no forfeit: the trophy remains"))
+  ;; (f) determinism: same seed replay → identical trophy set +
+  ;; identical ceremony field
+  (let ((run (lambda ()
+               (let ((st (cistern--new-game 42)))
+                 (cistern--cmd-set-goal-card
+                  st '(:tier 2 :goals ((:kind relieves-served :target 1))))
+                 (cistern--rewards-eval st (list (list 'relief 70 3 3)))
+                 (list (cistern-st-trophies st)
+                       (secure-hash 'md5
+                                    (prin1-to-string
+                                     (cistern-st-particles st))))))))
+    (cl-assert (equal (funcall run) (funcall run))
+               nil "same seed → identical trophies and ceremony field"))
+  (message "CISTERN-4B-M9-OK"))
