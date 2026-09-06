@@ -740,11 +740,11 @@ exactly base."
   ;; each exactly once
   (let ((st (cistern--new-game 42)))
     (cistern--rewards-eval st (make-list 100 'relief))
-    (let* ((intents (nth 1 (cistern-st-rewards-outcome st)))
+    (let* ((intents (cdr (cistern-st-rewards-outcome st)))
            (unlock-intents (cl-remove-if-not
                             (lambda (i) (eq (cistern--event-kind i) 'unlock))
                             intents))
-           (unlocks (mapcar (lambda (i) (plist-get i :id)) unlock-intents)))
+           (unlocks (mapcar (lambda (i) (plist-get (cdr i) :id)) unlock-intents)))
       (cl-assert (equal unlocks '(big-cistern fast-flush self-clean
                                   air-freshener golden-pipe))
                  nil "all five crossings in threshold order, once each"))

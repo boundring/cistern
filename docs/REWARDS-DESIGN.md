@@ -150,6 +150,18 @@ The field lives in domain state beside the sim. Its RNG stream is **derived from
 1. Upgrade pricing and goal-card difficulty values.
 2. VR-8 tip curve tuning (fixture exists; may move after playtest).
 3. Map seed library (alternative/complement to procedural generation).
+8. Bounded solvability retry inside generation (M2, Brogue pattern):
+   DEFERRED — reservation discipline guarantees map validity by
+   construction; the property tripwire names any violating seed;
+   implement the bounded retry then (director ruling, L-025).
+9. Relief "adjacent contamination puff if pipe was dirty" (M1):
+   DEFERRED — no dirt concept on plumbing exists in state
+   (unexpressable predicate, L-024); the severed-line spill is the
+   natural mechanism if the owner ever wants it (director ruling).
+10. Unlock persistence across maps (M8/M9, ledger 2): the unlock
+   record persists in state; the ceremony commits next-map unlocks
+   at trigger time; actual cross-map traversal is next-map-mechanics
+   territory, post-4b (director ruling, L-031).
 
 **Open (presentation-layer / copy, not design):**
 4. Paused-animation timer: bare 5 tps always vs debounced idle timer — CPU/battery choice only.

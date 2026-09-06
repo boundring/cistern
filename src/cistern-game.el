@@ -215,6 +215,7 @@ particle field's child stream (§4), never the sim LCG.  M4
 reputation accrues from the relief/burst/leak symbols.  The
 outcome stays the pinned default until later pairs re-shape it."
   (let ((intents nil)
+        (celebrate nil)
         ;; the tick's events: pending list + caller arguments, merged
         (events (append (cistern-st-rewards-events st) raw-events)))
     (dolist (ev events)
@@ -324,11 +325,33 @@ outcome stays the pinned default until later pairs re-shape it."
               (push (list :layer 'log :text line
                           :face (cistern--severity-face sev))
                     intents))))))
+    ;; M8 milestone ladder: cumulative relieves cross the ordered
+    ;; thresholds; each unlock emitted exactly once (membership
+    ;; guard) and persisted in the unlocks list (§5).  The ladder
+    ;; adds no reputation — milestones count relieves, not reputation.
+    (let ((n (length (cl-remove-if-not
+                      (lambda (e) (eq (cistern--event-kind e) 'relief)) events))))
+      (when (> n 0)
+        (setf (cistern-st-relieves st) (+ n (cistern-st-relieves st)))))
+    (dolist (step cistern--milestone-ladder)
+      (let ((threshold (car step)) (unlock (cdr step)))
+        (when (and (>= (cistern-st-relieves st) threshold)
+                   (not (memq unlock (cistern-st-unlocks st))))
+          (push unlock (cistern-st-unlocks st))
+          (push (list 'unlock :id unlock) intents)
+          (when (eq unlock 'golden-pipe)
+            (setq celebrate t)))))
     (setf (cistern-st-rewards-events st) nil)
     ;; store the outcome+intents in state (§5/L-027): the view reads
     ;; the stored 2-list and never calls rewards-eval itself
-    (let ((outcome (plist-put (copy-sequence cistern--rewards-default-outcome)
-                              :score (or (cistern-st-score st) 0)))
+    (let* ((outcome (plist-put (copy-sequence cistern--rewards-default-outcome)
+                               :score (or (cistern-st-score st) 0)))
+           (outcome (if (cistern-st-unlocks st)
+                        (plist-put outcome :unlocks (cistern-st-unlocks st))
+                      outcome))
+           (outcome (if celebrate
+                        (plist-put outcome :celebrate t)
+                      outcome))
           (final (nreverse intents)))
       (setf (cistern-st-rewards-outcome st) (cons outcome final))
       (list st outcome final))))
@@ -380,6 +403,12 @@ Game-changing presentation is the banner row, not a face."
     (`minor 'info)
     (`major 'error)
     (_ nil)))
+
+(defconst cistern--milestone-ladder
+  '((5 . big-cistern) (15 . fast-flush) (30 . self-clean)
+    (50 . air-freshener) (100 . golden-pipe))
+  "Ordered milestone ladder (§2/§5): (CUMULATIVE-RELIEVES .
+UNLOCK-ID).  Crossing 100 also celebrates (full buffer).")
 
 (defun cistern--goal-target (kind target tier)
   "Tier-adjusted TARGET (§5 pay-forward: Tier1 −25%, Tier3 +25%

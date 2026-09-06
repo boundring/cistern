@@ -1346,6 +1346,9 @@ One entry per dead/failed/retried run.
   field's rng position (`particle-rng`) already exists; the popup
   entity's ttl=3/vel (0,−1) migrate from intents into field
   particles at that pair.
+  RULING (director, 2026-09-06): "below the window pays 0" STANDS
+  (correct minimal reading; a tuning constant if playtesting
+  disagrees). No change.
 
 ---
 
@@ -1456,3 +1459,55 @@ One entry per dead/failed/retried run.
   the goal-card progress mechanism with a card-less ladder). M9
   last: ceremony state, commit-first trophy, and registering the
   consumption test.
+
+---
+
+## L-031 (2026-09-06, run: impl-phase4 — 4b Pair 9, R5 M8 milestone ladder)
+
+- Attempt: Red test `tests/test-4b-rewards.el ::
+  cistern-test-4b-m8-milestones` (red commit `1c59b71`; red run:
+  `void-function cistern-st-relieves`, 1/30, exit 1). Green =
+  `relieves` cumulative counter slot (approved state-shape pin,
+  L-031) + `cistern--milestone-ladder` (§2/§5 ordered
+  {threshold . unlock} table: 5 big-cistern, 15 fast-flush,
+  30 self-clean, 50 air-freshener, 100 golden-pipe) + the ladder
+  consumed in `cistern--rewards-eval`: payload AND symbol relief
+  events count (`cistern--event-kind` normalization); each crossing
+  pushes the unlock id onto `cistern-st-unlocks` (membership guard =
+  exactly-once) and emits `(unlock :id ID)` as an intent in
+  threshold order; the outcome's :unlocks carries the cumulative
+  set; the golden-pipe crossing sets the outcome's :celebrate flag
+  (full-buffer celebrate; the K=64 field-fill choreography is M9's).
+- State-shape ruling recorded (director): `unlocks` = the
+  unlocked-id list; `relieves` = cumulative counter. DEFERRED per
+  the same ruling (recorded in REWARDS-DESIGN §6 item 10): "unlocks
+  persist across maps (ledger 2)" is untestable without multi-map
+  mechanics — the unlock record persists in state; M9's ceremony
+  commits next-map unlocks at trigger time; cross-map traversal is
+  next-map-mechanics territory (post-4b). Same pattern as the M1
+  dirt clause.
+- Doc hygiene: REWARDS-DESIGN §6 now records the three
+  ruling-deferred clauses (M2 bounded retry, M1 dirt puff, M8/M9
+  cross-map persistence) — items 8-10.
+- Incidents (authoring, caught pre-commit): the M8 test's own
+  probes/rewrites produced three load-level paren defects (a
+  mapcar nesting error, a close-count slip, and a missing defun
+  close) — all caught by check-parens + a per-line depth trace +
+  the reader probe. Runtime contract note: the stored outcome is a
+  CONS `(outcome . intents)` — `(nth 1 …)` is the FIRST intent,
+  `(cdr …)` is the intents list; the test's intent extraction used
+  the wrong accessor twice before the suite went green. And
+  `(plist-get i :id)` on the `(unlock :id ID)` intent must read the
+  CDR's plist (the car is the event head) — fixed in the test.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 30 TESTS PASSED, exit 0.
+- Change for next attempt: M9 closes 4b — ceremony state
+  (commit-first trophy at MapCompleted, zero ticks), the
+  full-buffer field fill (§4 M9 trigger row: up to 64 `sparkle`,
+  ttl 6, glyphs * ! · § digits + centered banner), auto-run pause,
+  any-key skip with no forfeit — AND registering
+  `cistern-test-rewards-consumption` in tests/run.el (its M8/M5
+  asserts are expected green already; the final celebration assert
+  goes green with M9). The consumption test's M5 block still uses a
+  bare 'relief symbol for the pay assert — migrate it to the
+  payload vocabulary ((relief 70 3 3)) when registering, L-028.

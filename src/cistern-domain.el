@@ -85,7 +85,8 @@ by the view, not here).")
   (goal-card nil)            ; active goal card (§5): (:map-id :tier :goals :completed)
   (reputation 0)             ; 0-100 clamped; M4 deltas: +1 relief −5 burst −2 leak
   (rewards-outcome nil)      ; stored per-tick (outcome . intents) 2-list; the view reads it
-  (particles nil))           ; the particle field (§4): newest-first plist list, K=64 FIFO cap
+  (particles nil)            ; the particle field (§4): newest-first plist list, K=64 FIFO cap
+  (relieves 0))              ; cumulative relieves counter (M8 ladder; approval L-031)
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."

@@ -29,7 +29,9 @@
 
     ;; M5 relieve-pay: relief events pay, score drifts off zero.
     (let* ((st2 (cistern--new-game 43))
-           (paid (cistern--rewards-eval st2 '(relief))))
+           ;; payload vocabulary (L-028): the relief event carries
+           ;; urgency + tile; bladder 70 is inside the warning window
+           (paid (cistern--rewards-eval st2 (list (list 'relief 70 3 3)))))
       (cl-assert (> (plist-get (nth 1 paid) :score) 0)
                  "relief within the warning window pays"))
 
