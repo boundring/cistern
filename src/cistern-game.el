@@ -105,6 +105,29 @@ is Phase 4a; the table ships empty so advance is a no-op."
 line severed, no reachable toilet serves the sector and the bladder
 breach fires deterministically from the pinned constants.")
 
+(defconst cistern-tutorial-scenario-winning
+  (list
+   :name "win-serve"
+   :seed 42                       ; same seed as the losing scenario
+   :script
+    `((verb . ,(lambda (st) (cistern--cmd-purge st 5 2)))    ; starter tank: clears the 30-load backup and funds the build
+      (verb . ,(lambda (st) (cistern--cmd-build st 'pipe 6 2)))  ; grow the starter network outward (each cell is a
+      (verb . ,(lambda (st) (cistern--cmd-build st 'toilet 7 2))) ;  floor neighbor of the reserved starter plumbing)
+      (verb . ,(lambda (st) (cistern--cmd-build st 'pipe 6 3)))
+      (verb . ,(lambda (st) (cistern--cmd-build st 'pipe 6 4)))
+      (verb . ,(lambda (st) (cistern--cmd-build st 'pipe 6 5)))
+      (verb . ,(lambda (st) (cistern--cmd-build st 'toilet 7 5))) ; seat on the seekers' return funnel
+      (wait . 55))               ; same horizon budget as the losing scenario
+   :expect '((contamination . (= 0))
+             (over . nil)))
+  "Phase 4a winning walkthrough (plan 03 §4a pair 2): the SAME
+seed's need — the pure-wait run breaches at tick 50 because one
+wired toilet + a filling tank cannot serve the seekers — is served
+by purging before backup and growing a second seat onto the return
+funnel.  No :lesson: R4's acceptance here is contamination 0 on the
+same need, not a log line (the losing scenario's lesson carries the
+teaching moment).")
+
 (defun cistern--scenario-expect-p (st key val)
   "Evaluate one scenario :expect entry (KEY . VAL) against final ST."
   (pcase key

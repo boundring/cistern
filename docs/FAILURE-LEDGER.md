@@ -801,3 +801,58 @@ One entry per dead/failed/retried run.
      winning scenario ever carries a :lesson, the trigger needs
      revisiting (contam never rises there). Determinism pair (4) is
      expected to fall out; same-hash already holds for this scenario.
+
+---
+
+## L-020 (2026-09-06, run: impl-phase4 — Pair 2, R4 winning scenario)
+
+- Attempt: Red test `tests/test-4a-scenarios.el ::
+  cistern-test-4a-winning-clean` (red commit `ebf7575`; red run:
+  `cl-assertion-failed (boundp 'cistern-tutorial-scenario-winning)`,
+  1/18, exit 1). Green = `cistern-tutorial-scenario-winning` data
+  only — runner and expect interpreter untouched (the existing
+  `contamination`/`over` keys cover the acceptance; no new key).
+  Contamination's counter is monotonic (only ever incremented:
+  accident + severed-finish-use), so the final-state `(contamination
+  . (= 0))` assert proves contamination stayed 0 through AND at end
+  of the script — no mid-run sampling needed.
+- L-019 watch item (same seed's need, not a different failure):
+  honored. The winning premise IS the pure-wait breach mechanism —
+  one wired toilet + a filling tank cannot serve seekers who wander
+  east to mine before bladder-seek fires at tick 20. Winning script:
+  purge the starter tank (anchor (5,2); clears the 30-load backup
+  AND funds the build: +10 alloy → 30 budget) then grow the network
+  outward along the seekers' return funnel — pipe (6,2), toilet
+  (7,2), pipes (6,3)(6,4)(6,5), toilet (7,5). Every build cell is a
+  floor neighbor grown from the reserved starter-plumbing anchors
+  (L-011's derivation rule); the data is seed-42-tuned by design —
+  plan 03 defers ship-seed choice ("exists a seed where both
+  scenarios behave"; 42 is that seed). Horizon mirrors the losing
+  scenario: 7 verbs then wait 55, same tick budget.
+- Probe harvest (four rejected shapes before D landed, same desync
+  class as L-019): (a) second toilet at the starter cluster (V3/V4)
+  — toilets exist but workers still breach: the killer is RETURN
+  TRAVEL (~25+ detoured ticks from the east mining cluster vs 30
+  ticks from bladder-seek to burst), not queueing alone; (b) A-row
+  (7,2)+(7,4) — one seat short, worker #1 stood at (7,6) bladder 118
+  one step from a free toilet at t50; (c) standalone tank+toilet
+  pairs — 25 alloy each, one station cannot buy the missing seat.
+  D wins by putting the seat ON the funnel: workers pass (7,5)
+  around t45, so the last seeker seats at bladder 118 instead of
+  breaching at 120.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 18 TESTS PASSED, exit 0. Probe:
+  contam 0, tank-total 40 (purge reset + four deposits = every
+  original creator relieved), same-hash across two runs.
+- Pinned reading: the winning scenario carries NO :lesson, and that
+  is deliberate — R4's acceptance for the winning half is
+  "contamination staying 0" on the same seed's need, not a log
+  line; the losing scenario's lesson line carries the teaching
+  moment. The runner's :lesson trigger (contam > 0 during waits,
+  L-019) is therefore unexercised by this scenario by construction.
+- Margin note (desync sensitivity): the last seat lands at bladder
+  118 of 120 — zero slack. Deterministic at seed 42 (same-hash),
+  but any Phase-2-style retune of costs, rates, or pathing breaks
+  this scenario first. That is the plan's documented desync class:
+  a scenario that stops reproducing its own clean run is a dead run
+  — re-probe, re-tune the script data, never weaken the expect.
