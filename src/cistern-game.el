@@ -74,22 +74,38 @@ phantom-plumbing invariant, load-bearing)."
       (cistern--log st "DEMOLISHED %s AT (%d,%d) — %d ALLOY"
                     (upcase (symbol-name kind)) x y cistern-cost-demolish)))))
 
-(defun cistern--tutorial-steps ()
+(defun cistern--tutorial-steps (&optional table)
   "Tutorial mechanism holder: table of (PROMPT . PREDICATE) steps,
 predicate takes ST and a non-nil result advances.  Scenario content
-is Phase 4a; the table ships empty so advance is a no-op."
-  '())
+is Phase 4a; the table ships empty so advance is a no-op.  The
+optional TABLE arg is the test-injection point (the shipped game
+never passes one)."
+  (or table '()))
 
-(defun cistern--tutorial-advance (st)
-  "Advance the tutorial index if the current step's predicate holds
-(cistern.el:589-599 pattern, minus the nine legacy steps)."
-  (let ((steps (cistern--tutorial-steps))
+(defun cistern--tutorial-advance (st &optional table)
+  "Advance the tutorial index one gated step per tick (legacy
+cistern.el:589-599 semantics): the current step's predicate gates,
+already-satisfied steps resolve instantly on their tick, and
+completing the final step sets the index to `t' with the
+completion line."
+  (let ((steps (cistern--tutorial-steps table))
         (idx (cistern-st-tutorial st)))
     (when (and (numberp idx)
                (< idx (length steps))
                (funcall (cdr (nth idx steps)) st))
       (setf (cistern-st-tutorial st) (1+ idx))
-      (cistern--log st "TUTORIAL: OBJECTIVE COMPLETE"))))
+      (if (>= (1+ idx) (length steps))
+          (progn
+            (setf (cistern-st-tutorial st) t)
+            (cistern--log st "TUTORIAL COMPLETE — THE SECTOR IS YOURS"))
+        (cistern--log st "TUTORIAL: OBJECTIVE COMPLETE")))))
+
+(defun cistern--cmd-skip-tutorial (st)
+  "T skip (R4): mark the tutorial done so advance is a no-op.
+Use-case form — the index is state and mutates here, never in the
+driver (armed-verb precedent, L-010 pin 4)."
+  (setf (cistern-st-tutorial st) t)
+  (cistern--log st "TUTORIAL SKIPPED"))
 
 (defconst cistern-tutorial-scenario-losing
   (list

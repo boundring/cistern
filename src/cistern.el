@@ -73,8 +73,7 @@ pure render.  Every state-mutating command ends here."
 
 (defun cistern-skip-tutorial ()
   (interactive)
-  (setf (cistern-st-tutorial cistern--st) t)
-  (cistern--log cistern--st "TUTORIAL SKIPPED")
+  (cistern--cmd-skip-tutorial cistern--st)
   (cistern--refresh))
 
 (defun cistern-tick ()

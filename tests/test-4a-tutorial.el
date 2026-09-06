@@ -23,12 +23,16 @@ state-driven so steps resolve instantly when already satisfied.")
 
 (defun cistern-test-4a-tutorial ()
   ;; gate: a failing predicate holds the index — a later step whose
-  ;; predicate holds does NOT jump the gate
+  ;; predicate holds does NOT jump the gate.  The mechanism is
+  ;; exercised headless via cistern--tutorial-advance with an
+  ;; injected table (plan 03 done-when: "interactive path testable
+  ;; headless via the advance function"); its composition with the
+  ;; tick is pinned by the empty-table invariant below.
   (let ((st (cistern--new-game 42)))
     (cl-assert (equal (cistern--tutorial-steps cistern-test-4a-tut-table)
                       cistern-test-4a-tut-table)
                "tutorial steps accept an injectable table")
-    (cistern--do-tick st)
+    (cistern--tutorial-advance st cistern-test-4a-tut-table)
     (cl-assert (= (cistern-st-tutorial st) 0)
                "failing predicate holds the index")
     (cl-assert (not (cistern-test-4a-tut--log-has st "OBJECTIVE"))
@@ -40,20 +44,23 @@ state-driven so steps resolve instantly when already satisfied.")
   ;; (legacy cistern.el:589-599 semantics)
   (let ((st (cistern--new-game 42)))
     (cistern--cmd-purge st 5 2)          ; step one holds, step two fails
-    (cistern--do-tick st)
+    (cistern--tutorial-advance st cistern-test-4a-tut-table)
     (cl-assert (= (cistern-st-tutorial st) 1)
                "satisfied step advances the index exactly once per tick")
+    (cistern--tutorial-advance st cistern-test-4a-tut-table)
+    (cl-assert (= (cistern-st-tutorial st) 1)
+               "a second advance over the same state is a no-op")
     (cl-assert (cistern-test-4a-tut--log-has st "TUTORIAL: OBJECTIVE COMPLETE")
                "advance logs the objective line")
     (cistern--cmd-build st 'pipe 6 2)    ; step two now holds too
-    (cistern--do-tick st)
+    (cistern--tutorial-advance st cistern-test-4a-tut-table)
     (cl-assert (eq (cistern-st-tutorial st) t)
                "final step sets the index to done")
     (cl-assert (cistern-test-4a-tut--log-has st
                  "TUTORIAL COMPLETE — THE SECTOR IS YOURS")
                "final step logs the completion line")
-    ;; done is terminal: ticks after `t' change nothing
-    (cistern--do-tick st)
+    ;; done is terminal: advances after `t' change nothing
+    (cistern--tutorial-advance st cistern-test-4a-tut-table)
     (cl-assert (eq (cistern-st-tutorial st) t) "done stays done"))
 
   ;; T skip: the use-case form marks done so advance is a no-op and
@@ -68,7 +75,7 @@ state-driven so steps resolve instantly when already satisfied.")
                "skip logs the skip line")
     (cistern--cmd-purge st 5 2)
     (cistern--cmd-build st 'pipe 6 2)
-    (cistern--do-tick st)
+    (cistern--tutorial-advance st cistern-test-4a-tut-table)
     (cl-assert (eq (cistern-st-tutorial st) t)
                "advance is a no-op after skip")
     (cl-assert (not (cistern-test-4a-tut--log-has st "OBJECTIVE"))

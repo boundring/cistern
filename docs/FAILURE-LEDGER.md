@@ -856,3 +856,60 @@ One entry per dead/failed/retried run.
   this scenario first. That is the plan's documented desync class:
   a scenario that stops reproducing its own clean run is a dead run
   — re-probe, re-tune the script data, never weaken the expect.
+
+---
+
+## L-021 (2026-09-06, run: impl-phase4 — Pair 3, R4 predicate table + T skip)
+
+- Attempt: Red test `tests/test-4a-tutorial.el ::
+  cistern-test-4a-tutorial` (red commit `9b7874f`). First red run
+  was an authoring bug — registered `cistern-test-4a-tutorial` but
+  the defun was named `cistern-test-4a-tut` (`void-function`,
+  L-017's class: a red that dies on a naming mismatch is not the
+  requirement's red) — renamed before committing. Real red run:
+  `wrong-number-of-arguments` on `cistern--tutorial-steps`, 1/19,
+  exit 1 — the mechanism had no injection point. Green =
+  `cistern--tutorial-steps (&optional table)` (test-injection
+  point, minimal pinned shape; view and shipped game call it
+  no-arg, table stays empty), `cistern--tutorial-advance (st
+  &optional table)` ported to legacy cistern.el:589-599 semantics,
+  and the `cistern--cmd-skip-tutorial` use-case.
+- Phase-2 deviation fixed in passing (this pair's min impl per plan
+  03: "port cistern--tutorial-advance semantics"): the Phase 2
+  advance logged OBJECTIVE on every step and NEVER set the index to
+  `t` on completion. Legacy semantics restored: one gated step per
+  tick, already-satisfied steps resolve instantly on their tick
+  (order-free catch-up), completing the final step sets the index
+  to `t` and logs "TUTORIAL COMPLETE — THE SECTOR IS YOURS";
+  non-final steps log "TUTORIAL: OBJECTIVE COMPLETE".
+- Driver migration (armed-verb precedent, L-010 pin 4 — state
+  mutation belongs in use-cases): `cistern-skip-tutorial` setf'd
+  `(cistern-st-tutorial cistern--st)` directly at src/cistern.el:76;
+  now routes through `cistern--cmd-skip-tutorial`. The driver setf
+  is pinned against regression by a static assert (driver source
+  must not contain "(setf (cistern-st-tutorial").
+- Interpretation pin (flagged for the director): "order-free
+  catch-up" is read as ONE gated step per tick — plan 03's own
+  wording ("advances the tutorial index exactly once") and the
+  declared legacy pin both say per-tick single-step; "instant" means
+  an already-satisfied step resolves without new player events on
+  its tick, not multi-step catch-up in a single tick. If the
+  director wants while-loop catch-up, it is a one-line change to
+  advance + test — say so before pair 4.
+- Tooling lesson (second incident this phase): apply_patch
+  fuzzy-matched a hunk and replaced the losing scenario's defconst
+  header with a bogus `cistern--do-tick` line (and earlier mangled
+  the steps signature into a body form). Both caught by re-reading
+  the edited range before any run — generalize L-017's paren-scan
+  lesson: after ANY inexact-match warning, re-read the whole edited
+  region, not just the hunk tail.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 19 TESTS PASSED, exit 0.
+- Evidence: red runs above (exit 1); green prints
+  `CISTERN-4A-TUTORIAL-OK` (exit 0); full suite `ALL 19 TESTS
+  PASSED` (exit 0); parens OK on all three touched files.
+- Change for next attempt: pair 4 (scenario determinism) is
+  unaffected — scenarios never touch the tutorial index path beyond
+  the empty-table no-op. The view's `cistern-view--tutorial-line`
+  still consumes the no-arg steps call — shape unchanged, renders
+  nothing while the shipped table is empty.
