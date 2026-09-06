@@ -44,7 +44,8 @@
     cistern-test-4b-m4-reputation
     cistern-test-source-integrity
     cistern-test-4b-m5-relieve-pay
-    cistern-test-4b-m6-particle-field))
+    cistern-test-4b-m6-particle-field
+    cistern-test-4b-m7-severity))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

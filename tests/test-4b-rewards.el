@@ -636,3 +636,77 @@ exactly base."
                                (nth (+ 3 2) (split-string (cistern-view--render st) "\n")))
                nil "dust visible at the demolished tile"))
   (message "CISTERN-4B-M6-OK"))
+
+;; ---------------------------------------------------------------------------
+;; 4b Pair 8 — M7 face flash + three-tier log (REWARDS-DESIGN §2 M7):
+;; the DF announcement grammar — minor / major / game-changing.
+
+(defun cistern-test-4b-m7-severity ()
+  ;; (1) classification per the doc's assignments (relief → minor;
+  ;; burst, leak → major; MapCompleted → game-changing), deterministic
+  (dolist (case '((relief minor) (burst major) (leak major)
+                  (map-complete game-changing)))
+    (let ((s1 (cistern--event-severity (nth 0 case)))
+          (s2 (cistern--event-severity (nth 0 case))))
+      (cl-assert (eq s1 (nth 1 case)) nil "event %S classifies %S"
+                 (nth 0 case) (nth 1 case))
+      (cl-assert (eq s1 s2) nil "severity is deterministic")))
+  ;; (2) major: a real breach logs the major line, the stored slot
+  ;; carries the faced log intent, and the log-tail applies the
+  ;; error-class face
+  (let ((st (cistern--new-game 42)))
+    (let ((w (nth 1 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 14)
+      (setf (cistern--worker-y w) 7)
+      (setf (cistern--worker-bladder w)
+            (- cistern-bladder-burst cistern-bladder-rate)))
+    (cistern--do-tick st)
+    (let* ((breach (cl-find-if (lambda (l) (string-match-p "BREACH" l))
+                               (cistern-st-log st)))
+           (intent (cl-find-if (lambda (i)
+                                 (and (eq (plist-get i :layer) 'log)
+                                      (equal (plist-get i :text) breach)))
+                               (cdr (cistern-st-rewards-outcome st)))))
+      (cl-assert breach nil "breach logged")
+      (cl-assert intent nil "major log intent stored for the breach")
+      (cl-assert (eq (plist-get intent :face) 'error)
+                 nil "major line faces error")
+      ;; the error-class face reaches the rendered log tail
+      (let* ((tail (cistern-view--log-tail st))
+             (rows (split-string tail "\n"))
+             (hit (cl-find-if
+                   (lambda (r) (string-match-p "BREACH" r)) rows))
+             (face (and hit (get-text-property 0 'face hit))))
+        (cl-assert (eq face 'cistern-toilet-down)
+                   nil "log-tail renders the major face (error palette)"))
+      ;; error face on the tile: the breached tile is a hazard and
+      ;; renders with the existing error-class hazard face
+      (let* ((render (cistern-view--render st))
+             (row (nth (+ 3 7) (split-string render "\n")))
+             (face (get-text-property 14 'face row)))
+        (cl-assert (memq 'cistern-hazard (if (listp face) face (list face)))
+                   nil "breached tile renders the hazard (error-class) face"))))
+  ;; (3) minor: a real relief logs the minor faced line
+  (let ((st (cistern--new-game 42)))
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 3)
+      (setf (cistern--worker-y w) 3)
+      (setf (cistern--worker-bladder w)
+            (- cistern-bladder-seek cistern-bladder-rate)))
+    (cistern--do-tick st) (cistern--do-tick st) (cistern--do-tick st)
+    (let* ((relief-line (cl-find-if
+                         (lambda (l) (string-match-p "RELIEVED" l))
+                         (cistern-st-log st)))
+           (intent (cl-find-if (lambda (i)
+                                 (and (eq (plist-get i :layer) 'log)
+                                      (equal (plist-get i :text) relief-line)))
+                               (cdr (cistern-st-rewards-outcome st)))))
+      (cl-assert relief-line nil "relief logged")
+      (cl-assert intent nil "minor log intent stored for the relief")
+      (cl-assert (eq (plist-get intent :face) 'info)
+                 nil "minor line faces info")))
+  ;; (4) game-changing: MapCompleted rides the banner row (M3's
+  ;; structural treatment; copy DEFERRED) — classification only here
+  (cl-assert (eq (cistern--event-severity 'map-complete) 'game-changing)
+             nil "MapCompleted is game-changing")
+  (message "CISTERN-4B-M7-OK"))
