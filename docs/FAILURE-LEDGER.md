@@ -1407,3 +1407,52 @@ One entry per dead/failed/retried run.
   unlocked set (§5 "unlocks persist across maps" — a state-shape
   question to pin). M7 severity mapping can land independently.
   M9 last, registering the consumption test.
+
+---
+
+## L-030 (2026-09-06, run: impl-phase4 — 4b Pair 8, R5 M7 severity grammar)
+
+- Attempt: Red test `tests/test-4b-rewards.el ::
+  cistern-test-4b-m7-severity` (red commit `e87e307`; red run:
+  `void-function cistern--event-severity`, 1/29, exit 1). Green =
+  `cistern--event-severity` (game layer, pure, deterministic:
+  relief → minor; burst, leak → major; map-complete →
+  game-changing) + `cistern--severity-face` (minor → info, major →
+  error; game-changing presents as the banner row, not a face) +
+  faced log intents + the view's log-tail applying severity faces.
+- Presentation routing (all EXISTING surfaces, none invented):
+  minor/major lines ride the stored slot as `(:layer 'log :text
+  LINE :face ENUM)` intents; `cistern-view--log-tail` faces the
+  matching log line via the palette map (error → cistern-toilet-
+  down, info → cistern-dim), unmatched lines stay dim. The
+  game-changing banner keeps M3's structural treatment (reserved
+  row); copy still DEFERRED (§6). "Cleared after N ticks" — the
+  stored intents are replaced on the next evaluation, so the banner
+  clears on the following tick (N=1, the timing constant deferred).
+- Event-payload extension (demolish/relief precedent): burst and
+  leak events now carry their LOGGED LINE as payload — `(burst
+  "BREACH — CREATOR #N …")`, `(leak "SEVERED LINE AT …")` — so the
+  faced log intent's text is exactly the domain's announcement
+  (accident formats once, uses it for both log and payload; same for
+  the severed branch). Relief's minor line: finish-use now logs
+  "CREATOR RELIEVED AT (x,y)" and rewards-eval formats the identical
+  text for the intent — the sync is asserted by the test (intent
+  text must appear in the log).
+- Tile-face reading (no route needed): "error face on tile" is the
+  EXISTING hazard projection — the breached tile becomes a hazard
+  and `cistern-view--cell-glyph` projects the `cistern-hazard` face
+  (red bold). No tile-table change, no freshness state invented.
+  The breaching worker occludes the tile at D5 precedence (worker >
+  cell), so the assert uses the cell-glyph projection, not the
+  rendered row.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 29 TESTS PASSED, exit 0.
+- Change for next attempt: M8 milestone ladder — thresholds 5/15/30/
+  50/100 over CUMULATIVE relieves; unlock-once needs an
+  UnlockEmitted intent exactly once and a PERSISTED unlocked set.
+  State-shape pin proposal (route for approval before the pair):
+  `unlocks` — already a rewards-owned st slot (spec §3) — becomes
+  the unlocked-id list, plus a `relieves` counter field (or reuse
+  the goal-card progress mechanism with a card-less ladder). M9
+  last: ceremony state, commit-first trophy, and registering the
+  consumption test.

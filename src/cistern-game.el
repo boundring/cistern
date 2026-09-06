@@ -308,6 +308,22 @@ outcome stays the pinned default until later pairs re-shape it."
               (cistern--field-spawn st (cons x y) (cons 0 -1) 3
                                     (format "+%d" pay)
                                     (if tip 'bonus 'success) 'popup))))))
+    ;; M7 three-tier log grammar: faced log intents ride the stored
+    ;; slot; the view's log-tail applies the faces to the matching
+    ;; log lines.  Game-changing events present via the banner row
+    ;; (the M3 MapCompleted intent); banner copy DEFERRED per §6.
+    (dolist (e events)
+      (let ((sev (cistern--event-severity e)))
+        (when (and (consp e) sev (not (eq sev 'game-changing)))
+          (let ((line (pcase (cistern--event-kind e)
+                        (`relief (format "CREATOR RELIEVED AT (%d,%d)"
+                                         (nth 2 e) (nth 3 e)))
+                        (`burst (nth 1 e))
+                        (`leak (nth 1 e)))))
+            (when line
+              (push (list :layer 'log :text line
+                          :face (cistern--severity-face sev))
+                    intents))))))
     (setf (cistern-st-rewards-events st) nil)
     ;; store the outcome+intents in state (§5/L-027): the view reads
     ;; the stored 2-list and never calls rewards-eval itself
@@ -347,6 +363,23 @@ bladder rate) before burst.")
 itself (§5's vocabulary is payloadless symbols; payload-carrying
 events — demolish, relief — are lists)."
   (if (consp e) (car e) e))
+
+(defun cistern--event-severity (event)
+  "M7 three-tier announcement grammar (§2 M7, DF model): the
+severity of EVENT.  Deterministic given the event."
+  (pcase (cistern--event-kind event)
+    (`relief 'minor)
+    ((or `burst `leak) 'major)
+    (`map-complete 'game-changing)
+    (_ nil)))
+
+(defun cistern--severity-face (severity)
+  "Palette face enum for SEVERITY: minor → info, major → error.
+Game-changing presentation is the banner row, not a face."
+  (pcase severity
+    (`minor 'info)
+    (`major 'error)
+    (_ nil)))
 
 (defun cistern--goal-target (kind target tier)
   "Tier-adjusted TARGET (§5 pay-forward: Tier1 −25%, Tier3 +25%

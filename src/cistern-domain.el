@@ -428,8 +428,9 @@ bug class where plumbing state pointed elsewhere cannot exist."
           (progn
             (cistern--add-hazard st x y)
             (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
-            (push 'leak (cistern-st-rewards-events st)) ; severed line: leak (M4)
-            (cistern--log st "SEVERED LINE AT (%d,%d) — WASTE SPILLED" x y))
+            (let ((line (format "SEVERED LINE AT (%d,%d) — WASTE SPILLED" x y)))
+              (cistern--log st "%s" line)
+              (push (list 'leak line) (cistern-st-rewards-events st)))) ; leak (M4)
         (let ((best (car tanks)))
           (dolist (tk tanks)
             (when (< (plist-get (gethash tk (cistern-st-tanks st)) :load)
@@ -442,7 +443,8 @@ bug class where plumbing state pointed elsewhere cannot exist."
                                              :load)))
                   (cistern-st-tanks st))
           (push (list 'relief bladder x y)
-                (cistern-st-rewards-events st))))))) ; clean relieve (M4: urgency + tile payload)
+                (cistern-st-rewards-events st))
+          (cistern--log st "CREATOR RELIEVED AT (%d,%d)" x y)))))) ; minor faced line (M7)
 
 (defun cistern--add-hazard (st x y)
   "Contaminate (X,Y) if it is floor.  Everything else — ore,
@@ -463,7 +465,6 @@ base can never be destroyed by unserved need."
                        (not (gethash n (cistern--occupied-cells st w))))
               (throw 'placed t)))))
     (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
-    (push 'burst (cistern-st-rewards-events st)) ; breach (M4)
     (dolist (n (cistern--neighbors st x y))
       (dolist (o (cistern-st-creators st))
         (when (and (not (eq o w))
@@ -472,9 +473,12 @@ base can never be destroyed by unserved need."
           (setf (cistern--worker-sick o) cistern-sick-ticks))))
     ;; the domain log carries the worker's stable list index; the
     ;; identity glyph is a view concern (L-012 finding 1 resolution)
-    (cistern--log st "BREACH — CREATOR #%d OVERFLOWED AT (%d,%d)"
-                  (or (cl-position w (cistern-st-creators st) :test #'eq) 0)
-                  x y)))
+    (let* ((idx (or (cl-position w (cistern-st-creators st) :test #'eq) 0))
+           (line (format "BREACH — CREATOR #%d OVERFLOWED AT (%d,%d)" idx x y)))
+      (cistern--log st "%s" line)
+      ;; breach (M4): payload carries the logged line for the M7
+      ;; faced log intent
+      (push (list 'burst line) (cistern-st-rewards-events st)))))
 
 (defun cistern--seek-toilet (st w)
   (let* ((x (cistern--worker-x w))

@@ -680,12 +680,12 @@ exactly base."
         (cl-assert (eq face 'cistern-toilet-down)
                    nil "log-tail renders the major face (error palette)"))
       ;; error face on the tile: the breached tile is a hazard and
-      ;; renders with the existing error-class hazard face
-      (let* ((render (cistern-view--render st))
-             (row (nth (+ 3 7) (split-string render "\n")))
-             (face (get-text-property 14 'face row)))
-        (cl-assert (memq 'cistern-hazard (if (listp face) face (list face)))
-                   nil "breached tile renders the hazard (error-class) face"))))
+      ;; projects the existing error-class hazard face (the cell
+      ;; projection the render consumes; the breaching worker stands
+      ;; on it, so the row itself shows the worker at D5 precedence)
+      (let ((face (cdr (cistern-view--cell-glyph st 14 7))))
+        (cl-assert (eq face 'cistern-hazard)
+                   nil "breached tile projects the hazard (error-class) face"))))
   ;; (3) minor: a real relief logs the minor faced line
   (let ((st (cistern--new-game 42)))
     (let ((w (nth 0 (cistern-st-creators st))))
