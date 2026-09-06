@@ -710,3 +710,62 @@ exactly base."
   (cl-assert (eq (cistern--event-severity 'map-complete) 'game-changing)
              nil "MapCompleted is game-changing")
   (message "CISTERN-4B-M7-OK"))
+
+;; ---------------------------------------------------------------------------
+;; 4b Pair 9 — M8 milestone ladder (REWARDS-DESIGN §2 M8, §5 ladder
+;; shape): ordered {threshold, unlock} over cumulative relieves.
+
+(defun cistern-test-4b-m8-milestones ()
+  ;; (1)+(2) cumulative accounting across evals; exactly-once via the
+  ;; membership guard
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (make-list 3 'relief))
+    (cl-assert (= (cistern-st-relieves st) 3) nil "counter accrues")
+    (cl-assert (null (cistern-st-unlocks st)) nil "no unlock below threshold")
+    (cistern--rewards-eval st (make-list 2 'relief))
+    (cl-assert (= (cistern-st-relieves st) 5) nil "counter accrues across evals")
+    (cl-assert (member 'big-cistern (cistern-st-unlocks st))
+               nil "first threshold unlocks at 5")
+    (cl-assert (null (nth 2 (cistern--rewards-eval st nil)))
+               nil "no re-emission without a new crossing")
+    (cistern--rewards-eval st (make-list 3 'relief))
+    (cl-assert (equal (cistern-st-unlocks st) '(big-cistern))
+               nil "no re-emission, no premature unlock at 8"))
+  ;; payload reliefs count too (both event shapes normalize)
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (list (list 'relief 70 3 3) 'relief 'relief))
+    (cl-assert (= (cistern-st-relieves st) 3)
+               nil "payload and symbol relieves both count"))
+  ;; (3) ladder order: 100 relieves fire all five in threshold order,
+  ;; each exactly once
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (make-list 100 'relief))
+    (let* ((intents (nth 1 (cistern-st-rewards-outcome st)))
+           (unlock-intents (cl-remove-if-not
+                            (lambda (i) (eq (cistern--event-kind i) 'unlock))
+                            intents))
+           (unlocks (mapcar (lambda (i) (plist-get i :id)) unlock-intents)))
+      (cl-assert (equal unlocks '(big-cistern fast-flush self-clean
+                                  air-freshener golden-pipe))
+                 nil "all five crossings in threshold order, once each"))
+  ;; (4) the unlocked set survives further ticks
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (make-list 5 'relief))
+    (cistern--rewards-eval st (make-list 10 'relief))
+    (cistern--rewards-eval st nil)
+    (cl-assert (member 'big-cistern (cistern-st-unlocks st))
+               nil "unlocked set persisted in state"))
+  ;; (5) ladder-top: golden-pipe crossing celebrates (full buffer)
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (make-list 100 'relief))
+    (cl-assert (plist-get (nth 0 (cistern-st-rewards-outcome st)) :celebrate)
+               nil "golden-pipe crossing emits the full-buffer celebrate flag")
+    (cl-assert (member 'golden-pipe (cistern-st-unlocks st))
+               nil "golden-pipe unlocked"))
+  ;; (6) reputation interaction: none — the ladder adds no reputation
+  ;; beyond the relief deltas themselves (100 × +1 clamped at 100)
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (make-list 100 'relief))
+    (cl-assert (= (cistern-st-reputation st) 100)
+               nil "ladder crossing adds no reputation"))
+  (message "CISTERN-4B-M8-OK")))
