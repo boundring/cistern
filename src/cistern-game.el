@@ -11,8 +11,8 @@
 (defconst cistern-cost-demolish 3
   "Alloy cost of the demolish verb (R8).  Implementation-seed
 value, pinned for testability per plan 01 §2.3; final pricing is
-DEFERRED to REWARDS-DESIGN (spec §6).  Phase 2 ships no refund —
-the 50% refund contract is consumed in Phase 4b.")
+DEFERRED to REWARDS-DESIGN (spec §6).  The 50%-of-build-cost
+refund is consumed in 4b (M1).")
 
 (defun cistern--cmd-build (st kind x y)
   "Place KIND (toilet/pipe/tank) at (X,Y).  Ported verbatim from
@@ -66,13 +66,20 @@ phantom-plumbing invariant, load-bearing)."
       (cistern--log st "INSUFFICIENT ALLOY — %d REQUIRED"
                     cistern-cost-demolish))
      (t
-      (setf (cistern-st-alloy st)
-            (- (cistern-st-alloy st) cistern-cost-demolish))
-      (remhash (cons x y) (cistern-st-toilets st))
-      (remhash (cons x y) (cistern-st-tanks st))
-      (cistern--set-cell st x y 'floor)
-      (cistern--log st "DEMOLISHED %s AT (%d,%d) — %d ALLOY"
-                    (upcase (symbol-name kind)) x y cistern-cost-demolish)))))
+      (let ((refund (/ (pcase kind
+                         ('toilet cistern-cost-toilet)
+                         ('pipe cistern-cost-pipe)
+                         ('tank cistern-cost-tank))
+                       2))) ; 50% of build cost, floor (M1; rounding pinned L-024)
+        (setf (cistern-st-alloy st)
+              (+ (- (cistern-st-alloy st) cistern-cost-demolish) refund))
+        (remhash (cons x y) (cistern-st-toilets st))
+        (remhash (cons x y) (cistern-st-tanks st))
+        (cistern--set-cell st x y 'floor)
+        (push (list 'demolish x y) (cistern-st-rewards-events st))
+        (cistern--log st "DEMOLISHED %s AT (%d,%d) — %d ALLOY — %d REFUND"
+                      (upcase (symbol-name kind)) x y
+                      cistern-cost-demolish refund)))))
 
 (defun cistern--tutorial-steps (&optional table)
   "Tutorial mechanism holder: table of (PROMPT . PREDICATE) steps,
@@ -195,14 +202,38 @@ call exists at the use-case layer."
 
 (defun cistern--rewards-eval (st events)
   "Rewards use-case (R5): (state, tick EVENTS) → (updated state,
-outcome, presentation intents) as a 3-list.  Phase 2 placeholder:
-ST is returned unchanged with the pinned default outcome and empty
-intents.  The REWARDS-DESIGN consumption (goal cards, milestone
-ladder, reputation, particle spawns) is Phase 4b — NOT pre-built
-here.  4b's seeded garnish must draw from the seed⊕stream-id child
-stream, never ST's sim LCG (REWARDS-DESIGN §4); this placeholder
-consumes no randomness at all."
-  (list st (copy-sequence cistern--rewards-default-outcome) nil))
+outcome, presentation intents) as a 3-list.  Consumes the events
+emitted since the last read — ST's pending list (drained here)
+plus EVENTS.  Consumption per REWARDS-DESIGN, mechanic by
+mechanic: M1 dust — a successful demolish spawns 3–5 sparkle
+intents at the demolished tile, count and glyphs drawn from the
+particle field's child stream (§4), never the sim LCG.  The
+outcome stays the pinned default until the M3/M4/M5 pairs land."
+  (let ((intents nil))
+    (dolist (ev (append (cistern-st-rewards-events st) events))
+      ;; §5's event vocabulary is bare symbols (relief, burst, …);
+      ;; payload-carrying events (demolish) are lists.  Symbols pass.
+      (when (and (listp ev) (eq (car ev) 'demolish))
+        ;; §4 trigger table, Demolish dust row: 3–5 `sparkle`, ttl
+        ;; 2–3, glyphs `·` `.` — ttl/vel belong to the field's
+        ;; particles at the M6 pair; this pair emits spawn intents.
+        (let* ((x (nth 1 ev)) (y (nth 2 ev))
+               (count (+ 3 (mod (cistern--particle-draw st) 3))))
+          (dotimes (_ count)
+            (let ((g (cistern--particle-draw st)))
+              (push (list :pos (cons x y)
+                          :glyph (if (= 0 (mod g 2)) "·" ".")
+                          :face 'info :layer 'sparkle)
+                    intents))))))
+    (setf (cistern-st-rewards-events st) nil)
+    (list st (copy-sequence cistern--rewards-default-outcome)
+          (nreverse intents))))
+
+(defun cistern--particle-draw (st)
+  "Advance ST's particle child stream by one raw step, returning
+it.  The stream position lives in state (§4 ParticleField.rng)."
+  (setf (cistern-st-particle-rng st)
+        (cistern--stream-next (cistern-st-particle-rng st))))
 
 (defun cistern--cmd-cursor (st dir)
   "Move the cursor one cell in DIR (up/down/left/right), refusing
@@ -396,7 +427,9 @@ and rewards defaults)."
     (let ((a0 (cistern-st-alloy st)))
       (cistern--cmd-demolish st x y)
       (cl-assert (eq (cistern--cell st x y) 'floor))
-      (cl-assert (= (cistern-st-alloy st) (- a0 cistern-cost-demolish))))
+      (cl-assert (= (cistern-st-alloy st)
+                    (- (+ a0 (/ cistern-cost-pipe 2))
+                       cistern-cost-demolish)))))
     ;; refusals: wall, ore, in-use toilet — free of charge
     (let ((ore-idx (cl-position 'ore (cistern-st-map st))))
       (cistern--cmd-demolish st 0 0)

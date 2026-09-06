@@ -26,8 +26,11 @@
         (cl-assert (eq (cistern--cell st x y) 'floor) "cell back to floor")
         (cl-assert (not (gethash (cons x y) (cistern-st-tanks st)))
                    "tank hash entry gone")
-        (cl-assert (= (cistern-st-alloy st) (- a0 cistern-cost-demolish))
-                   "alloy reduced by exactly the demolish cost")))
+        ;; M1 (4b): demolish now refunds 50% of build cost, floor
+        (cl-assert (= (cistern-st-alloy st)
+                      (- (+ a0 (/ cistern-cost-tank 2))
+                         cistern-cost-demolish))
+                   "fee charged, 50% tank refund")))
 
     ;; --- B: a toilet fed through a demolished tank becomes unusable
     (let* ((run (cistern-test-game--floor-run st 3))
@@ -40,7 +43,9 @@
         (cistern--cmd-demolish st (+ x 2) y)
         (cl-assert (eq (cistern--cell st (+ x 2) y) 'floor))
         (cl-assert (not (gethash (cons (+ x 2) y) (cistern-st-tanks st))))
-        (cl-assert (= (cistern-st-alloy st) (- a0 cistern-cost-demolish)))
+        (cl-assert (= (cistern-st-alloy st)
+                      (- (+ a0 (/ cistern-cost-tank 2))
+                         cistern-cost-demolish)))
         (cl-assert (not (cistern--toilet-usable-p st x y))
                    "toilet fed through removed tank now unusable")
         (cl-assert (gethash (cons x y) (cistern-st-toilets st))

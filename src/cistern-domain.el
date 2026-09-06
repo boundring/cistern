@@ -79,7 +79,9 @@ by the view, not here).")
   (rng 1)                    ; LCG state; determinism lives here
   (purges 0) (built-pipe 0) (built-toilet 0) (built-tank 0) (earned 0) (migrants 0)
   (tutorial 0)               ; index into tutorial steps; t when done
-  score objectives unlocks)  ; rewards-owned; shape DEFERRED to REWARDS-DESIGN
+  score objectives unlocks   ; rewards-owned; shape DEFERRED to REWARDS-DESIGN
+  (rewards-events nil)       ; events emitted since the last rewards-eval read (§5)
+  (particle-rng 0))          ; the particle field's child-stream position (§4 ParticleField.rng)
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -163,6 +165,9 @@ plumbing hashes, and LCG residue."
   (setf (cistern-st-tanks st) (make-hash-table :test #'equal))
   (setf (cistern-st-seed st) seed)
   (setf (cistern-st-rng st) seed)
+  ;; the particle field's child stream: seed ⊕ stream-id 1 (§4);
+  ;; stream-id 0 is reserved (it would clone the sim LCG sequence)
+  (setf (cistern-st-particle-rng st) (cistern--stream-init seed 1))
   ;; outer walls
   (dotimes (y (cistern-st-h st))
     (dotimes (x (cistern-st-w st))

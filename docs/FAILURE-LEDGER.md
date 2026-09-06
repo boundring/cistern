@@ -1022,3 +1022,74 @@ One entry per dead/failed/retried run.
   RULING (director, 2026-09-06): implementation-pinned fixture
   ACCEPTED — derivation is doc-pinned, purpose is drift detection,
   re-pinning by fiat adds nothing. No change.
+
+---
+
+## L-024 (2026-09-06, run: impl-phase4 — 4b Pair 2, R5 M1 demolish refund + dust)
+
+- Attempt: Red test `tests/test-4b-rewards.el ::
+  cistern-test-4b-m1-demolish-refund` (red commit `54f5b9b`; red
+  run: `cl-assertion-failed` on the refund assert, alloy 15 vs 16 —
+  no refund, 1/22, exit 1). Green = 50%-of-build-cost refund (FLOOR:
+  pipe 1, toilet 5, tank 7 — rounding not doc-pinned, floor pinned
+  here) in `cistern--cmd-demolish`, fee 3 unchanged, demolish log
+  gains "— N REFUND"; dust: `cmd-demolish` pushes a payload event
+  `(demolish X Y)` onto the new `rewards-events` state slot;
+  `cistern--rewards-eval` converts pending events to 3–5
+  `sparkle` intents at the demolished tile (count + glyphs drawn
+  from the particle child stream, never the sim LCG) and drains the
+  list. Intent shape is L-017's verbatim; ttl/vel stay out of
+  intents — they belong to the field's particles at the M6 pair
+  (L-018 finding 2).
+- State additions (§5-shaped, pinned): `rewards-events` — §5's
+  rewards-eval consumes "events emitted this tick", the overlay
+  wiring calls it with nil events (L-017), so the verb-emitted
+  events need a state transport; verb SIGNATURES unchanged (st x y
+  → st+log) per the director's contract guardrail. `particle-rng` —
+  §4's ParticleField.rng, the field's persistent child-stream
+  position, needed now because dust draws must advance it;
+  initialized in gen-map to (seed ⊕ 1).
+- Contract findings (routed, not worked around):
+  1. "Adjacent contamination puff if pipe was dirty" (M1 §2): the
+     state has NO dirt concept on plumbing — the predicate is
+     unexpressable over state. Per the death rule this clause is
+     ROUTED to the director; the pair ships the three expressable
+     clauses (refund, tile empty, refuse-free) + dust. Nearest
+     existing mechanism if the ruling wants wiring: the severed-line
+     spill (finish-use with no connected tank) already contaminates.
+  2. M1's dust row says "gray face" but §4's face enum is closed
+     (success/warning/error/info/bonus) — dust emits `info` (the
+     neutral enum) pending ruling; adapter maps enum→face.
+  3. The doc's illustrative refund arithmetic ("pipe worth 10 …
+     leaves 105") uses doc-era prices; the invariant taken is the
+     50% refund with the Phase-2 pinned costs.
+- Contract-migration (changed contract, tests fixed not re-pinned):
+  the R8-era "alloy reduced by exactly the demolish cost" asserts
+  in `tests/game-demolish.el` (×2) and the `cistern-run-selftest`
+  demolish block moved to the fee-minus-refund arithmetic. The
+  losing scenario severs the starter pipe → its alloy trajectory
+  shifts +1 deterministically; breach timing is bladder-driven and
+  unaffected — the 4a determinism tripwire confirms byte-identical
+  replays (ALL 22 includes it).
+- Authoring incident (caught pre-commit by check-parens, the
+  L-017/L-021 class): the selftest assert migration dropped the
+  `let` close (5 opens, 4 closes) — paren scan found it in one
+  shot; second green-run round also surfaced the event-shape
+  mismatch below before the suite went green.
+- Event-shape note (fix during green): §5's event vocabulary is
+  BARE SYMBOLS (`relief` `burst` `leak` …) — the Phase-2 default
+  test passes symbols and my first draft called `car` on them.
+  rewards-eval now treats symbol events as payloadless and lists as
+  payload-carrying (`demolish`).
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 22 TESTS PASSED, exit 0.
+- Evidence: red run above; green prints `CISTERN-4B-M1-OK`; the
+  determinism arm (identical replay → identical dust) and the
+  drained-on-read arm both green; sim-LCG-untouched and
+  stream-position-advanced asserts green.
+- Change for next attempt: M5/M6 spawn tests reuse
+  `cistern--particle-draw` for stream-advancing draws from state —
+  the field's particle LIST lands at the M6 pair; until then dust
+  is single-frame intents via the existing overlay path (already
+  consumes them unchanged). The consumption test (L-009) remains
+  unregistered until the M9 pair.
