@@ -758,3 +758,46 @@ One entry per dead/failed/retried run.
      the contract the Particle field must drop into unchanged; if 4b's
      field needs :vel/:ttl handling, that lands in the domain
      use-case, never in the overlay mapping (L-017 change item).
+
+---
+
+## L-019 (2026-09-06, run: impl-phase4 — Pair 1, R4 losing scenario)
+
+- Attempt: Red test `tests/test-4a-scenarios.el ::
+     cistern-test-4a-losing-breach` (red commit `2db8778`; red run:
+     `cl-assertion-failed (fboundp 'cistern-tutorial-run-scenario)`,
+     1/17, exit 255→1). Green = `cistern-tutorial-run-scenario` +
+     `cistern-tutorial-scenario-losing` + `cistern--scenario-expect-p`
+     in `src/cistern-game.el`; scenario is data (seed + script +
+     expect + lesson), verbs are Phase 2 use-case calls over ST.
+- Scenario-shape desync caught while tuning (expected failure class
+     per plan 03 §4a, harvested before it shipped): the obvious losing
+     script — pure wait at seed 42 — DOES breach deterministically
+     (tick 50, contam 3), but through the wrong mechanism: the starter
+     toilet at (3,3) stays wired and reachable the whole run; workers
+     breach because one toilet + a filling tank can't serve four
+     seekers. That story's lesson would be "build more capacity", not
+     the pinned "no reachable wired toilet" premise. The losing script
+     was re-tuned to sever the starter line first (`cistern--cmd-demolish`
+     at (4,2), verb step), making the breach a pure function of the
+     bladder constants (20 + 2/tick → 120 at tick 50; wait 55 = margin,
+     derived from cistern-bladder-* constants, not magic counts). Watch
+     this class again in pair 2: the winning script's premise must be
+     the same seed's need served, not a different failure avoided.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+     -f cistern-run-all-tests`: ALL 17 TESTS PASSED, exit 0.
+- Evidence: red run above (exit 1); probe runs — severed-line script
+     breaches at tick 50 with contam 4 and `same-hash: t` across two
+     runs; green prints `CISTERN-4A-LOSING-OK` (exit 0); full suite
+     `ALL 17 TESTS PASSED` (exit 0).
+- Lesson: probe the scenario shape BEFORE writing the test — a
+     breach that fires for the wrong reason passes the contamination
+     assert while lying about the lesson. The expect predicates over
+     state (contam > 0, log-contains) cannot discriminate breach
+     mechanism; only the script's shape can.
+- Change for next attempt: pair 2 (winning scenario) reuses the
+     runner and expect interpreter unchanged — data only. The runner
+     logs :lesson once when contam first exceeds 0 during waits; if the
+     winning scenario ever carries a :lesson, the trigger needs
+     revisiting (contam never rises there). Determinism pair (4) is
+     expected to fall out; same-hash already holds for this scenario.

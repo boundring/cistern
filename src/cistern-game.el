@@ -91,6 +91,55 @@ is Phase 4a; the table ships empty so advance is a no-op."
       (setf (cistern-st-tutorial st) (1+ idx))
       (cistern--log st "TUTORIAL: OBJECTIVE COMPLETE"))))
 
+(defconst cistern-tutorial-scenario-losing
+  (list
+   :name "lose-breach"
+   :seed 42
+   :script                       ; (wait . N) → N ticks; (verb . FN) → (funcall FN st)
+    `((verb . ,(lambda (st) (cistern--cmd-demolish st 4 2))) ; sever the starter line: the only wired toilet goes dead
+      (wait . 55))               ; bladder 20 + 2/tick bursts at tick 50 (bladder-seek 60 → bladder-burst 120); 55 is margin
+   :lesson "LESSON: UNWIRED TOILET IS FURNITURE — LAY PIPE TO A TANK"
+   :expect '((contamination . (> 0))
+             (log-contains . "lesson")))
+  "Phase 4a losing walkthrough (plan 03 §4a pair 1): with the wired
+line severed, no reachable toilet serves the sector and the bladder
+breach fires deterministically from the pinned constants.")
+
+(defun cistern--scenario-expect-p (st key val)
+  "Evaluate one scenario :expect entry (KEY . VAL) against final ST."
+  (pcase key
+    (`contamination (funcall (car val) (cistern-st-contam st) (cadr val)))
+    (`log-contains (cl-some (lambda (line)
+                              (string-match-p (downcase val) (downcase line)))
+                            (cistern-st-log st)))
+    (`over (eq (not (cistern-st-over st)) (not val)))
+    (_ (error "UNKNOWN SCENARIO EXPECT KEY %S" key))))
+
+(defun cistern-tutorial-run-scenario (scenario)
+  "Headless SCENARIO run (plan 03 §4a): seed fresh state, replay
+the script ((wait . N) → that many `cistern--do-tick' calls;
+(verb . FN) → one (funcall FN ST) use-case call), state the
+scenario's :lesson once a breach lands, then assert every :expect
+predicate.  Returns the final state; signals on an unmet expect."
+  (let ((st (cistern--new-game (plist-get scenario :seed)))
+        (lesson (plist-get scenario :lesson))
+        (lesson-said nil))
+    (dolist (step (plist-get scenario :script) st)
+      (pcase (car step)
+        (`wait (dotimes (_ (cdr step))
+                 (cistern--do-tick st)
+                 (when (and lesson (not lesson-said)
+                            (> (cistern-st-contam st) 0))
+                   (setq lesson-said t)
+                   (cistern--log st "%s" lesson))))
+        (`verb (funcall (cdr step) st))
+        (_ (error "UNKNOWN SCENARIO STEP %S" step))))
+    (dolist (exp (plist-get scenario :expect))
+      (unless (cistern--scenario-expect-p st (car exp) (cdr exp))
+        (error "SCENARIO %s: EXPECT (%S . %S) FAILED"
+               (plist-get scenario :name) (car exp) (cdr exp))))
+    st))
+
 (defun cistern--do-tick (st)
   "Exactly one tick per action (R6): over-guard, then one domain
 sim tick, then the tutorial advance.  The legacy multi-tick
