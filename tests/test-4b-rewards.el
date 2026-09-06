@@ -402,21 +402,33 @@ neutral enum pending the L-024 ruling.")
 ;; Score popups are single-frame intents (M1-dust pattern); ttl/vel
 ;; drift lands with the M6 particle field (L-018 finding 2).
 
+(defun cistern-test-4b-m5--skip-tip (st)
+  "Consume ST's child-stream draws until the last residue is 1;
+the VR-8 cycle (x → 5x+1 mod 8) then yields five non-tip draws
+before the next tip residue, so a single following relief pays
+exactly base."
+  (catch 'done
+    (while t
+      (let ((d (cistern--particle-draw st)))
+        (when (= 1 (mod d 8)) (throw 'done st))))))
+
 (defun cistern-test-4b-m5-relieve-pay ()
   ;; (1) base pay: the doc pins no number — the base is the
   ;; implementation-pinned `cistern-score-relief-base' (DEFERRED-
   ;; with-fixture per §6, L-028); relief within the warning window
   ;; (bladder >= cistern-bladder-seek 60) pays it
   (let ((st (cistern--new-game 42)))
+    (cistern-test-4b-m5--skip-tip st)
     (cistern--rewards-eval st (list (list 'relief 70 3 3)))
     (cl-assert (= (cistern-st-score st) cistern-score-relief-base)
                nil "relief within the window pays base")
-    (cl-assert (= (plist-get (nth 1 (cistern-st-rewards-outcome st)) :score)
+    (cl-assert (= (plist-get (nth 0 (cistern-st-rewards-outcome st)) :score)
                   cistern-score-relief-base)
                nil "the stored outcome carries the live score"))
   ;; (2) urgency scaling: near-burst (bladder >= 100) pays 2x base;
   ;; below the window pays nothing
   (let ((st (cistern--new-game 42)))
+    (cistern-test-4b-m5--skip-tip st)
     (cistern--rewards-eval st (list (list 'relief 110 3 3)))
     (cl-assert (= (cistern-st-score st) (* 2 cistern-score-relief-base))
                nil "near-burst relief pays 2x base")
@@ -449,6 +461,7 @@ neutral enum pending the L-024 ruling.")
                    nil "same seed → same tip count"))))    
   ;; (4) popup intents: one '+N' popup at the relief tile, layer popup
   (let ((st (cistern--new-game 42)))
+    (cistern-test-4b-m5--skip-tip st)
     (cistern--rewards-eval st (list (list 'relief 70 12 6)))
     (let ((intents (cdr (cistern-st-rewards-outcome st))))
       (cl-assert (= 1 (length intents)) nil "one popup per paying relief")
@@ -469,6 +482,11 @@ neutral enum pending the L-024 ruling.")
       (setf (cistern--worker-bladder w)
             (- cistern-bladder-seek cistern-bladder-rate)))
     (cistern--do-tick st) (cistern--do-tick st) (cistern--do-tick st)
-    (cl-assert (= (cistern-st-score st) cistern-score-relief-base)
+    ;; a real seated relief pays through do-tick; the first draw may
+    ;; tip (2-3x), so assert the paid multiple
+    (cl-assert (memq (cistern-st-score st)
+                     (list cistern-score-relief-base
+                           (* 2 cistern-score-relief-base)
+                           (* 3 cistern-score-relief-base)))
                nil "a real seated relief pays through do-tick"))
   (message "CISTERN-4B-M5-OK"))

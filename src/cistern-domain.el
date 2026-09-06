@@ -412,7 +412,8 @@ occupancy grid so two workers can never share a tile."
   "Release the toilet, zero the bladder, deposit waste upstream.
 The released cell is the worker's OWN recorded toilet cell — the
 bug class where plumbing state pointed elsewhere cannot exist."
-  (let* ((tp (cistern--worker-toilet w))
+  (let* ((bladder (cistern--worker-bladder w)) ; urgency at relief (M5 payload)
+         (tp (cistern--worker-toilet w))
          (x (cistern--worker-x w))
          (y (cistern--worker-y w)))
     (setf (cistern--worker-using w) nil)
@@ -439,7 +440,8 @@ bug class where plumbing state pointed elsewhere cannot exist."
                                                         (cistern-st-tanks st))
                                              :load)))
                   (cistern-st-tanks st))
-          (push 'relief (cistern-st-rewards-events st))))))) ; clean relieve (M4)
+          (push (list 'relief bladder x y)
+                (cistern-st-rewards-events st))))))) ; clean relieve (M4: urgency + tile payload)
 
 (defun cistern--add-hazard (st x y)
   "Contaminate (X,Y) if it is floor.  Everything else — ore,

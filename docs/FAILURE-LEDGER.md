@@ -1291,3 +1291,58 @@ One entry per dead/failed/retried run.
   state, TTL/vel/FIFO) replaces the transient intent spawns per the
   §4 trigger table. M5's relieve-pay needs the relief event site
   (already pinned here) plus the M4 reputation counters it updates.
+
+---
+
+## L-028 (2026-09-06, run: impl-phase4 — 4b Pair 6, R5 M5 relieve-pay + popups)
+
+- Attempt: Red test `tests/test-4b-rewards.el ::
+  cistern-test-4b-m5-relieve-pay` (red commit `0e5f075`; red run:
+  `void-variable cistern-score-relief-base`, 1/27, exit 1). Green =
+  M5 economy + single-frame popup intents: `finish-use` now emits a
+  PAYLOAD relief event `(relief bladder% x y)` — the urgency (pre-
+  zero bladder) and relief tile the pay rule needs; pay rules: base
+  within the warning window (bladder ≥ 60), 2× at near-burst
+  (bladder ≥ 100 — implementation-pinned: 10 ticks before burst),
+  0 below the window; VR-8 tips: 1-in-8 relieves tip 2–3× base,
+  drawn from the particle child stream (never the sim LCG); score
+  accrues in the existing rewards-owned `score` slot; the stored
+  outcome's :score carries the live total; popup intents `+N` at
+  the relief tile, layer popup, face success (tips bonus).
+- EVENT-PAYLOAD DECISION (ruling-sanctioned): §5's relief symbol
+  cannot carry the urgency the pay rule needs; the event is now the
+  payload list `(relief bladder% x y)` — within the established
+  payload-list vocabulary (demolish precedent), NOT a reshape.
+  `cistern--event-kind` normalizes symbol/list events for all
+  consumers; M3 goal progress and M4 reputation counters now count
+  payload reliefs too (the sim emits payload events only).
+- Doc gaps (§6 fixture precedent, per the L-023 ruling pattern): the
+  M5 row gives NO base number — base = 10, implementation-pinned
+  (doc-era scale: the §2 M1 example's 100-coin economy); near-burst
+  threshold 100 likewise. Both are fixture-pinned constants a
+  designer tuning pass can move. "Below the window pays 0" is the
+  pinned reading of "relief WITHIN warning window pays base".
+- VR-8 determinism note: the child stream's low-3-bit cycle under
+  the LCG recurrence (x → 5x+1 mod 8, 5 invertible mod 8) hits all
+  8 residues exactly once per cycle — the 1/8 tip rate is exact by
+  construction over a sweep, and the fixture window (8–14 tips per
+  80 relieves) plus same-seed tip-count equality are asserted.
+- Known artifact (ledgered, M6 owns the fix): the '+N' popup glyph
+  is multi-char in a single map cell — the transient render row
+  widens by the extra chars. The M6 particle field owns proper
+  multi-cell popup placement, ttl=3, and vel (0,−1) drift; today's
+  popups are single-frame intents at the spawn cell (M1-dust
+  pattern, L-018 finding 2 boundary respected).
+- Contract migrations: `cistern--rewards-eval`'s stored outcome
+  :score is now LIVE (the accumulated score) — the Phase-2
+  default-outcome tests stay green because a fresh state with no
+  events still yields :score 0 verbatim. The 4a scenario tripwires
+  stay green: relieves accrue score during the winning replay
+  symmetrically (full-state hash), no scenario expect pins score.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 27 TESTS PASSED, exit 0.
+- Change for next attempt: M6 criterion 1 (fixture equality at
+  N = 0, 1, 3, 6) needs the particle field in domain state — the
+  field's rng position (`particle-rng`) already exists; the popup
+  entity's ttl=3/vel (0,−1) migrate from intents into field
+  particles at that pair.

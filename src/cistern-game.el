@@ -242,10 +242,10 @@ outcome stays the pinned default until later pairs re-shape it."
     (let ((card (cistern-st-goal-card st)))
       (when card
         (let* ((relieves (+ (length (cl-remove-if-not
-                                     (lambda (e) (eq e 'relief)) events))
+                                     (lambda (e) (eq (cistern--event-kind e) 'relief)) events))
                             (or (plist-get card :relieves) 0)))
                (bursts (+ (length (cl-remove-if-not
-                                   (lambda (e) (eq e 'burst)) events))
+                                   (lambda (e) (eq (cistern--event-kind e) 'burst)) events))
                           (or (plist-get card :bursts) 0)))
                (tier (plist-get card :tier)))
           (setq card (plist-put card :relieves relieves))
@@ -276,19 +276,42 @@ outcome stays the pinned default until later pairs re-shape it."
     ;; M4 reputation: deltas per §2 M4 verbatim (+1 relief, −5 burst,
     ;; −2 leak), clamped 0–100.
     (let* ((reliefs (length (cl-remove-if-not
-                             (lambda (e) (eq e 'relief)) events)))
+                             (lambda (e) (eq (cistern--event-kind e) 'relief)) events)))
            (bursts (length (cl-remove-if-not
-                            (lambda (e) (eq e 'burst)) events)))
+                            (lambda (e) (eq (cistern--event-kind e) 'burst)) events)))
            (leaks (length (cl-remove-if-not
-                           (lambda (e) (eq e 'leak)) events)))
+                           (lambda (e) (eq (cistern--event-kind e) 'leak)) events)))
            (delta (+ reliefs (* -5 bursts) (* -2 leaks))))
       (unless (= delta 0)
         (setf (cistern-st-reputation st)
               (min 100 (max 0 (+ delta (cistern-st-reputation st)))))))
+    ;; M5 relieve-pay: base within the warning window, 2x near-burst,
+    ;; VR-8 tips (1-in-8 draws, 2-3x base) from the child stream.
+    ;; Popup intents are single-frame at the relief tile; ttl/vel
+    ;; drift belongs to the M6 particle field (L-018 finding 2).
+    (dolist (e events)
+      (when (and (consp e) (eq (cistern--event-kind e) 'relief))
+        (let* ((bladder (nth 1 e))
+               (x (nth 2 e)) (y (nth 3 e)))
+          (when (>= bladder cistern-bladder-seek)
+            (let* ((near (>= bladder cistern-score-near-burst-bladder))
+                   (tip (= 0 (mod (cistern--particle-draw st) 8)))
+                   (mult (cond (tip (+ 2 (mod (cistern--particle-draw st) 2)))
+                               (near 2)
+                               (t 1)))
+                   (pay (* mult cistern-score-relief-base)))
+              (setf (cistern-st-score st)
+                    (+ pay (or (cistern-st-score st) 0)))
+              (push (list :pos (cons x y)
+                          :glyph (format "+%d" pay)
+                          :face (if tip 'bonus 'success)
+                          :layer 'popup)
+                    intents))))))
     (setf (cistern-st-rewards-events st) nil)
     ;; store the outcome+intents in state (§5/L-027): the view reads
     ;; the stored 2-list and never calls rewards-eval itself
-    (let ((outcome (copy-sequence cistern--rewards-default-outcome))
+    (let ((outcome (plist-put (copy-sequence cistern--rewards-default-outcome)
+                              :score (or (cistern-st-score st) 0)))
           (final (nreverse intents)))
       (setf (cistern-st-rewards-outcome st) (cons outcome final))
       (list st outcome final))))
@@ -307,6 +330,22 @@ it.  The stream position lives in state (§4 ParticleField.rng)."
   "Reputation tier (§5): 0–39 Tier 1, 40–69 Tier 2, 70–100
 Tier 3.  The pay-forward function M3's card constructor consumes."
   (cond ((< rep 40) 1) ((< rep 70) 2) (t 3)))
+
+(defconst cistern-score-relief-base 10
+  "Base score for a relief within the warning window (M5).  The
+doc pins no number — implementation-pinned with fixture, DEFERRED
+per §6 (L-028).")
+
+(defconst cistern-score-near-burst-bladder 100
+  "Bladder %% at or above which a relief pays 2x base (M5
+near-burst).  Implementation-pinned: 20 points (10 ticks at the
+bladder rate) before burst.")
+
+(defun cistern--event-kind (e)
+  "Event kind of E: the head of a payload list, or the symbol
+itself (§5's vocabulary is payloadless symbols; payload-carrying
+events — demolish, relief — are lists)."
+  (if (consp e) (car e) e))
 
 (defun cistern--goal-target (kind target tier)
   "Tier-adjusted TARGET (§5 pay-forward: Tier1 −25%, Tier3 +25%
