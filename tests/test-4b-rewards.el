@@ -82,3 +82,83 @@
 
 (provide 'test-4b-rewards)
 ;;; tests/test-4b-rewards.el ends here
+
+;; ---------------------------------------------------------------------------
+;; 4b Pair 2 — M1 demolish-with-refund (REWARDS-DESIGN §2 M1).
+
+(defconst cistern-test-4b-m1-dust-glyphs '("·" ".")
+  "M1 dust glyphs, REWARDS-DESIGN §4 trigger table (Demolish dust
+row).  Dust face: the doc row says \"gray face\" but the §4 face
+enum is closed (success/warning/error/info/bonus) — 'info is the
+neutral enum pending the L-024 ruling.")
+
+(defun cistern-test-4b-m1-demolish-refund ()
+  ;; M1 acceptance (§2): 50% refund of the build cost, tile empty,
+  ;; refuse on empty tile (no state change).  The doc's illustrative
+  ;; arithmetic ("pipe worth 10 ... leaves 105") uses doc-era prices;
+  ;; the invariant is the 50% refund.  Rounding is not doc-pinned —
+  ;; FLOOR, ledgered (L-024).  The Phase-2 demolish fee (3) still
+  ;; charges.  Anchors: (6,2)/(6,3)/(6,4) are floor neighbors of the
+  ;; reserved starter plumbing (L-011 derivation), verified floor at
+  ;; seed 42.
+  (dolist (case '((pipe 6 2 2 1) (toilet 6 3 10 5) (tank 6 4 15 7)))
+    (let* ((kind (nth 0 case))
+           (x (nth 1 case)) (y (nth 2 case))
+           (cost (nth 3 case)) (refund (nth 4 case))
+           (st (cistern--new-game 42)))
+      (cistern--cmd-build st kind x y)
+      (cl-assert (eq (cistern--cell st x y) kind) "fixture placed")
+      (let ((alloy0 (cistern-st-alloy st)))
+        (cistern--cmd-demolish st x y)
+        (cl-assert (eq (cistern--cell st x y) 'floor) "tile empty")
+        (cl-assert (= (cistern-st-alloy st)
+                      (+ (- alloy0 cistern-cost-demolish) refund))
+                   "fee 3 charged, 50% of build cost refunded (floor)"))
+      ;; dust: M1 trigger row — 3-5 sparkle particles at the demolished
+      ;; tile, glyphs from the row, amounts drawn from the CHILD stream
+      ;; (never the sim LCG); intents in the L-017 pinned shape
+      (let* ((rng0 (cistern-st-rng st))
+             (prng0 (cistern-st-particle-rng st))
+             (intents (nth 2 (cistern--rewards-eval st nil))))
+        (cl-assert (and (>= (length intents) 3) (<= (length intents) 5))
+                   "demolish dust: 3-5 particles")
+        (dolist (i intents)
+          (cl-assert (equal (plist-get i :pos) (cons x y))
+                     "dust spawns at the demolished tile")
+          (cl-assert (member (plist-get i :glyph) cistern-test-4b-m1-dust-glyphs)
+                     "dust glyphs from the M1 row")
+          (cl-assert (eq (plist-get i :face) 'info)
+                     "dust face is the neutral palette enum")
+          (cl-assert (eq (plist-get i :layer) 'sparkle)
+                     "dust layer is sparkle"))
+        (cl-assert (= (cistern-st-rng st) rng0)
+                   "sim LCG untouched by dust draws")
+        (cl-assert (not (= (cistern-st-particle-rng st) prng0))
+                   "dust draws consume the child stream (position advances)")
+        (cl-assert (null (nth 2 (cistern--rewards-eval st nil)))
+                   "emitted events drain on read"))))
+  ;; refusal on empty tile: free, no event, no dust
+  (let* ((st (cistern--new-game 42))
+         (alloy0 (cistern-st-alloy st)))
+    (cistern--cmd-demolish st 6 5)
+    (cl-assert (= (cistern-st-alloy st) alloy0) "refusal is free")
+    (cl-assert (null (cistern-st-rewards-events st))
+               "refusal emits no event"))
+  ;; starter plumbing is player-equivalent: refunds like any pipe
+  ;; (L-020 note: losing scenario alloy shifts +1; breach timing is
+  ;; bladder-driven and unaffected — the 4a tripwire confirms)
+  (let* ((st (cistern--new-game 42))
+         (alloy0 (cistern-st-alloy st)))
+    (cistern--cmd-demolish st 4 2)
+    (cl-assert (= (cistern-st-alloy st)
+                  (+ (- alloy0 cistern-cost-demolish) 1))
+               "starter pipe refunds like any pipe"))
+  ;; determinism: identical replay → identical dust
+  (let ((dust (lambda ()
+                (let ((st (cistern--new-game 42)))
+                  (cistern--cmd-build st 'pipe 6 2)
+                  (cistern--cmd-demolish st 6 2)
+                  (nth 2 (cistern--rewards-eval st nil))))))
+    (cl-assert (equal (funcall dust) (funcall dust))
+               "dust draws are deterministic from the child stream"))
+  (message "CISTERN-4B-M1-OK"))
