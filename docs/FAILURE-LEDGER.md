@@ -918,3 +918,50 @@ One entry per dead/failed/retried run.
   the empty-table no-op. The view's `cistern-view--tutorial-line`
   still consumes the no-arg steps call — shape unchanged, renders
   nothing while the shipped table is empty.
+
+---
+
+## L-022 (2026-09-06, run: impl-phase4 — Pair 4, R4 scenario determinism)
+
+- Attempt: `tests/test-4a-scenarios.el ::
+  cistern-test-4a-deterministic` (commit `6fcff17`). R10 DEVIATION,
+  recorded honestly: NO RED EVER FIRED. The determinism property
+  genuinely holds on the rewritten stack — same-hash was probed in
+  pairs 1-2 (L-006 class: green falls out of faithful use of the
+  deterministic machinery, seeded procgen + LCG-in-state + pure
+  verbs), and the strongest probe passed on arrival. Per the
+  standing protocol the probe was strengthened until it
+  discriminates instead of manufacturing a bug; the L-006 lesson
+  (strengthen the probe, never manufacture) governs, and the
+  fail-first red/green shape degenerates to test + ledger.
+- The probe (permanent tripwire, all arms anchored to the scenario
+  data): (1) replay identity — each scenario run twice at seed 42
+  yields byte-identical final state (secure-hash over
+  prin1-to-string of the WHOLE state per L-002: map vector, both
+  hashes' keys+values, worker fields, counters, rng, log); (2)
+  different-seed divergence (42 vs 43) for BOTH scenarios; (3)
+  cross-scenario divergence at the same seed (losing ≠ winning);
+  (4) chunking invariance — the losing script with the wait split
+  30+25 hashes identical (semantically equivalent chunking is
+  invisible); (5) order sensitivity — the losing script with the
+  demolish verb AFTER the waits hashes different (the comparator
+  sees step-execution order). Arms 2-5 quantify what the assert
+  catches (L-004); a throwaway probe additionally confirmed the
+  fingerprint flips on a single counter mutation.
+- Outcome: PASS on arrival, kept as tripwire. Canonical suite
+  `emacs -Q --batch -l tests/run.el -f cistern-run-all-tests`:
+  ALL 20 TESTS PASSED, exit 0. Green = NO code change required
+  (plan 03 pair 4 min impl: "none expected — falls out of seeded
+  state + pure verbs"); no leak surfaced, so no game/domain fix.
+- Lesson: determinism here is structural, not aspirational — one
+  state object, LCG inside it, no wall-clock or unseeded consumer in
+  the runner's path. The R10 risk to watch in later phases is NOT
+  the scenarios themselves but any new consumer that touches state
+  outside the seeded path (a future rewards garnish drawing from
+  wall-clock, a view-cached value leaking into state) — the
+  tripwire test will catch exactly that class.
+- Change for next attempt: Phase 4b's seeded garnish must draw from
+  the seed⊕stream-id child stream (REWARDS-DESIGN §4) — this
+  tripwire covers the scenarios only; 4b's consumption test (still
+  intentionally red, L-009) is the discriminator for rewards
+  determinism.
