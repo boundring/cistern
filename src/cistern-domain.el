@@ -84,7 +84,8 @@ by the view, not here).")
   (particle-rng 0)           ; the particle field's child-stream position (§4 ParticleField.rng)
   (goal-card nil)            ; active goal card (§5): (:map-id :tier :goals :completed)
   (reputation 0)             ; 0-100 clamped; M4 deltas: +1 relief −5 burst −2 leak
-  (rewards-outcome nil))     ; stored per-tick (outcome . intents) 2-list; the view reads it
+  (rewards-outcome nil)      ; stored per-tick (outcome . intents) 2-list; the view reads it
+  (particles nil))           ; the particle field (§4): newest-first plist list, K=64 FIFO cap
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -567,6 +568,45 @@ permanent scarring: stop bleeding and the marks fade."
              (>= (cistern-st-contam st) cistern-contam-limit))
     (setf (cistern-st-over st) "SECTOR CONDEMNED — CONTAMINATION LIMIT")
     (cistern--log st (cistern-st-over st))))
+
+;; 6b. Particle field (REWARDS-DESIGN §4): domain-owned, seeded,
+;; pure.  The field is a newest-first list of particle plists
+;; (:pos (X . Y) :vel (DX . DY) :ttl N :glyph S :face ENUM :layer ENUM).
+;; K = 64, oldest evicted FIFO at spawn; ttl −= 1 per advance,
+;; removed at 0.
+
+(defconst cistern--field-cap 64 "Max live particles (§4).")
+
+(defun cistern--field-spawn (st pos vel ttl glyph face layer)
+  "Spawn one particle into ST's field.  Vel is (DX . DY), each
+component −1/0/+1; TTL counts down per advance.  FIFO eviction at
+the K=64 cap, oldest first."
+  (push (list :pos pos :vel vel :ttl ttl
+              :glyph glyph :face face :layer layer)
+        (cistern-st-particles st))
+  (when (> (length (cistern-st-particles st)) cistern--field-cap)
+    (setf (cistern-st-particles st)
+          (cl-subseq (cistern-st-particles st) 0 cistern--field-cap))))
+
+(defun cistern--advance-particles (st)
+  "One particle advance (§4): pos += vel, ttl −= 1, removal at 0.
+Pure field mechanics — sim counters are untouched.  Invalid field
+state (ttl < 0, |vel| > 1) raises: fail-first, no silent
+corruption."
+  (let ((alive nil))
+    (dolist (p (cistern-st-particles st))
+      (let* ((vel (plist-get p :vel))
+             (dx (car vel)) (dy (cdr vel))
+             (pos (plist-get p :pos))
+             (ttl (1- (plist-get p :ttl))))
+        (when (or (< ttl 0) (> (abs dx) 1) (> (abs dy) 1))
+          (error "INVALID PARTICLE STATE — ttl %S vel %S" ttl vel))
+        (when (> ttl 0)
+          (push (plist-put (plist-put p :ttl ttl)
+                           :pos (cons (+ (car pos) dx)
+                                      (+ (cdr pos) dy)))
+                alive))))
+    (setf (cistern-st-particles st) (nreverse alive))))
 
 (defun cistern--sim-tick (st)
   "One full simulation tick: creators, hazards, migration, check.

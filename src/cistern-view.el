@@ -91,34 +91,29 @@ Exact colors are Phase 4b; unknown faces pass through so
 hand-built test intents can use Emacs faces directly.")
 
 (defun cistern-view--celebration-overlay (st)
-  "Dumb celebration projection (plan 02 §3): read the STORED
-outcome+intents from state (L-027: rewards-eval runs once per tick
-inside do-tick and stores them; the view reads, never advances —
-spec §3.3) and return this frame's overlay as a cons
-\(MAP-ALIST . BANNER-TEXT).  MAP-ALIST entries
-\(\(X . Y) . (GLYPH . FACE)) for non-banner intents, clipped to
-map bounds; BANNER-TEXT is the layer:banner text for the reserved
-post-map row.  Transient by construction: ST is never mutated —
-the next frame restores from state.  Empty for the Phase-2 default
-outcome (nil intents).  Intent shape pinned for 4b's particle
-field to drop in unchanged: a plist (:pos (X . Y) :glyph S :face
-FACE-OR-PALETTE-ENUM :layer sparkle|popup|banner); banner intents
-carry :text instead of :pos.  advance-particles is a use case the
-presentation timer calls (wiring point pinned in the auto-run
-callback); the view only reads, never advances."
-  (let ((map nil) (banner "")
-        (intents (cdr (cistern-st-rewards-outcome st))))
-    (dolist (intent intents)
-      (if (eq (plist-get intent :layer) 'banner)
-          (setq banner (concat banner (plist-get intent :text)))
-        (let* ((pos (plist-get intent :pos))
-               (face (plist-get intent :face)))
-          (when (and pos (cistern--in-bounds-p st (car pos) (cdr pos)))
-            (push (cons (cons (car pos) (cdr pos))
-                        (cons (plist-get intent :glyph)
-                              (or (cdr (assq face cistern-view--palette-faces))
-                                  face)))
-                  map)))))
+  "Dumb celebration projection (§4 renderer purity): project the
+FIELD particles at their CURRENT positions — no mutation, no
+advance inside the renderer (advance-particles is called by the
+presentation layer, L-027/L-029) — plus the banner text from the
+stored non-particle intents.  MAP-ALIST entries \(\(X . Y) .
+\(GLYPH . FACE)) clipped to map bounds; BANNER-TEXT is the
+reserved post-map row text."
+  (let ((map nil) (banner ""))
+    ;; field particles (L-029: particle-layer intent emission died
+    ;; here — the field is the only particle source)
+    (dolist (p (cistern-st-particles st))
+      (let* ((pos (plist-get p :pos))
+             (face (plist-get p :face)))
+        (when (and pos (cistern--in-bounds-p st (car pos) (cdr pos)))
+          (push (cons (cons (car pos) (cdr pos))
+                      (cons (plist-get p :glyph)
+                            (or (cdr (assq face cistern-view--palette-faces))
+                                face)))
+                map))))
+    ;; non-particle intents (banner) from the stored per-tick slot
+    (dolist (intent (cdr (cistern-st-rewards-outcome st)))
+      (when (eq (plist-get intent :layer) 'banner)
+        (setq banner (concat banner (plist-get intent :text)))))
     (cons map banner)))
 
 ;; ---------------------------------------------------------------------------

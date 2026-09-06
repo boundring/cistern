@@ -40,15 +40,14 @@ the hook renders nothing (byte-identical)."
       ;; the per-tick evaluation; the view reads, never calls
       ;; rewards-eval.
       (setq r0 (progn
-                 (setf (cistern-st-rewards-outcome st)
-                       (cons '(:score 0 :objectives nil :unlocks nil
-                                      :celebrate t)
-                             (list intent)))
+                 (setf (cistern-st-particles st)
+                       (list (plist-put (copy-sequence intent) :ttl 3)))
                  (cistern-view--render st)))
       (setq r1 (cl-letf (((symbol-function 'cistern-view--celebration-overlay)
                           (lambda (_s) '(nil . ""))))
                  (cistern-view--render st)))
       (setf (cistern-st-rewards-outcome st) nil)
+      (setf (cistern-st-particles st) nil)
       (setq r2 (cistern-view--render st))
       ;; transient: hook off, and the next live (default) frame,
       ;; restore the original projection byte-for-byte
@@ -91,8 +90,8 @@ the hook renders nothing (byte-identical)."
       ;; particle under the cursor does not paint
       (setf (cistern-st-cursor st) (cons px py))
       (let* ((rc (progn
-                   (setf (cistern-st-rewards-outcome st)
-                         (cons cistern-test-r5--default-outcome (list intent)))
+                   (setf (cistern-st-particles st)
+                         (list (plist-put (copy-sequence intent) :ttl 3)))
                    (cistern-view--render st)))
              (row (nth (+ 3 py) (split-string rc "\n")))
              (face (get-text-property px 'face row)))
@@ -104,6 +103,7 @@ the hook renders nothing (byte-identical)."
       ;; --- (a) default outcome: the hook is a no-op by construction —
       ;; byte-identical to the short-circuited render
       (setf (cistern-st-rewards-outcome st) nil)
+      (setf (cistern-st-particles st) nil)
       (let ((a (cistern-view--render st))
             (b (cl-letf (((symbol-function 'cistern-view--celebration-overlay)
                           (lambda (_s) '(nil . ""))))

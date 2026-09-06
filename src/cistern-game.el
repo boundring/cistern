@@ -222,16 +222,19 @@ outcome stays the pinned default until later pairs re-shape it."
       ;; payload-carrying events (demolish) are lists.  Symbols pass.
       (when (and (listp ev) (eq (car ev) 'demolish))
         ;; §4 trigger table, Demolish dust row: 3–5 `sparkle`, ttl
-        ;; 2–3, glyphs `·` `.` — ttl/vel belong to the field's
-        ;; particles at the M6 pair; this pair emits spawn intents.
+        ;; 2–3, glyphs `·` `.`, short vel — spawned INTO the field.
+        ;; Draw order pinned (L-029 fixture): count, then per
+        ;; particle: glyph, ttl, vel-x, vel-y.
         (let* ((x (nth 1 ev)) (y (nth 2 ev))
                (count (+ 3 (mod (cistern--particle-draw st) 3))))
           (dotimes (_ count)
-            (let ((g (cistern--particle-draw st)))
-              (push (list :pos (cons x y)
-                          :glyph (if (= 0 (mod g 2)) "·" ".")
-                          :face 'info :layer 'sparkle)
-                    intents))))))
+            (let* ((g (cistern--particle-draw st))
+                   (ttlp (+ 2 (mod (cistern--particle-draw st) 2)))
+                   (vx (- (mod (cistern--particle-draw st) 3) 1))
+                   (vy (- (mod (cistern--particle-draw st) 3) 1))
+                   (glyph (if (= 0 (mod g 2)) "·" ".")))
+              (cistern--field-spawn st (cons x y) (cons vx vy) ttlp
+                                    glyph 'info 'sparkle))))))
     ;; M3 goal-card evaluator: re-checked on every call (headless
     ;; stand-in for the per-tick check; tick wiring is the M4/M5
     ;; step, split pinned in L-026).  Progress accrues from relief
@@ -302,11 +305,9 @@ outcome stays the pinned default until later pairs re-shape it."
                    (pay (* mult cistern-score-relief-base)))
               (setf (cistern-st-score st)
                     (+ pay (or (cistern-st-score st) 0)))
-              (push (list :pos (cons x y)
-                          :glyph (format "+%d" pay)
-                          :face (if tip 'bonus 'success)
-                          :layer 'popup)
-                    intents))))))
+              (cistern--field-spawn st (cons x y) (cons 0 -1) 3
+                                    (format "+%d" pay)
+                                    (if tip 'bonus 'success) 'popup))))))
     (setf (cistern-st-rewards-events st) nil)
     ;; store the outcome+intents in state (§5/L-027): the view reads
     ;; the stored 2-list and never calls rewards-eval itself

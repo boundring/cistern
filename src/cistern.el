@@ -21,6 +21,11 @@
 (defun cistern--refresh ()
   "Driver-owned buffer mutation (D4): erase and insert the view's
 pure render.  Every state-mutating command ends here."
+  ;; §4 auto-run path: one particle advance per redisplay — paired
+  ;; with the sim tick the command already ran; paused redisplay
+  ;; advances the field only (celebrations finish while frozen).
+  ;; Call site pinned in L-029.
+  (cistern--advance-particles cistern--st)
   (let ((inhibit-read-only t))
     (erase-buffer)
     (insert (cistern-view--render cistern--st))

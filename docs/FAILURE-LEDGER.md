@@ -1346,3 +1346,64 @@ One entry per dead/failed/retried run.
   field's rng position (`particle-rng`) already exists; the popup
   entity's ttl=3/vel (0,−1) migrate from intents into field
   particles at that pair.
+
+---
+
+## L-029 (2026-09-06, run: impl-phase4 — 4b Pair 7, R5 M6 particle field)
+
+- Attempt: Red test `tests/test-4b-rewards.el ::
+  cistern-test-4b-m6-particle-field` (red commit `7153588`; red run:
+  `void-function cistern-st-particles`, 1/28, exit 1). Green covers
+  §4 criteria 1–6 (criterion 7 ceremony-commit-first is M9's):
+  (1) golden-fixture equality at N = 0, 1, 3, 6 over the full
+  particle list — fixture generated from the §4 trigger row + the
+  pinned draw order BEFORE implementation (L-023 provenance);
+  (2) same-seed identity + ≥3 distinct fields across seeds 1–5;
+  (3) TTL expiry — ttl-6 removed exactly at the 6th advance, empty
+  after max-TTL + 1; (4) K=64 FIFO eviction — 70 spawns keep the
+  newest 64; (5) advance-when-paused — N advances move pos/ttl while
+  tick/alloy/reputation/sim-LCG stay frozen; (6) renderer purity —
+  deterministic render, zero state mutation. Plus §4 failure mode 5:
+  invalid field state (ttl < 0, |vel| > 1) raises in the advance.
+- SCOPE decision (announced pre-commit): ONE pair — field + advance
+  semantics + spawn migration + overlay migration together; no
+  overlay-migration follow-up pair needed (the overlay change was
+  ~15 lines once the field existed).
+- Layer pin: the field (`particles` slot) and
+  `cistern--advance-particles` live in DOMAIN (field mechanics
+  beside the struct; sim counters untouched — criterion 5);
+  spawning happens in the game layer's rewards-eval via
+  `cistern--field-spawn` (K=64 FIFO, oldest evicted).
+- ADVANCE CALL SITE (§4 key decision, pinned): `cistern--refresh`
+  calls `cistern--advance-particles` before reading the field —
+  one advance per redisplay. Auto-run frame = do-tick (advance-sim)
+  + refresh (advance-particles); paused redisplay = refresh only —
+  celebrations finish while the sim is frozen. do-tick itself does
+  NOT advance (no double advance per frame).
+- SPAWN-SITE MIGRATION list (particle-layer intent emission died
+  here): M1 dust — 3–5 `sparkle` at the demolished tile, ttl 2–3,
+  short vel, glyphs `·`/`.` (draw order per particle: glyph, ttl,
+  vel-x, vel-y — pinned, fixture-bearing); M5 popup — one `popup`
+  ttl 3, vel (0,−1) per paying relief (no draws — fixed by the §4
+  row). The stored intents slot now carries ONLY non-particle
+  intents (banner text, M3 MapCompleted); the overlay projects the
+  FIELD for map glyphs and the stored slot for banners only.
+- Known artifact carried from L-028: the '+N' popup glyph is
+  multi-char in one map cell; the field now makes per-cell digit
+  placement possible at a later polish pair if wanted.
+- Incidents: several heredoc-authored test defects (malformed
+  dotted conses `(cons 0 . -1)`, close-count slips in the M6 test,
+  a mapcar nesting error) — all caught by check-parens + a reader
+  form probe + the suite BEFORE any commit. Lesson: prefer
+  file-based probes over inline --eval for any nontrivial elisp
+  (three inline probe self-destructions this pair); the
+  source-integrity entry now covers src/ per-form integrity and
+  would flag the load-merge class instantly.
+- Outcome: GREEN. Canonical suite `emacs -Q --batch -l tests/run.el
+  -f cistern-run-all-tests`: ALL 28 TESTS PASSED, exit 0.
+- Change for next attempt: M8 milestone ladder — thresholds over
+  cumulative relieves (payload relief events already count via
+  `cistern--event-kind`); unlock-once semantics want a persisted
+  unlocked set (§5 "unlocks persist across maps" — a state-shape
+  question to pin). M7 severity mapping can land independently.
+  M9 last, registering the consumption test.
