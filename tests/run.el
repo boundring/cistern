@@ -80,7 +80,9 @@
     cistern-test-ux-q25-particle-placement
     cistern-test-ux-q26-non-modal-guard
     cistern-test-ux-q27-tutorial-table
-    cistern-test-ux-q28-briefing-proofread))
+    cistern-test-ux-q28-briefing-proofread
+    cistern-test-ux-q29-auto-run
+    cistern-test-ux-q30-regret-window))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

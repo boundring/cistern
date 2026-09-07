@@ -745,6 +745,71 @@ carries the arm-then-click line and the seed mention (Q01)."
                t "the briefing carries the arm-then-click line")
     (cl-assert (string-match-p "seed" text) t "the briefing mentions the seed")))
 
+;; --- Q29: auto-run surfaced + pacing ------------------------------------------------
+
+(defun cistern-test-ux-q29-auto-run ()
+  "While the auto-run chain is live the Q01 badge slot shows
+AUTO-RUN; prefix-arg slow mode schedules 1 tick/second (1.0s
+links) beside the 5tps default.  The handle stays out of state."
+  ;; slow mode schedules 1.0s links; the flag mirrors into state
+  (setq cistern--auto-run-timer nil)
+  (let (sched)
+    (cl-letf (((symbol-function 'run-with-idle-timer)
+               (lambda (secs repeat fn &rest _)
+                 (push (list secs repeat fn) sched)
+                 (list 'fake-timer (length sched))))
+              ((symbol-function 'cancel-timer) #'ignore))
+      (let ((st (cistern--new-game 42)))
+        (cistern-input-auto-run-toggle st 'slow)
+        (cl-assert (equal (car sched) (list 1.0 nil
+                                            'cistern-input--auto-run-callback))
+                   t "slow mode: 1 tick/second links")
+        (cl-assert (cistern-st-auto-run st) t "auto-run flag on")
+        (cistern-input-auto-run-toggle st)
+        (cl-assert (null (cistern-st-auto-run st))
+                   t "toggle-off clears the flag")
+        ;; fast default unchanged: 0.2s links
+        (cistern-input-auto-run-toggle st)
+        (cl-assert (equal (car sched) (list 0.2 nil
+                                            'cistern-input--auto-run-callback))
+                   t "default stays 5 ticks/second")
+        ;; the badge rides Q01's reserved slot
+        (cl-assert (string-match-p "AUTO-RUN" (cistern-test-ux--header st))
+                   t "header shows AUTO-RUN while the chain is live")
+        (cistern-input-auto-run-toggle st)))))
+
+;; --- Q30: free regret window ----------------------------------------------------------
+
+(defun cistern-test-ux-q30-regret-window ()
+  "Demolishing in the same tick the piece was placed refunds
+fully — the place+demolish cycle costs nothing; after a tick the
+old refund rules return.  The Q07 purge ledger is untouched."
+  ;; same tick: alloy unchanged across the cycle
+  (let ((st (cistern--new-game 42)))
+    (let ((spot (cistern-test-game--floor-run st 1))
+          (a0 (cistern-st-alloy st)))
+      (cistern--cmd-build st 'pipe (car spot) (cadr spot))
+      (cistern--cmd-demolish st (car spot) (cadr spot))
+      (cl-assert (= (cistern-st-alloy st) a0)
+                 t "place + immediate demolish: alloy unchanged")))
+  ;; after a tick: the old refund rules (50% of build cost)
+  (let ((st (cistern--new-game 42)))
+    (let ((spot (cistern-test-game--floor-run st 1))
+          (a0 (cistern-st-alloy st)))
+      (cistern--cmd-build st 'pipe (car spot) (cadr spot))
+      (cistern--do-tick st)
+      (cistern--cmd-demolish st (car spot) (cadr spot))
+      (cl-assert (= (cistern-st-alloy st)
+                    (- (+ a0 (/ cistern-cost-pipe 2))
+                       cistern-cost-demolish))
+                 t "after a tick the old refund rules return")))
+  ;; tick 1: the cheap start always affords the undo
+  (let ((st (cistern--new-game 42)))
+    (let ((spot (cistern-test-game--floor-run st 1)))
+      (cistern--cmd-build st 'tank (car spot) (cadr spot))
+      (cl-assert (>= (cistern-st-alloy st) cistern-cost-demolish)
+                 t "tick-1 alloy always affords the demolish undo"))))
+
 ;; --- Q23: death summary panel -------------------------------------------------------
 
 (defun cistern-test-ux-q23-death-panel ()
