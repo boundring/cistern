@@ -82,7 +82,9 @@
     cistern-test-ux-q27-tutorial-table
     cistern-test-ux-q28-briefing-proofread
     cistern-test-ux-q29-auto-run
-    cistern-test-ux-q30-regret-window))
+    cistern-test-ux-q30-regret-window
+  ;; UX Round-2 refactor (docs/ux/TOP-30-R2.md, build order)
+    cistern-test-ux2-q01-width-contract))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
