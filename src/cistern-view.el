@@ -310,6 +310,11 @@ can never be listed twice."
                           ((> (cistern--worker-sick w) 0)
                            (format "sick (%d ticks)" (cistern--worker-sick w)))
                           (t "working"))))))
+    ;; R2-Q09: a demolishable cell built this tick advertises the
+    ;; free undo where the cursor rests
+    (when (and (memq kind '(pipe toilet tank))
+               (cistern--built-this-tick-p st x y))
+      (setq base (concat base (cdr (assq 'same-tick-free cistern--copy)))))
     (concat "CURSOR (" (number-to-string x) "," (number-to-string y)
             "): " base (if who (concat "  —  " who) ""))))
 
@@ -347,7 +352,8 @@ when nothing is placed yet."
             (push (format "%s %s %s"
                           (cdr (assq kind cistern-view--kind-names))
                           (cistern--tile-glyph kind)
-                          (mapconcat #'identity (nreverse words) ", "))
+                          ;; R2-Q14: a multi-axis target reads as ONE compound
+                          (mapconcat #'identity (nreverse words) " + "))
                   parts)))))
     (when parts
       (mapconcat #'identity (nreverse parts) ", "))))

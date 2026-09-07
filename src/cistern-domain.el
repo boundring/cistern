@@ -417,6 +417,13 @@ Q20: the inspector's bearing reads the shared geometry here."
       (when sorted
         (cons (nth 1 (car sorted)) (nth 2 (car sorted)))))))
 
+(defun cistern--built-this-tick-p (st x y)
+  "R2-Q09: was the placed piece at (X,Y) built THIS tick (the
+free regret window still open)?  The view reads this query — it
+never touches the built-at hash (D6)."
+  (let ((bt (gethash (cons x y) (cistern-st-built-at st))))
+    (and bt (= bt (cistern-st-tick st)))))
+
 (defun cistern--walkable-p (st x y tx ty)
   "Is (X,Y) enterable by a worker walking to target (TX,TY)?
 Table-passable cells always.  A toilet only when it is the target:
@@ -812,6 +819,7 @@ game layer (Phase 2)."
     (tutorial-line-fmt . "TUTORIAL %d/%d: %s  (T skips)")
     (help-arm . "t/p/K arm — click to place")
     (bearing-floor . "FLOOR — %s")
+    (same-tick-free . " — SAME-TICK: FREE UNDO")
     (death-panel . "%s / TICKS %d · RELIEVES %d · SCORE %d / PRESS n TO RESTART")
     (goal-met-served . "GOAL MET — %d SERVED")
     (goal-met-bursts . "GOAL MET — %d BURSTS HELD")
