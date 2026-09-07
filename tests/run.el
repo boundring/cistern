@@ -92,7 +92,9 @@
     cistern-test-ux2-q06-hint-lifetime
     cistern-test-ux2-q07-dead-pipe-inspector
     cistern-test-ux2-q08-briefing-interactions
-    cistern-test-ux2-q10-goals-explained))
+    cistern-test-ux2-q10-goals-explained
+    cistern-test-ux2-q09-same-tick-inspector
+    cistern-test-ux2-q14-compound-bearings))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

@@ -287,5 +287,41 @@ C-u r slow auto-run."
     (cl-assert (string-match-p "score and trophies" text)
                t "the completion reward named")))
 
+;; --- R2-Q09: the free same-tick regret is discoverable ---------------------------
+
+(defun cistern-test-ux2-q09-same-tick-inspector ()
+  "A cell built this tick offers the free undo where the cursor
+rests; after one tick the offer is gone."
+  (let ((st (cistern--new-game 42)))
+    (let ((spot (cistern-test-game--floor-run st 1)))
+      (cistern--cmd-build st 'pipe (car spot) (cadr spot))
+      (setf (cistern-st-cursor st) (cons (car spot) (cadr spot)))
+      (cl-assert (string-match-p "SAME-TICK: FREE UNDO"
+                                 (cistern-test-ux2--plain
+                                  (cistern-view--inspector st)))
+                 t "a same-tick cell offers the free undo")
+      (cistern--do-tick st)
+      (cl-assert (null (string-match-p "SAME-TICK"
+                                       (cistern-test-ux2--plain
+                                        (cistern-view--inspector st))))
+                 t "after a tick the offer is gone"))))
+
+;; --- R2-Q14: multi-axis bearings read as one target ---------------------------------
+
+(defun cistern-test-ux2-q14-compound-bearings ()
+  "Diagonal offsets render as one +-joined compound; single-axis
+lines are unchanged."
+  (let ((st (cistern--new-game 42)))
+    ;; cursor (3,4): the starter toilet is straight north (single
+    ;; axis), the starter tank is diagonal (compound)
+    (setf (cistern-st-cursor st) (cons 3 4))
+    (let ((insp (cistern-test-ux2--plain (cistern-view--inspector st))))
+      (cl-assert (string-match-p "toilet Ω 1 north, " insp)
+                 t "single-axis line unchanged")
+      (cl-assert (string-match-p "tank ▣ 2 east \\+ 2 north" insp)
+                 t "the diagonal reads as one compound")
+      (cl-assert (null (string-match-p "2 east, 2 north" insp))
+                 t "no comma-joined axis pair remains"))))
+
 (provide 'test-ux-r2)
 ;;; test-ux-r2.el ends here
