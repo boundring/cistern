@@ -285,5 +285,60 @@ the view carries a literal :foreground (cistern-cursor excepted)."
                        t "face %s carries a literal :foreground" f))))))
   (message "CISTERN-V4-03-PURITY-OK"))
 
+(defun cistern-test-v4-04-palette-apply ()
+  "V4-04 (A2.5 batch half): mode init applies the derived palette
+frame-scoped; the refresh drift guard re-derives on a background
+change (one string compare); the theme hook is registered."
+  (let ((st (cistern--new-game 42))
+        (buf (get-buffer-create " *cistern-palette-probe*")))
+    (setq cistern--st st)
+    (set-frame-parameter (selected-frame) 'background-color "#101010")
+    (setq cistern--palette-cache nil)
+    (unwind-protect
+        (progn
+          (with-current-buffer buf
+            (cistern-mode)
+            (cl-assert (equal (car cistern--palette-cache) "#101010")
+                       t "mode init did not derive the palette")
+            (let ((wall (face-attribute 'cistern-wall :foreground
+                                        (selected-frame) 'default)))
+              (cl-assert (and (stringp wall) (string-match-p "^#[0-9A-F][0-9A-F]" wall))
+                         t "cistern-wall got no derived foreground")))
+          ;; drift guard: bg change + stale cache → refresh re-derives
+          (set-frame-parameter (selected-frame) 'background-color "#F5F5F5")
+          (with-current-buffer buf
+            (cistern--refresh)
+            (cl-assert (equal (car cistern--palette-cache) "#F5F5F5")
+                       t "refresh drift guard did not re-derive"))
+          ;; the theme hook is registered by mode init
+          (cl-assert (memq 'cistern--theme-refresh enable-theme-functions)
+                     t "enable-theme-functions hook missing"))
+      (kill-buffer buf)))
+  (message "CISTERN-V4-04-OK"))
+
+(defun cistern-test-v4-04-palette-live ()
+  "V4-04 (A2.5 GUI half): on a display, flipping the frame
+background between dark and light flips every glyph face's
+polarity and the measured contrast meets each class target.
+Registered + SKIPPED in batch (L-076 probe pattern)."
+  (if (not (display-graphic-p))
+      (message "cistern-test-v4-04-palette-live: SKIPPED (no display) — probe registered, suite stays green")
+    (let ((frm (make-frame '((width . 40) (height . 12)))))
+      (unwind-protect
+          (progn
+            (dolist (bg '("#101010" "#F5F5F5"))
+              (set-frame-parameter frm 'background-color bg)
+              (cistern--apply-palette frm)
+              (dolist (e cistern-view--face-roles)
+                (let* ((color (face-attribute (intern
+                                               (format "cistern-%s" (car e)))
+                                              :foreground frm 'default))
+                       (ratio (cistern-test--ratio color bg)))
+                  (cl-assert (>= ratio 4.5)
+                             t "live frame: role %s at %.2f on %s"
+                             (car e) ratio bg))))
+            (princ "CISTERN-V4-04-LIVE-OK"))
+        (delete-frame frm)))))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here

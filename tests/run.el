@@ -106,7 +106,9 @@
     cistern-test-v4-02-log-browser
     cistern-test-v4-02-log-width
     cistern-test-v4-03-derive-palette
-    cistern-test-v4-03-palette-purity))
+    cistern-test-v4-03-palette-purity
+    cistern-test-v4-04-palette-apply
+    cistern-test-v4-04-palette-live))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
