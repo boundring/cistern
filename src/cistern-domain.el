@@ -303,16 +303,6 @@ Returns hash (X . Y) -> distance.  The seed is included regardless."
              (cistern-st-tanks st))
     maxload))
 
-(defun cistern--toilets-backed-p (st)
-  "True when any placed toilet is out of service while not in use
-(legacy :716-722 semantics verbatim)."
-  (let ((backed nil))
-    (maphash (lambda (k _v)
-               (when (eq (cistern--toilet-state st (car k) (cdr k)) 'down)
-                 (setq backed t)))
-             (cistern-st-toilets st))
-    backed))
-
 (defun cistern--toilets-backed-up-p (st)
   "Q09 split, backed-up half: a placed toilet is out of service
 with a live path whose tanks are OVER CAPACITY (full to the cap).
@@ -330,6 +320,18 @@ line anticipates instead of lying."
                  (setq backed t)))
              (cistern-st-toilets st))
     backed))
+
+(defun cistern--toilets-severed-p (st)
+  "Q09 split, severed half: a placed toilet is out of service
+with NO tank reachable through its plumbing (the path is cut).
+Both halves replace the collapsed legacy backed-p."
+  (let ((severed nil))
+    (maphash (lambda (k _v)
+               (when (and (eq (cistern--toilet-state st (car k) (cdr k)) 'down)
+                          (null (cistern--connected-tanks st (car k) (cdr k))))
+                 (setq severed t)))
+             (cistern-st-toilets st))
+    severed))
 
 (defun cistern--walkable-p (st x y tx ty)
   "Is (X,Y) enterable by a worker walking to target (TX,TY)?
