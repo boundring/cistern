@@ -96,7 +96,8 @@ by the view, not here).")
   (rewards-outcome nil)      ; stored per-tick (outcome . intents) 2-list; the view reads it
   (particles nil)            ; the particle field (§4): newest-first plist list, K=64 FIFO cap
   (relieves 0)               ; cumulative relieves counter (M8 ladder; approval L-031)
-  (trophies nil))            ; completed map seeds, committed at trigger time (M9; §5 ledger 2)
+  (trophies nil)             ; completed map seeds, committed at trigger time (M9; §5 ledger 2)
+  (summary nil))             ; Q22: run-summary snapshot, banked at condemnation
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -685,7 +686,15 @@ permanent scarring: stop bleeding and the marks fade."
   (when (and (not (cistern-st-over st))
              (>= (cistern-st-contam st) cistern-contam-limit))
     (setf (cistern-st-over st) "SECTOR CONDEMNED — CONTAMINATION LIMIT")
-    (cistern--log-sev st 'error "%s" (cistern-st-over st))))
+    (cistern--log-sev st 'error "%s" (cistern-st-over st))
+    ;; Q22: bank the run summary AT TRIGGER TIME — commit-first, the
+    ;; death panel (Q23) only ever reads it
+    (setf (cistern-st-summary st)
+          (list :ticks (cistern-st-tick st)
+                :relieves (cistern-st-relieves st)
+                :score (or (cistern-st-score st) 0)
+                :trophies (cistern-st-trophies st)
+                :cause (cistern-st-over st)))))
 
 ;; 6b. Particle field (REWARDS-DESIGN §4): domain-owned, seeded,
 ;; pure.  The field is a newest-first list of particle plists
@@ -787,7 +796,11 @@ game layer (Phase 2)."
     (refusal-alloy . "NEED %d ALLOY — PURGE (x) PAYS")
     (badge-armed . "  ARMED: %s — CLICK PLACES, ESC CANCELS")
     (help-arm . "t/p/K arm — click to place")
-    (bearing-floor . "FLOOR — %s"))
+    (bearing-floor . "FLOOR — %s")
+    (death-panel . "%s / TICKS %d · RELIEVES %d · SCORE %d / PRESS n TO RESTART")
+    (goal-met-served . "GOAL MET — %d SERVED")
+    (goal-met-bursts . "GOAL MET — %d BURSTS HELD")
+    (goal-met-ceiling . "GOAL MET — CONTAM UNDER %d"))
   "Q11 copy table, keyed by surface (Q05/Q08/Q10 milestones and
 pressure lines so far).")
 

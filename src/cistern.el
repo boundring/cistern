@@ -94,7 +94,11 @@ pure render.  Every state-mutating command ends here."
 (defun cistern-tick ()
   (interactive)
   (if (cistern-st-over cistern--st)
-      (cistern--log cistern--st "SECTOR CONDEMNED — PRESS n FOR NEW GAME")
+      ;; Q23: ONE restart line, not one per post-over keypress — the
+      ;; duplicate suppression is silent (log history keeps the first)
+      (let ((line "SECTOR CONDEMNED — PRESS n FOR NEW GAME"))
+        (unless (equal (caar (cistern-st-log cistern--st)) line)
+          (cistern--log cistern--st "%s" line)))
     (cistern--do-tick cistern--st))
   (cistern--refresh))
 

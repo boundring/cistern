@@ -431,10 +431,14 @@ chronological."
                                    collect i)
                           3))
          (n (length window))
-         (rest-idx (last (cl-loop for i from (1- n) downto 0
-                                  unless (memq i major-idx)
-                                  collect i)
-                         (- 3 (length major-idx)))))
+         ;; newest first — the descending index stream is already in
+         ;; recency order, so the fill takes its HEAD
+         (rest-idx (let ((cand (cl-loop for i from (1- n) downto 0
+                                        unless (memq i major-idx)
+                                        collect i)))
+                     (cl-subseq cand 0
+                                (min (length cand)
+                                     (max 0 (- 3 (length major-idx))))))))
     (mapcar (lambda (i) (nth i window))
             (sort (append major-idx rest-idx) #'<))))
 
@@ -449,7 +453,16 @@ lines precede the map rows."
          ;; reserved banner row (§3.5): after the map rows, before the
          ;; inspector; empty for the default outcome.  Banner content
          ;; design (ceremony copy/centering) is Phase 4 — DEFERRED.
-         (banner (cdr celebration)))
+         ;; Q23: on condemnation the banner layer carries the death
+         ;; panel built from the banked Q22 summary.
+         (banner (concat (cdr celebration)
+                         (when (and (cistern-st-over st)
+                                    (cistern-st-summary st))
+                           (format (cdr (assq 'death-panel cistern--copy))
+                                   (plist-get (cistern-st-summary st) :cause)
+                                   (plist-get (cistern-st-summary st) :ticks)
+                                   (plist-get (cistern-st-summary st) :relieves)
+                                   (plist-get (cistern-st-summary st) :score))))))
     (concat
      ;; Q21: the header line arrives already-faced (CONTAM segment)
      (cistern-view--header-line st)

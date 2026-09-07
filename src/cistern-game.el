@@ -291,6 +291,7 @@ state for the view to read (L-027); the view never calls this."
             ;; ticks; the ceremony that follows is pure presentation
             (push (plist-get card :map-id) (cistern-st-trophies st))
             (setq ceremony-p t)
+            (setq intents (cistern--narrate-goals st card intents))
             (push (list :layer 'banner :text "MAP COMPLETED") intents))
           (setf (cistern-st-goal-card st) card))))
     ;; M9 ceremony fill (§4 M9 row): up to K=64 ttl-6 static sparkles
@@ -395,6 +396,21 @@ by the caller before this runs.  Returns the extended INTENTS."
     (push (list :layer 'log :text line :face 'success) intents)
     (push (list :layer 'banner :text line) intents)
     (push (list 'unlock :id unlock) intents)))
+
+(defun cistern--narrate-goals (st card intents)
+  "Q24: log each satisfied goal of CARD as GOAL MET (success
+face) BEFORE the completion banner.  Returns the extended
+INTENTS."
+  (dolist (g (plist-get card :goals) intents)
+    (let* ((kind (plist-get g :kind))
+           (key (pcase kind
+                  (`relieves-served 'goal-met-served)
+                  (`bursts-allowed 'goal-met-bursts)
+                  (`contamination-ceiling 'goal-met-ceiling)))
+           (line (format (cdr (assq key cistern--copy))
+                         (plist-get g :target))))
+      (cistern--log-sev st 'success "%s" line)
+      (push (list :layer 'log :text line :face 'success) intents))))
 
 (defun cistern--particle-draw (st)
   "Advance ST's particle child stream by one raw step, returning
