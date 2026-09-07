@@ -879,5 +879,141 @@ names it."
                t "badge does not name the fixture type"))
   (message "CISTERN-V4-11-OK"))
 
+(defconst cistern-test-v4-12--d20s '(9 1 10 10 6 14 14 17)
+  "Pinned first d20s at (seed 20260830, stream 3) — RPG §7.")
+
+(defun cistern-test-v4-12--seed-d20 (st n)
+  "Advance ST's stream past the first N pinned d20 draws."
+  (dotimes (_ n) (cistern--rpg-d20 st)))
+
+(defun cistern-test-v4-12-rpg-machinery ()
+  "V4-12 (A3/A6–A11): D&D checks resolve through the shared
+(matrix-id . band) hash with nat-20/1 promotion; exposure replaces
+the auto-sick; composure spikes on the 100-crossing; stride only
+adds steps; XP/clearance ledger gates CL.II/III; suits classify by
+dominant stat; stream hygiene holds."
+  ;; A9: matrix shape + unknown-id error
+  (cl-assert (equal (cistern--matrix-effect 'exposure-grit 0) '(:sick 5))
+             t "exposure band 0 wrong")
+  (cl-assert (equal (cistern--matrix-effect 'exposure-grit 2) '(:sick 0))
+             t "exposure band 2 wrong")
+  (cl-assert (equal (cistern--matrix-effect 'composure-nerve 0)
+                    '(:spike 10))
+             t "composure band 0 wrong")
+  (cl-assert (condition-case e (progn (cistern--matrix-effect 'nope 0) nil)
+               (error t))
+             t "unknown matrix-id did not error")
+  ;; A3: suit classification with the fixed tie order
+  (let ((w (cistern--worker-make :stats '(15 15 9 14))))
+    (cl-assert (eq (cistern--rpg-suit w 'fall-shaft) 'suited)
+               t "FLOW-dominant not suited on fall-shaft")
+    (cl-assert (eq (cistern--rpg-suit w 'long-drop) 'neutral)
+               t "FLOW-dominant not neutral on long-drop")
+    (cl-assert (eq (cistern--rpg-suit w 'hermetic-booth) 'unsuited)
+               t "FLOW-dominant not unsuited on hermetic-booth")
+    (setf (cistern--worker-clearance w) 2)
+    (cl-assert (eq (cistern--rpg-suit w 'hermetic-booth) 'neutral)
+               t "CL.II cross-cert did not remove unsuited"))
+  ;; pinned d20 sequence at the fixture seed
+  (let ((st (cistern--new-game 20260830)))
+    (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
+    (dolist (d cistern-test-v4-12--d20s)
+      (cl-assert (= (cistern--rpg-d20 st) d) t "pinned d20 drift"))))
+  ;; A6: exposure — band-2 draw does not sicken; band-0 adds +5
+  (let ((st (cistern--new-game 20260830)))
+    (let ((victim (car (cistern-st-creators st)))
+          (breacher (cadr (cistern-st-creators st))))
+      (setf (cistern--worker-x victim) 8)
+      (setf (cistern--worker-y victim) 6)
+      (setf (cistern--worker-x breacher) 8)
+      (setf (cistern--worker-y breacher) 7)
+      ;; victim is α: GRIT 15 → mod +2; d20 #3 = 10 → 10+2−12 = 0 → band 2
+      (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
+      (cistern-test-v4-12--seed-d20 st 2)
+      (cistern--accident st breacher)
+      (cl-assert (= (cistern--worker-sick victim) 0)
+                 t "band-2 exposure still sickened")
+      (cl-assert (cl-some (lambda (e)
+                            (string-match-p "EXPOSURE LOGGED" (car e)))
+                          (cistern-st-log st))
+                 t "exposure-hold line missing"))
+    (let ((victim (car (cistern-st-creators st)))
+          (breacher (cadr (cistern-st-creators st))))
+      (setf (cistern--worker-x victim) 8)
+      (setf (cistern--worker-y victim) 6)
+      (setf (cistern--worker-x breacher) 8)
+      (setf (cistern--worker-y breacher) 7)
+      ;; d20 #2 = 1 → nat-1 demotes to band 0: sick = clamp(30−8)+5 = 27
+      (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
+      (cistern--rpg-d20 st)
+      (cistern--accident st breacher)
+      (cl-assert (= (cistern--worker-sick victim) 27)
+                 t "band-0 exposure sick duration wrong: %S"
+                 (cistern--worker-sick victim)))))
+  ;; A7: composure — spike on the 100-crossing, only there
+  (let ((st (cistern--new-game 20260830)))
+    (let ((w (cistern--worker-make :x 8 :y 6 :stats '(10 10 10 10))))
+      (setf (cistern--worker-bladder w) 101)
+      (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
+      (cistern--rpg-d20 st)                    ; d20 #1 = 9 → 9+0−10 = band 1 → +5
+      (cistern--rpg-composure st w 99)
+      (cl-assert (= (cistern--worker-bladder w) 106)
+                 t "composure spike wrong: %S"
+                 (cistern--worker-bladder w))
+      (let ((pos (cistern-st-rpg-pos st)))
+        (cistern--rpg-composure st w 101)
+        (cl-assert (= (cistern-st-rpg-pos st) pos)
+                   t "composure rolled on a non-crossing tick")
+        (cl-assert (= (cistern--worker-bladder w) 106)
+                   t "composure moved bladder off-crossing")))))
+  ;; A8: stride — first step-toward rolls, adds a step, journey-pinned
+  (let ((st (cistern--new-game 20260830)))
+    (let ((w (car (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 8)
+      (setf (cistern--worker-y w) 6)
+      (setf (cistern--worker-stats w) '(10 10 10 20)) ; ARCHIVE mod +2
+      (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
+      (cistern-test-v4-12--seed-d20 st 7)      ; d20 #8 = 17 → 17+2−16 pass
+      (cistern--step-toward st w 8 4)
+      (let ((pos (cistern-st-rpg-pos st))
+            (steps (- 6 (cistern--worker-y w))))
+        (cl-assert (= steps 2) t "stride pass did not move 2: %S" steps)
+        (cistern--step-toward st w 8 4)
+        (cl-assert (= (cistern-st-rpg-pos st) pos)
+                   t "stride re-rolled within one journey"))))
+  ;; A10: stream hygiene — RPG code never touches the sim LCG/particles
+  (dolist (fn '(cistern--rpg-check cistern--rpg-roll-stats
+                cistern--rpg-composure cistern--rpg-grant-xp
+                cistern--rpg-suit cistern--rpg-use-ticks))
+    (let ((src (format "%S" (symbol-function fn))))
+      (cl-assert (not (string-match-p "cistern--rand\\|particle" src))
+                 t "%s touches a foreign stream" fn)))
+  ;; A11: XP ledger + clearance gates
+  (let ((st (cistern--new-game 42)))
+    (let ((w (car (cistern-st-creators st))))
+      (setf (cistern--worker-stats w) '(15 15 9 14))
+      (cistern--rpg-grant-xp st w 11)
+      (cl-assert (eq (cistern--worker-clearance w) 1) t "CL.II early")
+      (cistern--rpg-grant-xp st w 1)
+      (cl-assert (eq (cistern--worker-clearance w) 2) t "CL.II at 12")
+      (cistern--rpg-grant-xp st w 18)
+      (cl-assert (eq (cistern--worker-clearance w) 3) t "CL.III at 30")
+      ;; +2 to the lowest stat (NERVE 9 → 11)
+      (cl-assert (equal (cistern--worker-stats w) '(15 15 11 14))
+                 t "CL.III stat raise wrong: %S"
+                 (cistern--worker-stats w))))
+  ;; use_ticks_eff per §2.2 with clamps
+  (let ((w (cistern--worker-make :stats '(15 15 9 14)))); dominant FLOW
+    (cl-assert (= (cistern--rpg-use-ticks w 'fall-shaft) 1)
+               t "suited long use")
+    (cl-assert (= (cistern--rpg-use-ticks w 'long-drop) 2)
+               t "neutral long use")
+    (cl-assert (= (cistern--rpg-use-ticks w 'hermetic-booth) 3)
+               t "unsuited use")
+    (setf (cistern--worker-clearance w) 2)
+    (cl-assert (= (cistern--rpg-use-ticks w 'hermetic-booth) 2)
+               t "CL.II kept the unsuited penalty"))
+  (message "CISTERN-V4-12-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here
