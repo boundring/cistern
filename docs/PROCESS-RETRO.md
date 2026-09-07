@@ -55,3 +55,14 @@ L-001..L-006; commit range `66f3940..3725f31`.
   on unexpected red-pass; disable-the-guard probe when a pass could be
   luck.
 - **P6** Independent verifier gate after every phase.
+
+## Steering lessons — UX cycle (2026-09-07)
+
+Written after the two-round adversarial UX cycle (45 directives, 79/79 suite, L-035..L-075). Lessons for SOONER guidance and steering of delegated subagents, each tied to observed evidence:
+
+1. **Layout and pixel rulings require a measurement probe before the ruling.** Evidence: the director's batch-3 ruling accepted the armed-badge 95-col overflow on reasoning; round-2 measurement (antagonist N1) showed the badge renders 126 cols, wraps, and shifts the map under `cistern-view--cell-at` — the ruling was overturned and re-fixed as R2-Q02. Rule: any ruling about width/geometry/visual layout is preceded by a render probe with the numbers in it; the director rules on the numbers, not the reasoning.
+2. **Merge curator dependency chains into one red/green group at brief time.** Evidence: Q08's acceptance forced Q09's domain split into the same green (ledgered L-039) — handled well, but the merge was discovered mid-batch; the curator's dependency map predicted it. Rule: when the plan prints 'X before Y', the batch brief states them as one group with one green boundary.
+3. **Batch cadence: ≤4 directives.** Evidence: round-1 batches of 7–9 directives ran 55–65 minutes, leaving director rulings (Q03 setter placement, Q01 version drop) unratified for the whole batch; round-2's smaller batches surfaced decisions in minutes. Rule: a batch is at most 4 directives or 30 minutes of expected work, whichever comes first.
+4. **Throwaway probe scripts are the highest defect-rate artifact — brief the discipline up front.** Evidence: four collector/probe authoring bugs (cons-vs-list hash key ×2, header-stride misread, mapcar nesting) all in /tmp scripts, never in shipped code; the fix pattern (file-based probes over inline --eval, check-parens + reader form probe, explicit key construction for dot-cons vs list) emerged via the ledger but was learned per-session. Rule: collector and antagonist briefs carry the probe discipline from turn one.
+5. **Route-don't-invent held at scale — keep it.** Evidence: 10+ contract questions returned as routings with options (Q03 placement, refund arithmetic, map_id, GOALS semantics, badge width, cross-map persistence); every one resolved by a one-line director ruling and audited clean at both closing reviews. Zero silent inventions found.
+6. **Mid-turn steering with owner feedback is the fastest corrective available.** Evidence: the owner's 'alignment only in pipes/toilets/ore glyphs' observation, steered into a running diagnosis turn, narrowed the search to two glyphs (◆ ▣ double-width fallback in the owner's Iosevka) within minutes — versus the full-glyph sweep the worker was running. Rule: owner observations go into the running turn as steering, not into a post-mortem.
