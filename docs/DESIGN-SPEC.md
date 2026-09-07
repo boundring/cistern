@@ -11,14 +11,14 @@ lessons-into-ledger, failure-informed handoff). Execution follows
 ## 1. Product intent
 
 CISTERN is a turn-based sanitation-management sim in the register of
-Tsutomu Nihei's *Blame!*: workers convert time into alloy, their biological
-need must be routed through a toilet→pipe→tank network, and contamination is
-the clock. **Route need to capacity. Convert waste to income. Contamination
-is the clock.**
+Tsutomu Nihei's *Blame!*. Workers turn time into alloy. Their biological
+need must be routed through a toilet→pipe→tank network. Contamination is
+the clock. **Route need to capacity. Convert waste to income.
+Contamination is the clock.**
 
 ### The three player complaints — design drivers
 
-1. **"Why can't I demolish stuff?"** — There is no demolish verb. The only
+1. **"Why can't I demolish stuff?"** — No demolish verb exists. The only
    removal is `cistern--cmd-decon` (cistern.el:527), which cleans a
    hazard *tile*; a misplaced toilet, pipe, or tank is permanent. → R8.
 2. **"Why is it always the same map?"** — `cistern--build-map`
@@ -74,10 +74,11 @@ All references into `legacy/cistern-share/cistern-2.0.0/`.
                                               pure functions)
 ```
 
-Dependency direction: strictly inward. Drivers → adapters → use cases →
-domain. Domain imports nothing Emacs-y (no `buffer`, no `window`, no timers,
-no faces). Use cases take state + intent, return state (and a log line);
-they never touch buffers. Adapters are pure projections/translations.
+Dependencies point one way: inward. Drivers → adapters → use cases →
+domain. The domain imports nothing Emacs-y (no `buffer`, no `window`, no
+timers, no faces). Use cases take state + intent, return state (and a log
+line); they never touch buffers. Adapters are pure projections and
+translations.
 
 ### 3.2 Elisp file layout
 
@@ -90,9 +91,9 @@ they never touch buffers. Adapters are pure projections/translations.
 | `src/cistern.el` | driver | group, defcustoms, global live-state var, `cistern-mode` keymap, mouse keymap, `cistern` entry, help, autoload |
 | `tests/*.el` | test | headless deterministic tests, one per requirement + extended selftest/soak |
 
-Keep decisions minimal-sufficient (least-active-decisions): the only pinned
-choices are the five file boundaries above, the single-state-object rule,
-and the tile-table data shape (§3.4). Everything else is DEFERRED (§6).
+Pin the minimum (least-active-decisions): the five file boundaries, the
+single-state-object rule, the tile-table data shape (§3.4). Everything
+else is DEFERRED (§6).
 
 ### 3.3 Dependency rules
 

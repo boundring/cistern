@@ -1,6 +1,10 @@
 # CISTERN
 
-A toilet-sanitation management sim that runs in an Emacs buffer. Wire toilets to tanks before the bladders win. Explore seeded sectors, work through goal cards, build reputation, unlock milestones, and throw ceremony celebrations when the pipes hold.
+Sanitation duty in an Emacs buffer. Sector 7, 34 by 16 cells of a
+structure nobody finished and nobody will. Workers mine ore. Their
+bladders fill. You wire toilets to tanks by pipe, purge the tanks,
+clean what leaks. Contamination is the clock. THE STRUCTURE DOES NOT
+CARE.
 
 ## Run it
 

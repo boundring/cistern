@@ -1,6 +1,6 @@
 # PLAYING CISTERN
 
-A toilet-sanitation management sim in an Emacs buffer.
+Sanitation duty, Sector 7, in an Emacs buffer.
 
 ## Run it
 
@@ -9,47 +9,45 @@ emacs -Q -l /path/to/cistern/src/cistern.el
 M-x cistern
 ```
 
-That's it — the game opens in the `*cistern*` buffer.
+The game opens in the `*cistern*` buffer.
 
-## The idea
+## The job
 
-You run the sanitation for Sector 7. Workers (α β γ …) mine ore (◆)
-for alloy — your building currency. Their bladders fill as they work;
-at 60% they walk to a toilet (Ω) and sit down. But a toilet only
-works when it's wired by pipe (─) to a tank (▣) with room left. Every
-use sends 10 units of waste down the line into the tank.
+You run the sanitation for one sector of the Structure. Workers
+(α β γ …) mine ore (◆) for alloy. Alloy buys pipes, toilets, tanks.
+Their bladders fill as they work — 2% a tick. At 60% a worker walks
+to a toilet (Ω) and sits down; entering the tile is sitting down.
+A toilet works only when pipe (─) connects it to a tank (▣) with
+room left. Each use sends 10 units down the line and takes 2 ticks.
 
-A full tank backs up every toilet it feeds — those toilets go red and
-out of service. Purge the tank (free, and it PAYS: 1 alloy per 3
-units of waste).
+A full tank backs up every toilet it feeds. Backed-up toilets turn
+red and refuse customers. Purge the tank with `x`: free, and it
+pays — 1 alloy per 3 units of waste.
 
-A worker who can't reach a working toilet eventually breaches: the
-tile turns to contamination (▒), which spreads to neighboring floor
-and makes nearby workers sick. Decontaminate with `c`. At 20
-contamination the sector is condemned — game over.
+A worker who cannot reach a working toilet eventually breaches. The
+tile turns to contamination (▒), which spreads to adjacent floor,
+and nearby workers fall sick. Decontaminate with `c`. At 20
+contamination the sector is condemned. Game over.
 
-Every 40 ticks a migrant arrives. More workers, more load.
+Every 40 ticks a migrant arrives. Population is load. The cap is 8.
 
-## What to try first
+## First shifts
 
-1. Watch the starter setup: there is one toilet already wired to one
-   tank. Press `SPC` a few times and find the workers on the map —
-   the inspector line describes whatever the cursor rests on, so put
-   the cursor on a worker (arrows) and watch their bladder %.
-2. When the pressure line says the toilet is backed up, put the
-   cursor on the tank (▣) and press `x` to purge it — free toilets
-   and free alloy.
-3. Expand: lay pipe (`p`) from the wired run outward, add another
-   toilet (`t`) at the far end, and a tank (`K`) when the load gets
-   heavy. The wiring rule: a toilet works if pipe connects it to ANY
-   tank with headroom — short runs are cheap runs.
-4. When contamination (▒) appears, cursor onto it and press `c`.
-5. Press `r` to let the sim run by itself at 5 ticks/second — press
-   `r` again to take back control.
+1. Press `SPC` a few times. One toilet is already wired to one tank.
+   Put the cursor on a worker (arrow keys) and read the inspector
+   line: bladder percent, mood.
+2. When the pressure line says the toilets are backed up, cursor to
+   the tank (▣) and press `x`. Free toilets. Free alloy.
+3. Expand. Lay pipe (`p`) outward, add a toilet (`t`) at the far
+   end, add a tank (`K`) when the load grows. The wiring rule: pipe
+   connects a toilet to ANY tank with headroom. Short runs win.
+4. Contamination (▒) appears — cursor onto it, press `c`.
+5. Press `r` to let the sim run itself at 5 ticks a second. `r`
+   again takes control back.
 
-The one lesson of the tutorial scenarios, in a sentence: **wire the
-toilets to the tanks before the bladders win.** Capacity that isn't
-connected is as useless as no capacity at all.
+The whole game in one sentence: **wire the toilets to the tanks
+before the bladders win.** Capacity you did not connect is not
+capacity.
 
 ## Keys
 
@@ -57,42 +55,77 @@ connected is as useless as no capacity at all.
 |-----|--------|
 | `SPC` / `RET` | advance one tick |
 | arrow keys / mouse-1 | move the cursor |
-| `t` | build a toilet (10 alloy) at the cursor |
-| `p` | lay pipe (2 alloy) at the cursor |
-| `K` | build a tank (15 alloy) at the cursor |
-| `d` | demolish the structure at the cursor (3 alloy, half refunded) |
-| `c` | decontaminate the tile at the cursor (3 alloy) |
-| `x` | purge the tank at the cursor (free, pays alloy back) |
-| `r` | auto-run toggle (5 ticks/second) |
+| `t` | build a toilet (10 alloy) |
+| `p` | lay pipe (2 alloy) |
+| `K` | build a tank (15 alloy) |
+| `d` | demolish (3 alloy; full refund same tick, half after) |
+| `c` | decontaminate the tile (3 alloy) |
+| `x` | purge the tank (free, pays alloy back) |
+| `r` | auto-run toggle (5 ticks/s; prefix arg runs 1 tick/s) |
+| `u` / `ESC` | disarm the armed build verb |
 | `T` | skip the tutorial |
+| `L` | full log, oldest first |
 | `n` | new game (new sector) |
-| `?` | in-game briefing |
+| `?` | briefing — seed, version, the rules |
 | `q` | quit |
 
-Tip: build with the keyboard, or press a build key once and then
-click anywhere on the map — the click places it there and advances
-one tick. The cursor-movement click (no build key pressed) never
-ticks the clock.
+Build two ways. Press a build key, then press `SPC` — the piece
+lands at the cursor. Or press the build key and click the map: the
+click places the piece and advances one tick. An unarmed click only
+moves the cursor; it never ticks the clock. While a verb is armed,
+the header carries a badge: `ARMED: PIPE — CLICK PLACES, ESC
+CANCELS`.
 
-## Rewards you'll see
+## Rewards
 
-- **Score popups** — a worker who relieves with a full bladder pays
-  you: `+10` floats up from the toilet (2× near bursting, occasional
-  2–3× tips).
-- **Goal cards** — a card sets objectives (serve N workers, keep
-  contamination under a ceiling, survive N bursts). Complete all
-  goals and the sector celebrates.
-- **MAP COMPLETED** — the big one: a banner row appears under the map
-  and the whole field fills with ceremony sparkles for a few ticks.
-  The sector's seed is banked as a trophy.
-- **Milestones** — cumulative relieves unlock achievements (watch the
-  log); cross 100 lifetime relieves for a full celebration.
-- **Reputation** — rises with relieves, sinks with bursts and leaks;
-  three tiers shape future goal cards (easier or harder targets).
+- **Score** — a worker who relieves pays 10. Paid at 2× when the
+  bladder was near bursting. Occasional tips: 1 in 8 relieves pays
+  2–3×. The popup floats up from the toilet.
+- **Goal cards** — a card sets objectives: serve N workers, hold
+  bursts under N, keep contamination under a ceiling. Your first
+  card arrives at tick one: serve 3, ceiling 5. Meet every goal and
+  the sector logs `GOAL MET`, then `MAP COMPLETED` runs across the
+  banner row. The map's seed is banked as a trophy.
+- **Ceremony** — on completion the plain floor sparkles for a few
+  ticks. No modal. Nothing stops. Pipes, walls and plumbing stay
+  visible.
+- **Milestones** — cumulative relieves unlock announcements in the
+  log: BIG CISTERN at 5, FAST FLUSH at 15, SELF-CLEAN at 30,
+  AIR FRESHENER at 50, GOLDEN PIPE at 100. Crossing 100 also
+  throws a full celebration.
+- **Reputation** — +1 per relief, −5 per burst, −2 per leak,
+  clamped 0–100. Three tiers: under 40, mid, 70 and up. Future goal
+  cards bend with your tier — easier targets or harder ones.
 
 ## Reading the screen
 
-Line 1: sector status — tick, alloy, population, contamination, seed.
-Line 2: the keys, with prices. Line 3: the glyph legend. The map.
-Then the banner row (celebrations), the inspector (what the cursor
-rests on), the pressure line (how the plumbing feels), and the log.
+- **Line 1** — the strip: `TICK ALLOY POP CONTAM SCORE GOALS REP`.
+  CONTAM goes yellow at half the limit, red bold near it. After REP:
+  a dim slot for the ARMED and AUTO-RUN badges. The seed lives in
+  the `?` briefing.
+- **Line 2** — the keys, with prices.
+- **Line 3** — the glyph legend: `· floor  ▓ wall  + gate  ◆ ore
+  vein  ╌ dead pipe  ─ pipe  Ω toilet  ▣ tank  ▒ contamination
+  α worker`. A pipe lit cyan is connected to capacity; a grey `╌`
+  is wire to nowhere.
+- **The map** — 34 by 16 cells.
+- **The banner row** — celebrations, and on condemnation the death
+  panel: cause, ticks survived, relieves served, final score,
+  `PRESS n TO RESTART`.
+- **The inspector** — one line on whatever the cursor rests on. On
+  plain floor it gives bearings: nearest toilet and nearest tank,
+  cells and direction.
+- **The hint row** — refusals that name the fix. `NO FLOOR THERE —
+  AIM FOR OPEN FLOOR`. `NEED 10 ALLOY — PURGE (x) PAYS`. One tick,
+  then gone.
+- **The pressure line** — how the plumbing feels, faced by state:
+  red bold when toilets are backed up or lines severed (`LINES
+  SEVERED — REWIRE (p) — TANK AT (x,y)`), yellow at `PRESSURE
+  RISING — TANK 85%`, dim at `LINES NOMINAL — THE STRUCTURE DOES
+  NOT CARE`.
+- **The log tail** — the last three lines that matter. Repeats
+  collapse with an ×N count. Bursts and condemnation always make
+  the tail. `L` opens the whole log.
+- **The tutorial line** — three steps over the real map: cursor
+  onto a worker, purge a filling tank, watch the alloy land. `T`
+  skips.
