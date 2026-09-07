@@ -86,7 +86,9 @@
   ;; UX Round-2 refactor (docs/ux/TOP-30-R2.md, build order)
     cistern-test-ux2-q01-width-contract
     cistern-test-ux2-q02-badge-geometry
-    cistern-test-ux2-q03-copy-sweep))
+    cistern-test-ux2-q03-copy-sweep
+    cistern-test-ux2-q04-goals-claimed
+    cistern-test-ux2-q05-dust-contract))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

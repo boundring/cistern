@@ -147,5 +147,58 @@ byte-identical."
           (cl-assert (= 0 (cistern-test-ux2--string-count s f))
                      t "copy %S drifted outside the table" s))))))
 
+;; --- R2-Q04: GOALS progress never regresses -------------------------------------
+
+(defun cistern-test-ux2-q04-goals-claimed ()
+  "Fresh game renders GOALS 0/2; the ceiling objective, once
+claimed (contamination rose inside the target), stays counted when
+contamination keeps rising.  Completion is untouched."
+  (let ((st (cistern--new-game 42)))
+    (cl-assert (string-match-p "GOALS 0/2"
+                               (cistern-test-ux2--plain
+                                (cistern-view--header-line st)))
+               t "fresh game renders GOALS 0/2, not 1/2")
+    ;; contamination rises INSIDE the target: the ceiling is claimed
+    (setf (cistern-st-contam st) 1)
+    (cistern--rewards-eval st nil)
+    (cl-assert (string-match-p "GOALS 1/2"
+                               (cistern-test-ux2--plain
+                                (cistern-view--header-line st)))
+               t "a risen, held ceiling is claimed")
+    ;; contamination keeps RISING past the target: no regression
+    (setf (cistern-st-contam st) 7)
+    (cistern--rewards-eval st nil)
+    (cl-assert (string-match-p "GOALS 1/2"
+                               (cistern-test-ux2--plain
+                                (cistern-view--header-line st)))
+               t "the claimed goal stays counted (never drops)"))
+  ;; completion unchanged: served + ceiling-at-zero still completes
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (make-list 3 'relief))
+    (cl-assert (cl-find-if (lambda (i)
+                             (and (eq (plist-get i :layer) 'banner)
+                                  (equal (plist-get i :text) "MAP COMPLETED")))
+                           (cdr (cistern-st-rewards-outcome st)))
+               t "completion semantics untouched")))
+
+;; --- R2-Q05: M1 demolish dust obeys the particle contract --------------------------
+
+(defun cistern-test-ux2-q05-dust-contract ()
+  "Demolish dust is observable with ZERO tick delay, draws only
+from the M9 glyph set, and sits on plain floor."
+  (let ((st (cistern--new-game 42)))
+    (let ((spot (cistern-test-game--floor-run st 1)))
+      (cistern--cmd-build st 'pipe (car spot) (cadr spot))
+      (cistern--cmd-demolish st (car spot) (cadr spot))
+      (let ((ps (cistern-st-particles st)))
+        (cl-assert ps t "dust present immediately after the demolish")
+        (dolist (p ps)
+          (cl-assert (null (member (plist-get p :glyph) '("·" ".")))
+                     t "no floor-dot dust glyph")
+          (cl-assert (eq (cistern--cell st (car (plist-get p :pos))
+                                         (cdr (plist-get p :pos)))
+                         'floor)
+                     t "dust over plain floor"))))))
+
 (provide 'test-ux-r2)
 ;;; test-ux-r2.el ends here
