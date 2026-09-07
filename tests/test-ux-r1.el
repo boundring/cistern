@@ -340,7 +340,8 @@ the same tile table, so no glyph is listed twice."
                      (replace-regexp-in-string "\\`GLYPHS:\\s-*" "" legend)
                      "\\s-\\{2\\}" t))
            (glyphs (mapcar (lambda (e) (substring e 0 1)) entries)))
-      (cl-assert (= 1 (how-many "╌" legend))
+      ;; NB: how-many cannot match this multibyte glyph; split-count
+      (cl-assert (= 1 (1- (length (split-string legend "╌"))))
                  t "legend lists the dead pipe exactly once")
       (cl-assert (= (length glyphs) (length (cl-delete-duplicates
                                             glyphs :test #'string=)))

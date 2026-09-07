@@ -153,7 +153,9 @@ variants only — base glyphs never leave the table."
      ((eq kind 'pipe)
       (if (cistern--connected-tanks st x y)
           (cons (cistern-view--pipe-shape st x y) 'cistern-pipe-live)
-        (cons glyph 'cistern-pipe-dead)))
+        ;; Q12: the unconnected pipe gets the tile table's distinct
+        ;; dead glyph — it is no longer the floor dot
+        (cons (cistern--tile-dead-glyph kind) 'cistern-pipe-dead)))
      ((eq kind 'toilet)
       (cons glyph (cdr (assq (cistern--toilet-state st x y)
                              cistern-view--toilet-faces))))
@@ -206,12 +208,19 @@ objectives; nil without a card."
           cistern-cost-demolish cistern-cost-decon))
 
 (defun cistern-view--legend-line ()
+  "Q12: GENERATED from the tile table — a kind with :dead-glyph
+lists the dead glyph (its base glyph never renders), so one glyph
+can never be listed twice."
   (concat "GLYPHS:  "
-          (mapconcat (lambda (entry)
-                       (format "%s %s" (cistern--tile-glyph (car entry))
-                               (cdr (assq (car entry)
-                                          cistern-view--kind-names))))
-                     cistern--tile-table "  ")
+          (mapconcat
+           (lambda (entry)
+             (let* ((kind (car entry))
+                    (dead (plist-get (cdr entry) :dead-glyph))
+                    (glyph (or dead (cistern--tile-glyph kind)))
+                    (name (cdr (assq kind cistern-view--kind-names))))
+               (format "%s %s" glyph
+                       (if dead (concat "dead " name) name))))
+           cistern--tile-table "  ")
           "  " (aref cistern-view--worker-glyphs 0) " worker\n"))
 
 (defun cistern-view--inspector (st)

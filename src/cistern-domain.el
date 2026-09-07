@@ -43,7 +43,8 @@ the view header and the driver help read it inward.")
     (door   :glyph "+" :passable t   :buildable nil :firebreak t   :conn nil)
     (ore    :glyph "◆" :passable t   :buildable nil :firebreak t   :conn nil)
     (hazard :glyph "▒" :passable nil :buildable nil :firebreak nil :conn nil)
-    (pipe   :glyph "·" :passable t   :buildable nil :firebreak t   :conn nil)
+    (pipe   :glyph "·" :dead-glyph "╌"
+            :passable t   :buildable nil :firebreak t   :conn nil)
     (toilet :glyph "Ω" :passable nil :buildable nil :firebreak t   :conn nil)
     (tank   :glyph "▣" :passable nil :buildable nil :firebreak t   :conn nil))
   "One entry per cell kind.  No cell-kind pcase/case may exist
@@ -55,6 +56,12 @@ by the view, not here).")
 (defun cistern--tile-glyph (kind)
   "Glyph for KIND, resolved through the tile table."
   (plist-get (cistern--tile kind) :glyph))
+
+(defun cistern--tile-dead-glyph (kind)
+  "Glyph for an UNCONNECTED KIND (Q12) — the table's
+:dead-glyph when it has one, the base glyph otherwise."
+  (or (plist-get (cistern--tile kind) :dead-glyph)
+      (cistern--tile-glyph kind)))
 
 (defun cistern--tile-passable-p (kind)
   "Passability for KIND, resolved through the tile table."

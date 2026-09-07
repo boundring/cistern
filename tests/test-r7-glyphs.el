@@ -41,8 +41,10 @@ the render is a pure, propertized projection of state."
                    t "connected pipe renders a plumbing shape")
         (cl-assert (eq (cdr conn) 'cistern-pipe-live)
                    t "connected pipe face is the live face")
-        (cl-assert (string= (car dead) (cistern--tile-glyph 'pipe))
-                   t "isolated pipe renders the tile-table glyph")
+        ;; Q12: the isolated pipe renders the table's distinct DEAD
+        ;; glyph — no longer the base/floor dot
+        (cl-assert (string= (car dead) (cistern--tile-dead-glyph 'pipe))
+                   t "isolated pipe renders the table's dead glyph")
         (cl-assert (eq (cdr dead) 'cistern-pipe-dead)
                    t "isolated pipe face is the dead face")
         (cl-assert (not (string= (car conn) (car dead)))
