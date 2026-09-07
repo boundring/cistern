@@ -2749,3 +2749,26 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-084 (2026-09-07, run: impl-v4-w1 — V4-08 briefing regen + help sections, S4.4)
+
+- Outcome: LANDED (red commit `git log b4fce67..HEAD~1`, green this
+  commit).
+- Red: cistern--help-text absent (no POWER LAYER, no generated
+  glyphs).
+- Green: cistern-help refactored to print the pure builder
+  cistern--help-text — four sections (CONCEPT/THE LOOP, GENERATED
+  GLYPHS from the tile table via the legend generator,
+  CONTROLS — THE BASICS verbatim, CONTROLS — THE POWER LAYER with
+  the S4 pairings, all five S1.3 browser keys, the
+  you-already-know frame, and a describe-mode pointer); 95-col
+  contract asserted line-by-line.
+- Integration notes: (1) the probe caught a literal "·" (floor/pipe
+  glyph) inside the browser-keys row — separators switched to "/";
+  (2) the smoke briefing test pins the one-line form "At %d the
+  sector is condemned" — the loop prose was reworded to keep it on
+  one line (smoke regression honored, no re-pinning needed).
+- VERIFY: canonical suite ALL 92 TESTS PASSED (batch).
+
+---
+

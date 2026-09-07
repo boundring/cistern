@@ -522,32 +522,41 @@ to the line's source cell, q closes.")
 (defun cistern-help ()
   (interactive)
   (with-output-to-temp-buffer "*cistern help*"
+    (princ (cistern--help-text))))
+
+(defun cistern--help-text ()
+  "V4-08 (SURFACE S4.4): the ? briefing — four sections, basics
+before power.  GLYPHS is GENERATED from the tile table (Q12's
+one-source spirit — the old hand-typed lines had already drifted);
+the power layer is framed as pairings the player already knows."
+  (with-output-to-string
     (princ (format "CISTERN v%s — sanitation protocol for Sector 7 — map seed %d\n\n"
                    cistern-version
                    (if cistern--st (cistern-st-seed cistern--st) 0)))
     (princ "THE CONCEPT\n")
     (princ "  Route need to capacity.  Convert waste to income.\n")
     (princ "  Contamination is the clock.\n\n")
-    (princ "GLYPHS\n")
-    (princ "  ▓ wall    · floor    ◆ ore vein    ─ pipe    Ω toilet\n")
-    (princ "  ▣ tank    ▒ contamination    + gate    α..θ workers\n\n")
     (princ "THE LOOP\n")
-    (princ "  Workers mine ◆ for alloy.  Their bladders fill.  At 60%\n")
-    (princ "  they walk to a Ω and seat themselves — entering the toilet\n")
-    (princ "  tile IS sitting down.  A Ω works only when piped to a ▣ with\n")
-    (princ "  headroom.  Each use sends 10 units down the line.\n\n")
-    (princ "  A full ▣ backs up every Ω it feeds (red Ω).  Purge with x on\n")
-    (princ "  the ▣: free, and it PAYS 1 alloy per 3 units of waste.\n\n")
-    (princ "  At 100% a worker breaches: the tile turns ▒, contamination\n")
-    (princ "  rises, neighbors fall sick.  ▒ spreads to adjacent floor.\n")
-    (princ (format "  Decon with c.  At %d the sector is condemned.\n\n"
+    (princ "  Workers mine for alloy.  Their bladders fill.  At 60% they\n")
+    (princ "  walk to a toilet and seat themselves — entering the toilet\n")
+    (princ "  tile IS sitting down.  A toilet works only when piped to a\n")
+    (princ "  tank with headroom.  Each use sends 10 units down the line.\n\n")
+    (princ "  A full tank backs up every toilet it feeds (red toilet).\n")
+    (princ "  Purge with x on the tank: free, and it PAYS 1 alloy per 3\n")
+    (princ "  units of waste.\n\n")
+    (princ "  At 100% a worker breaches: the tile turns contaminated,\n")
+    (princ "  contamination rises, neighbors fall sick.  It spreads to\n")
+    (princ (format "  adjacent floor.  At %d the sector is condemned.\n\n"
                    cistern-contam-limit))
     (princ (format "  Every %d ticks a migrant arrives.  Population means load.\n\n"
                    cistern-migrant-every))
     ;; R2-Q10: the strip's GOALS segment, explained
     (princ "  GOALS n/m tracks the active goal card; complete it for\n")
     (princ "  score and trophies.\n\n")
-    (princ "CONTROLS\n")
+    ;; V4-08 (S4.4 §2): GENERATED — one source, the tile table
+    (princ (cistern-view--legend-line))
+    (princ "\n")
+    (princ "CONTROLS — THE BASICS\n")
     (princ "  SPC / RET   advance one tick\n")
     (princ "  arrows / mouse   move cursor\n")
     (princ (format "  t   build toilet (%d)     p   lay pipe (%d)\n"
@@ -563,7 +572,19 @@ to the line's source cell, q closes.")
     (princ "  C-u r slow auto-run (1 tps)\n")
     (princ "  r   auto-run (5 ticks/s)\n")
     (princ "  T   skip tutorial         n   new game\n")
-    (princ "  ?   this briefing         q   quit\n")))
+    (princ "  ?   this briefing         q   quit\n\n")
+    ;; V4-08 (S4.4 §4): the emacs power layer — pairings, not a new
+    ;; language (briefing prose, not table copy)
+    (princ "CONTROLS — THE POWER LAYER\n")
+    (princ "  You already know these.  Every one already worked in emacs;\n")
+    (princ "  here they run the sector.\n")
+    (princ "  C-n/C-p/C-f/C-b move     C-a/C-e row home/end\n")
+    (princ "  M-< / M-> map corners    M-f/M-b next/prev structure\n")
+    (princ "  C-g cancel armed verb    C-s jump to nearest wired toilet\n")
+    (princ "  . repeat last build      (emacs C-x z repeats, too)\n\n")
+    (princ "  THE LOG BROWSER (L)\n")
+    (princ "  n/p walk / C-s search / RET jump to source / g refresh / q close\n")
+    (princ "  (describe-mode documents the full keymap: C-h m)\n")))
 
 (provide 'cistern)
 ;;; cistern.el ends here
