@@ -48,7 +48,10 @@
     cistern-test-4b-m7-severity
     cistern-test-4b-m8-milestones
     cistern-test-rewards-consumption
-    cistern-test-4b-m9-ceremony))
+    cistern-test-4b-m9-ceremony
+  ;; smoke L-034 regressions (live-driver defects)
+    cistern-test-smoke-run-line
+    cistern-test-smoke-help-briefing))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
