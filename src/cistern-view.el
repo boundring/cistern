@@ -170,14 +170,35 @@ variants only — base glyphs never leave the table."
 ;; Render composition: every piece is a pure function of ST.
 
 (defun cistern-view--header-line (st)
-  (format "CISTERN — SECTOR-7 — v%s  TICK %d   ALLOY %d   POP %d/%d   CONTAM %d/%d   SEED %d%s\n"
-          cistern-version (cistern-st-tick st)
-          (cistern-st-alloy st)
-          (length (cistern-st-creators st)) cistern-pop-cap
-          (cistern-st-contam st) cistern-contam-limit
-          (cistern-st-rng st)
-          (if (cistern-st-over st) (concat "   !! " (cistern-st-over st))
-            "")))
+  "Q01 strip contract: fixed segment order TICK ALLOY POP
+CONTAM SCORE GOALS REP.  SEED and the version moved to the ?
+briefing (width budget at 95 cols); one dim badge slot (Q19
+armed, Q29 auto-run) is reserved after REP."
+  (let ((gc (cistern-view--goal-counts st)))
+    (format "CISTERN — SECTOR-7  TICK %d  ALLOY %d  POP %d/%d  CONTAM %d/%d  SCORE %d  GOALS %s  REP %d%s"
+            (cistern-st-tick st)
+            (cistern-st-alloy st)
+            (length (cistern-st-creators st)) cistern-pop-cap
+            (cistern-st-contam st) cistern-contam-limit
+            (or (cistern-st-score st) 0)
+            (if gc (format "%d/%d" (car gc) (cdr gc)) "-/-")
+            (cistern-st-reputation st)
+            (if (cistern-st-over st) (concat "   !! " (cistern-st-over st))
+              ""))))
+
+(defun cistern-view--goal-counts (st)
+  "Active-card progress (Q04): (MET . TOTAL) from the card's
+objectives; nil without a card."
+  (let ((card (cistern-st-goal-card st)))
+    (when card
+      (cons (cl-count-if (lambda (g) (plist-get g :satisfied))
+                         (plist-get card :goals))
+            (length (plist-get card :goals))))))
+
+(defun cistern-view--header-badges (st)
+  "Reserved dim strip segment after REP (Q01): filled by Q19
+\(armed verb) and Q29 (auto-run).  Empty until then."
+  "")
 
 (defun cistern-view--help-line ()
   (format "[arrows/mouse] cursor  [t]oilet %d  [p]ipe %d  [K]tank %d  [d]emolish %d  [c]decon %d  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit\n"
@@ -308,6 +329,8 @@ lines precede the map rows."
          (banner (cdr celebration)))
     (concat
      (propertize (cistern-view--header-line st) 'face 'cistern-header)
+     (propertize (cistern-view--header-badges st) 'face 'cistern-dim)
+     "\n"
      (propertize (cistern-view--help-line) 'face 'cistern-dim)
      (propertize (cistern-view--legend-line) 'face 'cistern-dim)
      (cistern-view--map-rows st overlay)

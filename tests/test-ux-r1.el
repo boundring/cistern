@@ -34,7 +34,7 @@
   "Seat creator 0 on the starter toilet (3,3) from a guaranteed
 free floor neighbor and drive one full relief through `cistern--do-tick'.
 Returns the seat spot (X . Y)."
-  (let ((w (car (cistern-st-creators st)))
+  (let* ((w (car (cistern-st-creators st)))
         (spot (cl-loop for n in (cistern--neighbors st 3 3)
                        when (and (eq (cistern--cell st (car n) (cdr n)) 'floor)
                                  (not (gethash n (cistern--occupied-cells st w))))
@@ -70,7 +70,7 @@ reserved (Q19 armed, Q29 auto-run); SEED lives in the ? briefing."
                t "SEED left the strip — it lives in the ? briefing now")
     (cl-assert (<= (length header) 95)
                t "strip truncated at width 95 (len %d)" (length header))
-    (cl-assert (null (cistern-view--header-badges st))
+    (cl-assert (equal (cistern-view--header-badges st) "")
                t "badge slot reserved and empty")
     (cistern-help)
     (let ((text (with-current-buffer "*cistern help*" (buffer-string))))

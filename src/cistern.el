@@ -174,7 +174,9 @@ and the chain callback live in the input adapter; the handle is
 (defun cistern-help ()
   (interactive)
   (with-output-to-temp-buffer "*cistern help*"
-    (princ (format "CISTERN v%s — sanitation protocol for Sector 7\n\n" cistern-version))
+    (princ (format "CISTERN v%s — sanitation protocol for Sector 7 — map seed %d\n\n"
+                   cistern-version
+                   (if cistern--st (cistern-st-seed cistern--st) 0)))
     (princ "THE CONCEPT\n")
     (princ "  Route need to capacity.  Convert waste to income.\n")
     (princ "  Contamination is the clock.\n\n")
