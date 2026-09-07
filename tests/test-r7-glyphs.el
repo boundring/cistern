@@ -80,27 +80,30 @@ the render is a pure, propertized projection of state."
                    'cistern-tank-full)
                t "near-capacity tank face"))
 
-  ;; --- L-012 finding #1: worker identity glyphs live in the view;
-  ;; the domain log carries the worker index, not a glyph
-  (cl-assert (not (boundp 'cistern--worker-glyphs))
-             t "domain no longer owns the glyph table")
-  (cl-assert (not (fboundp 'cistern--worker-glyph))
-             t "domain glyph lookup removed")
-  (cl-assert (fboundp 'cistern-view--worker-glyph)
-             t "view owns worker identity rendering")
+  ;; --- Q14 (supersedes L-012 finding #1): ONE identity helper in
+  ;; the domain, read by the accident log, the map and the inspector;
+  ;; the view's private table is retired
+  (cl-assert (boundp 'cistern--worker-glyphs)
+             t "domain hosts the shared glyph table (Q14)")
+  (cl-assert (fboundp 'cistern--worker-glyph)
+             t "domain glyph lookup is the one helper (Q14)")
+  (cl-assert (not (boundp 'cistern-view--worker-glyphs))
+             t "view's private glyph table retired (Q14)")
   (with-temp-buffer
     (insert-file-contents
-     (expand-file-name "src/cistern-domain.el" cistern-test-r7--root))
-    (cl-assert (not (string-match-p "worker-glyph" (buffer-string)))
-               t "domain source carries no worker-glyph references"))
+     (expand-file-name "src/cistern-view.el" cistern-test-r7--root))
+    (cl-assert (not (string-match-p "cistern-view--worker-glyph"
+                                    (buffer-string)))
+               t "view carries no PRIVATE worker-glyph definitions (Q14)"))
   (let* ((st (cistern--new-game 42))
          (w (car (cistern-st-creators st))))
     (cistern--accident st w)
     (let ((line (caar (cistern-st-log st))))
-      (cl-assert (string-match-p "CREATOR #0 OVERFLOWED" line)
-                 t "domain log carries the worker index")
-      (cl-assert (not (string-match-p "α" line))
-                 t "domain log carries no glyph")))
+      ;; Q14: the log names the identity glyph the map renders
+      (cl-assert (string-match-p
+                  (format "CREATOR %s OVERFLOWED" (cistern--worker-glyph st w))
+                  line)
+                 t "domain log names the worker's glyph")))
   ;; the view renders identity from the stable per-worker position
   (let* ((st (cistern--new-game 42))
          (w (car (cistern-st-creators st)))

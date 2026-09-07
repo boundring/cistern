@@ -49,9 +49,10 @@ and the render MUST agree on this count (L-014).")
   "Tutorial line.")
 
 ;; ---------------------------------------------------------------------------
-;; View-local tables: enum→face, kind→legend/inspector text, worker
-;; identity glyphs (L-012 finding 1 resolution: presentation concern,
-;; moved here from the domain).
+;; View-local tables: enum→face, kind→legend/inspector text.  Worker
+;; identity glyphs moved BACK to the domain (Q14): one helper, shared
+;; by the accident log, the map and the inspector — superseding the
+;; L-012 view-only placement.
 
 (defconst cistern-view--kind-faces
   '((wall . cistern-wall) (floor . cistern-floor) (door . cistern-door)
@@ -72,15 +73,8 @@ and the render MUST agree on this count (L-014).")
     (hazard . "CONTAMINATION — press c to decon")
     (pipe . "PIPE — the only wire; keep it short")))
 
-(defconst cistern-view--worker-glyphs ["α" "β" "γ" "δ" "ε" "ζ" "η" "θ"]
-  "Worker identity glyphs indexed by the worker's stable position
-in the creators list.")
-
-(defun cistern-view--worker-glyph (st w)
-  "Identity glyph for worker W from its stable creators-list index."
-  (let ((i (or (cl-position w (cistern-st-creators st) :test #'eq) 0)))
-    (aref cistern-view--worker-glyphs
-          (mod i (length cistern-view--worker-glyphs)))))
+;; Q14 removed the private copy: identity lives in the domain —
+;; `cistern--worker-glyph' is the one helper.
 
 (defconst cistern-view--palette-faces
   '((success . cistern-toilet) (warning . cistern-tank-high)
@@ -221,7 +215,7 @@ can never be listed twice."
                (format "%s %s" glyph
                        (if dead (concat "dead " name) name))))
            cistern--tile-table "  ")
-          "  " (aref cistern-view--worker-glyphs 0) " worker\n"))
+          "  " (aref cistern--worker-glyphs 0) " worker\n"))
 
 (defun cistern-view--inspector (st)
   "One sentence describing whatever the cursor rests on."
@@ -249,7 +243,7 @@ can never be listed twice."
          (who
           (when w
             (format "%s — bladder %d%% — %s"
-                    (cistern-view--worker-glyph st w)
+                    (cistern--worker-glyph st w)
                     (cistern--worker-bladder w)
                     (cond ((cistern--worker-using w)
                            (format "in toilet (%d ticks left)"
@@ -299,7 +293,7 @@ Q11 from the domain table."
                (ov (and (not cur) (not w)
                         (cdr (assoc (cons x y) overlay))))
                (cg (cistern-view--cell-glyph st x y))
-               (glyph (cond (w (cistern-view--worker-glyph st w))
+               (glyph (cond (w (cistern--worker-glyph st w))
                             (ov (car ov))
                             (t (car cg))))
                (base-face (cond (w (if (> (cistern--worker-sick w) 0)

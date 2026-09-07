@@ -131,6 +131,22 @@ the log is UNCAPPED — tail clipping is the view's concern."
 error = major — the view maps the enum through its palette."
   (push (cons (apply #'format fmt args) sev) (cistern-st-log st)))
 
+;; Q14: the ONE worker-identity table + helper, hosted in the
+;; domain (innermost layer) so the accident log, the map and the
+;; inspector all read the same source — superseding L-012's
+;; view-only placement, per the TOP-30 binding directive.
+(defconst cistern--worker-glyphs ["α" "β" "γ" "δ" "ε" "ζ" "η" "θ"]
+  "Worker identity glyphs indexed by the worker's stable position
+in the creators list.")
+
+(defun cistern--worker-glyph (st w)
+  "Identity glyph for worker W from its stable creators-list
+index.  The map, the inspector and the accident log all name the
+worker by this glyph (Q14: no format drift, no off-by-one)."
+  (let ((i (or (cl-position w (cistern-st-creators st) :test #'eq) 0)))
+    (aref cistern--worker-glyphs
+          (mod i (length cistern--worker-glyphs)))))
+
 ;; ---------------------------------------------------------------------------
 ;; 3. Grid primitives.  Ported verbatim from cistern.el:104-119.
 
@@ -546,10 +562,10 @@ base can never be destroyed by unserved need."
                    (= (cistern--worker-x o) (car n))
                    (= (cistern--worker-y o) (cdr n)))
           (setf (cistern--worker-sick o) cistern-sick-ticks))))
-    ;; the domain log carries the worker's stable list index; the
-    ;; identity glyph is a view concern (L-012 finding 1 resolution)
-    (let* ((idx (or (cl-position w (cistern-st-creators st) :test #'eq) 0))
-           (line (format "BREACH — CREATOR #%d OVERFLOWED AT (%d,%d)" idx x y)))
+    ;; Q14: the log names the worker's identity glyph — the same one
+    ;; the map renders at this cell (one helper, one source)
+    (let ((line (format "BREACH — CREATOR %s OVERFLOWED AT (%d,%d)"
+                        (cistern--worker-glyph st w) x y)))
       (cistern--log-sev st 'error "%s" line)
       ;; breach (M4): payload carries the logged line for the M7
       ;; faced log intent
