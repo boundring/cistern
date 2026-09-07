@@ -113,7 +113,8 @@
     cistern-test-v4-05-manifold-flood-loop
     cistern-test-v4-06-kind-faces
     cistern-test-v4-07-keybinds-coach
-    cistern-test-v4-08-briefing))
+    cistern-test-v4-08-briefing
+    cistern-test-v4-09-qol))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

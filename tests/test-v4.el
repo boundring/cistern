@@ -679,5 +679,74 @@ list), and no line exceeds 95 cols."
                  t "help glyphs omit %s" (car entry))))
   (message "CISTERN-V4-08-OK"))
 
+(defun cistern-test-v4-09-qol ()
+  "V4-09 (A5.1–A5.3): `.' repeats the last successful arm and
+refuses when nothing armed or after ESC; the death panel carries
+the L — FULL HISTORY line and the log survives condemnation; the
+migrant countdown logs exactly once at T−3."
+  ;; A5.1: repeat arms the last verb at the current cursor
+  (let ((st (cistern--new-game 42)))
+    (setq cistern--st st cistern--last-armed nil
+          cistern--teach-seen nil cistern--teach-fired nil)
+    (cistern--cmd-purge st 5 2)          ; fund the builds
+    (setf (cistern-st-cursor st) (cons 8 6))
+    (cistern-build-pipe)
+    (cl-assert (eq cistern--last-armed 'pipe) t "build did not record fuel")
+    (setf (cistern-st-cursor st) (cons 9 6))
+    (cistern-repeat-arm)
+    (cl-assert (eq (cistern-st-armed-verb st) 'pipe)
+               t "`.` did not re-arm pipe")
+    (cl-assert (string-match-p "ARMED: PIPE"
+                               (or (cistern-view--header-badges st) ""))
+               t "header badge missing after repeat")
+    ;; refusal via the standard path: cursor moved to a wall
+    (setf (cistern-st-cursor st) (cons 0 0))
+    (let ((alloy (cistern-st-alloy st)))
+      (cistern-repeat-arm)
+      (cl-assert (= (cistern-st-alloy st) alloy)
+                 t "illegal-cell repeat charged alloy")))
+  ;; no prior arm / after ESC: `.` is a no-op
+  (let ((st (cistern--new-game 42)))
+    (setq cistern--st st cistern--last-armed nil
+          cistern--teach-seen nil cistern--teach-fired nil)
+    (cistern-repeat-arm)
+    (cl-assert (null (cistern-st-armed-verb st))
+               t "`.` fired with no prior arm")
+    (setf (cistern-st-cursor st) (cons 8 6))
+    (cistern-build-pipe)
+    (cistern-disarm)
+    (cl-assert (null cistern--last-armed) t "ESC kept the repeat fuel")
+    (setf (cistern-st-cursor st) (cons 9 6))
+    (cistern-repeat-arm)
+    (cl-assert (null (cistern-st-armed-verb st))
+               t "`.` repeated a disarmed verb"))
+  ;; A5.2: the death panel names the full history; log survives
+  (let ((st (cistern--new-game 42)))
+    (setq cistern--st st)
+    (setf (cistern-st-contam st) cistern-contam-limit)
+    (cistern--do-tick st)
+    (cl-assert (cistern-st-over st) t "fixture did not condemn")
+    (let ((render (substring-no-properties (cistern-view--render st))))
+      (cl-assert (string-match-p "FULL HISTORY" render)
+                 t "death panel lacks the full-history line"))
+    (let ((before (length (cistern-st-log st))))
+      (cl-assert (> before 0) t "empty log at condemnation")))
+  ;; A5.3: the migrant countdown lands once at T−3
+  (let ((st (cistern--new-game 42))
+        (hits 0) (line-95 t))
+    (dotimes (_ 38)
+      (cistern--do-tick st))
+    (dolist (e (cistern-st-log st))
+      (when (string-match-p "MIGRANT IN" (car e))
+        (setq hits (1+ hits))
+        (when (> (length (car e)) 95) (setq line-95 nil))))
+    (cl-assert (= hits 1) t "countdown logged %d times" hits)
+    (cl-assert line-95 t "countdown line over 95 cols")
+    (cistern--do-tick st)
+    (dolist (e (last (cistern-st-log st) 1))
+      (cl-assert (not (string-match-p "MIGRANT IN" (car e)))
+                 t "countdown repeated at T−2")))
+  (message "CISTERN-V4-09-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here
