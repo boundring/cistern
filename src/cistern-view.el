@@ -218,28 +218,40 @@ objectives; nil without a card."
             "")))
 
 (defun cistern-view--help-line ()
-  (format (concat "[arrows/mouse] cursor  [t]oilet %d  [p]ipe %d  [K]tank %d"
-                  "  [d]emolish %d  [c]decon %d  [x]purge  [SPC]tick"
-                  "  [r]auto-run  [n]ew  [?]help  [q]uit  "
-                  (cdr (assq 'help-arm cistern--copy)) "\n")
+  "R2-Q01: the help is TWO deliberate dim rows, each within the
+95-col contract — row A cursor + act verbs, row B arm/meta."
+  (format (concat "[arrows/mouse] move [t]oilet %d [p]ipe %d [K]tank %d"
+                  " [d]emolish %d [c]decon %d [x]purge [SPC]tick\n"
+                  "[t]/[p]/[K] %s [r]auto-run [n]ew [?]help [q]uit\n")
           cistern-cost-toilet cistern-cost-pipe cistern-cost-tank
-          cistern-cost-demolish cistern-cost-decon))
+          cistern-cost-demolish cistern-cost-decon
+          (cdr (assq 'help-arm cistern--copy))))
 
 (defun cistern-view--legend-line ()
   "Q12: GENERATED from the tile table — a kind with :dead-glyph
 lists the dead glyph (its base glyph never renders), so one glyph
 can never be listed twice."
-  (concat "GLYPHS:  "
-          (mapconcat
-           (lambda (entry)
-             (let* ((kind (car entry))
-                    (dead (plist-get (cdr entry) :dead-glyph))
-                    (glyph (or dead (cistern--tile-glyph kind)))
-                    (name (cdr (assq kind cistern-view--kind-names))))
-               (format "%s %s" glyph
-                       (if dead (concat "dead " name) name))))
-           cistern--tile-table "  ")
-          "  " (aref cistern--worker-glyphs 0) " worker\n"))
+  ;; R2-Q01: wrapped on a GLYPHS:-aligned continuation row — α worker
+  ;; never orphans onto a wrapped display line at 95 cols.  The legend
+  ;; renders below the map (the pre-map block is pinned at the
+  ;; header-lines constant; see R2-Q02's block-height derivation).
+  (let* ((entries (mapconcat
+                   (lambda (entry)
+                     (let* ((kind (car entry))
+                            (dead (plist-get (cdr entry) :dead-glyph))
+                            (glyph (or dead (cistern--tile-glyph kind)))
+                            (name (cdr (assq kind cistern-view--kind-names))))
+                       (format "%s %s" glyph
+                               (if dead (concat "dead " name) name))))
+                   cistern--tile-table "  "))
+         ;; wrap before the last two entries: row 1 fits 85 cols,
+         ;; the continuation is GLYPHS:-aligned and carries the worker
+         (split-at (string-match-p "  ▣" entries)))
+    (concat "GLYPHS:  "
+            (substring entries 0 split-at) "\n"
+            (make-string 9 ?\s)
+            (substring entries (+ split-at 2))
+            "  " (aref cistern--worker-glyphs 0) " worker\n")))
 
 (defun cistern-view--inspector (st)
   "One sentence describing whatever the cursor rests on."
@@ -468,11 +480,12 @@ lines precede the map rows."
                                    (plist-get (cistern-st-summary st) :score))))))
     (concat
      ;; Q21: the header line arrives already-faced (CONTAM segment)
-     (cistern-view--header-line st)
+     (propertize (cistern-view--header-line st) 'face 'cistern-header)
      (propertize (cistern-view--header-badges st) 'face 'cistern-dim)
      "\n"
+     ;; R2-Q01: the help is two dim rows; the wrapped legend renders
+     ;; below the map — the pre-map block stays header-lines tall
      (propertize (cistern-view--help-line) 'face 'cistern-dim)
-     (propertize (cistern-view--legend-line) 'face 'cistern-dim)
      (cistern-view--map-rows st overlay)
      (propertize (concat banner "\n") 'face 'cistern-header)
      (propertize (concat (cistern-view--inspector st) "\n")
@@ -484,7 +497,11 @@ lines precede the map rows."
      (propertize (concat (cistern-view--pressure-line st) "\n")
                  'face (cistern-view--pressure-face st))
      (cistern-view--tutorial-line st)
-     (cistern-view--log-tail st))))
+     (cistern-view--log-tail st)
+     ;; R2-Q01: the wrapped legend renders at the frame foot — the
+     ;; banner→inspector adjacency and the header-lines-tall pre-map
+     ;; block both stay pinned
+     (propertize (cistern-view--legend-line) 'face 'cistern-dim))))
 
 ;; ---------------------------------------------------------------------------
 ;; Buffer geometry (Pair 2 slice; shares the header-lines constant).

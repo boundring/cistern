@@ -40,7 +40,7 @@ orphaned)."
     ;; the help reflowed into two rows, all keys visible
     (cl-assert (string-match-p "\\[SPC\\]tick" help-a)
                t "row A shows [SPC]tick")
-    (cl-assert (string-match-p "cursor" help-a) t "row A is the cursor row")
+    (cl-assert (string-match-p "move" help-a) t "row A is the cursor row")
     (cl-assert (string-match-p "arm — click to place" help-b)
                t "row B carries the Q19 arm phrase")
     (cl-assert (string-match-p "\\[r\\]auto-run" help-b) t "row B shows auto-run")
@@ -51,8 +51,8 @@ orphaned)."
                t "dead pipe listed")
     (cl-assert (string-match-p "α worker" (nth (1+ legend-idx) lines))
                t "α worker on the continuation row, not orphaned")
-    (cl-assert (string-match-p "Ω toilet" (nth (1+ legend-idx) lines))
-               t "toilet listed on the continuation")
+    (cl-assert (string-match-p "▣ tank" (nth (1+ legend-idx) lines))
+               t "tank listed on the continuation")
     ;; THE contract: every render row fits 95 cols
     (dolist (row lines)
       (cl-assert (<= (length row) 95)
