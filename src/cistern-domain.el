@@ -97,7 +97,11 @@ by the view, not here).")
   (particles nil)            ; the particle field (§4): newest-first plist list, K=64 FIFO cap
   (relieves 0)               ; cumulative relieves counter (M8 ladder; approval L-031)
   (trophies nil)             ; completed map seeds, committed at trigger time (M9; §5 ledger 2)
-  (summary nil))             ; Q22: run-summary snapshot, banked at condemnation
+  (summary nil)              ; Q22: run-summary snapshot, banked at condemnation
+  (auto-run nil)             ; Q29: badge mirror — the timer HANDLE never
+                             ; enters state (D2); this is its on/off echo
+  (built-at nil))            ; Q30: hash (X . Y) -> tick-of-build, for the
+                             ; same-tick regret window
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -754,6 +758,7 @@ game layer (Phase 2)."
         (setf (cistern-st-creators st) (append (cistern-st-creators st)
                                                (list w)))))
     (setf (cistern-st-migrants st) 0)
+    (setf (cistern-st-built-at st) (make-hash-table :test #'equal))
     ;; Q03 (REWARDS-DESIGN §1): the starter card is dealt from tick
     ;; one — serve 3, ceiling 5 — so the whole goal loop is live
     ;; without test injection.  One call, via the existing setter.
@@ -795,6 +800,7 @@ game layer (Phase 2)."
     (refusal-no-floor . "NO FLOOR THERE — AIM FOR OPEN FLOOR")
     (refusal-alloy . "NEED %d ALLOY — PURGE (x) PAYS")
     (badge-armed . "  ARMED: %s — CLICK PLACES, ESC CANCELS")
+    (badge-auto . "  AUTO-RUN")
     (help-arm . "t/p/K arm — click to place")
     (bearing-floor . "FLOOR — %s")
     (death-panel . "%s / TICKS %d · RELIEVES %d · SCORE %d / PRESS n TO RESTART")

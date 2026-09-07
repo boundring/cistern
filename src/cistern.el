@@ -179,13 +179,14 @@ no arm-then-fail noise."
                       (cdr (cistern-st-cursor cistern--st)))
   (cistern--refresh))
 
-(defun cistern-auto-run-toggle ()
+(defun cistern-auto-run-toggle (&optional slow)
   "Toggle the 5 ticks/second auto-run timer ('r').  Scheduling
 and the chain callback live in the input adapter; the handle is
-`cistern--auto-run-timer' (Pinned D2)."
-  (interactive)
+`cistern--auto-run-timer' (Pinned D2).  Q29: a prefix arg runs
+slow mode — 1 tick/second."
+  (interactive "P")
   (setq cistern-input--refresh #'cistern--refresh)
-  (cistern-input-auto-run-toggle cistern--st))
+  (cistern-input-auto-run-toggle cistern--st slow))
 
 (defun cistern-log ()
   "Q16: the full uncapped log, oldest first, in a read-only

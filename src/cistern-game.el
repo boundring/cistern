@@ -41,6 +41,7 @@ cistern.el:498-525, rendered calls stripped."
      (t
       (setf (cistern-st-alloy st) (- (cistern-st-alloy st) cost))
       (cistern--set-cell st x y kind)
+      (puthash (cons x y) (cistern-st-tick st) (cistern-st-built-at st))
       (pcase kind
         ('toilet
          (puthash (cons x y) (list :busy nil) (cistern-st-toilets st))
@@ -76,15 +77,24 @@ phantom-plumbing invariant, load-bearing)."
       (cistern--log st "INSUFFICIENT ALLOY — %d REQUIRED"
                     cistern-cost-demolish))
      (t
-      (let ((refund (/ (pcase kind
-                         ('toilet cistern-cost-toilet)
-                         ('pipe cistern-cost-pipe)
-                         ('tank cistern-cost-tank))
-                       2))) ; 50% of build cost, floor (M1; rounding pinned L-024)
+      (let* ((build-cost (pcase kind
+                           ('toilet cistern-cost-toilet)
+                           ('pipe cistern-cost-pipe)
+                           ('tank cistern-cost-tank)))
+             ;; Q30: the free regret window — demolishing in the same
+             ;; tick the piece was placed refunds EVERYTHING (the fee
+             ;; and the full build cost: the cycle costs nothing).
+             ;; After a tick the M1 50% split returns (L-024 rounding).
+             (regret (let ((bt (gethash (cons x y) (cistern-st-built-at st))))
+                       (and bt (= bt (cistern-st-tick st)))))
+             (refund (if regret
+                         (+ cistern-cost-demolish build-cost)
+                       (/ build-cost 2))))
         (setf (cistern-st-alloy st)
               (+ (- (cistern-st-alloy st) cistern-cost-demolish) refund))
         (remhash (cons x y) (cistern-st-toilets st))
         (remhash (cons x y) (cistern-st-tanks st))
+        (remhash (cons x y) (cistern-st-built-at st))
         (cistern--set-cell st x y 'floor)
         (push (list 'demolish x y) (cistern-st-rewards-events st))
         (cistern--log st "DEMOLISHED %s AT (%d,%d) — %d ALLOY — %d REFUND"

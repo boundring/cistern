@@ -801,7 +801,7 @@ old refund rules return.  The Q07 purge ledger is untouched."
       (cistern--cmd-demolish st (car spot) (cadr spot))
       (cl-assert (= (cistern-st-alloy st)
                     (- (+ a0 (/ cistern-cost-pipe 2))
-                       cistern-cost-demolish))
+                       cistern-cost-pipe cistern-cost-demolish))
                  t "after a tick the old refund rules return")))
   ;; tick 1: the cheap start always affords the undo
   (let ((st (cistern--new-game 42)))

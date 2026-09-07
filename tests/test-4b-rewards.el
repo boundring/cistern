@@ -105,6 +105,8 @@ neutral enum pending the L-024 ruling.")
            (st (cistern--new-game 42)))
       (cistern--cmd-build st kind x y)
       (cl-assert (eq (cistern--cell st x y) kind) "fixture placed")
+      (cistern--do-tick st)                 ; Q30: past the regret window —
+      ;; the M1 50% refund rules are the ticked behavior
       (let ((alloy0 (cistern-st-alloy st)))
         (cistern--cmd-demolish st x y)
         (cl-assert (eq (cistern--cell st x y) 'floor) "tile empty")

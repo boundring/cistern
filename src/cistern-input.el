@@ -47,19 +47,27 @@ callback after each tick so the timer's per-fire path repaints
 (L-015 change item b).  Driver→adapter registration keeps the
 dependency inward; nil until the driver's toggle command runs.")
 
-(defun cistern-input-auto-run-toggle (st)
-  "Toggle auto-run (5 ticks/second) for ST — the testable adapter
-unit; the driver's `cistern-auto-run-toggle' command calls this.
-On: schedule the first 0.2s chain link.  Off: cancel the live
-link.  ST is taken for adapter-signature uniformity (D1: only the
-callback reads the global); the handle is
-`cistern--auto-run-timer'."
+(defvar cistern-input--auto-run-interval 0.2
+  "Seconds between auto-run chain links (Q29 pacing): 0.2 = 5
+ticks/second; 1.0 = the prefix-arg slow mode, 1 tick/second.
+Plumbing, never game state (D2).")
+
+(defun cistern-input-auto-run-toggle (st &optional slow)
+  "Toggle auto-run for ST — the testable adapter unit; the
+driver's `cistern-auto-run-toggle' command calls this.  On:
+schedule the first chain link at the pacing interval (0.2s, or
+1.0s when SLOW — Q29 prefix-arg slow mode, 1 tick/second).  Off:
+cancel the live link.  The handle stays out of state (D2); the
+on/off FLAG mirrors into ST for the Q01 badge slot."
   (if cistern--auto-run-timer
       (progn (cancel-timer cistern--auto-run-timer)
-             (setq cistern--auto-run-timer nil))
-    (setq cistern--auto-run-timer
-          (run-with-idle-timer 0.2 nil
-                               #'cistern-input--auto-run-callback))))
+             (setq cistern--auto-run-timer nil)
+             (setf (cistern-st-auto-run st) nil))
+    (setq cistern-input--auto-run-interval (if slow 1.0 0.2)
+          cistern--auto-run-timer
+          (run-with-idle-timer cistern-input--auto-run-interval nil
+                               #'cistern-input--auto-run-callback))
+    (setf (cistern-st-auto-run st) t)))
 
 (defun cistern-input--auto-run-callback ()
   "One auto-run chain link: exactly one tick via the tick use
@@ -79,7 +87,7 @@ deliberately not pre-built."
       (when cistern-input--refresh
         (funcall cistern-input--refresh))
       (setq cistern--auto-run-timer
-            (run-with-idle-timer 0.2 nil
+            (run-with-idle-timer cistern-input--auto-run-interval nil
                                  #'cistern-input--auto-run-callback)))))
 
 (provide 'cistern-input)

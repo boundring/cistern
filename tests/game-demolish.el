@@ -26,11 +26,18 @@
         (cl-assert (eq (cistern--cell st x y) 'floor) "cell back to floor")
         (cl-assert (not (gethash (cons x y) (cistern-st-tanks st)))
                    "tank hash entry gone")
-        ;; M1 (4b): demolish now refunds 50% of build cost, floor
+        ;; Q30: the place+demolish cycle happened in the SAME tick —
+        ;; the free regret window refunds everything (fee + full cost)
+        (cl-assert (= (cistern-st-alloy st) 100)
+                   "same-tick regret: the cycle costs nothing")
+        ;; after a tick, the M1 50% rules return (L-024 rounding)
+        (cistern--cmd-build st 'tank x y)
+        (cistern--do-tick st)
+        (cistern--cmd-demolish st x y)
         (cl-assert (= (cistern-st-alloy st)
-                      (- (+ a0 (/ cistern-cost-tank 2))
-                         cistern-cost-demolish))
-                   "fee charged, 50% tank refund")))
+                      (- (+ 100 (/ cistern-cost-tank 2))
+                         cistern-cost-tank cistern-cost-demolish))
+                   "after a tick: fee charged, 50% tank refund")))
 
     ;; --- B: a toilet fed through a demolished tank becomes unusable
     (let* ((run (cistern-test-game--floor-run st 3))
@@ -43,9 +50,9 @@
         (cistern--cmd-demolish st (+ x 2) y)
         (cl-assert (eq (cistern--cell st (+ x 2) y) 'floor))
         (cl-assert (not (gethash (cons (+ x 2) y) (cistern-st-tanks st))))
-        (cl-assert (= (cistern-st-alloy st)
-                      (- (+ a0 (/ cistern-cost-tank 2))
-                         cistern-cost-demolish)))
+        ;; Q30: same-tick regret — the cycle costs nothing (a0 was
+        ;; measured after the tank build, so the tank cost came back)
+        (cl-assert (= (cistern-st-alloy st) (+ a0 cistern-cost-tank)))
         (cl-assert (not (cistern--toilet-usable-p st x y))
                    "toilet fed through removed tank now unusable")
         (cl-assert (gethash (cons x y) (cistern-st-toilets st))
