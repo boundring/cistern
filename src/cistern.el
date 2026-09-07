@@ -34,8 +34,6 @@ pure render.  Every state-mutating command ends here."
   (let ((inhibit-read-only t))
     (erase-buffer)
     (insert (cistern-view--render cistern--st))
-    ;; Q17: the hint is a one-tick transient — the render consumed it
-    (cistern--cmd-consume-hint cistern--st)
     (goto-char (point-min))))
 
 (defvar cistern-mode-map
@@ -82,17 +80,20 @@ pure render.  Every state-mutating command ends here."
 
 (defun cistern-new-game ()
   (interactive)
+  (when cistern--st (cistern--cmd-consume-hint cistern--st)) ; R2-Q06
   (setq cistern--st (cistern--new-game
                      (cistern--rand cistern--st 2147483647)))
   (cistern--refresh))
 
 (defun cistern-skip-tutorial ()
   (interactive)
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
   (cistern--cmd-skip-tutorial cistern--st)
   (cistern--refresh))
 
 (defun cistern-tick ()
   (interactive)
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
   (if (cistern-st-over cistern--st)
       ;; Q23: ONE restart line, not one per post-over keypress — the
       ;; duplicate suppression is silent (log history keeps the first)
@@ -131,6 +132,10 @@ cursor move, no tick; armed = place at the cell + one tick)."
                cistern--st (line-number-at-pos (point))
                (current-column)))))
     (when xy
+      ;; R2-Q06: an ARMED click is a placement (drains the hint); an
+      ;; unarmed click is aiming (preserves it)
+      (when (cistern-st-armed-verb cistern--st)
+        (cistern--cmd-consume-hint cistern--st))
       (cistern-input-click cistern--st (car xy) (cdr xy))
       (cistern--refresh))))
 
@@ -141,6 +146,7 @@ the single arming site per L-010 pin 4) and build it at the cursor
 while arming the verb for click-to-place).  Q19: a refused
 at-cursor build posts its hint and does NOT arm — refuse cleanly,
 no arm-then-fail noise."
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
   (when (cistern--cmd-build cistern--st kind
                             (car (cistern-st-cursor cistern--st))
                             (cdr (cistern-st-cursor cistern--st)))
@@ -149,6 +155,7 @@ no arm-then-fail noise."
 
 (defun cistern-disarm ()
   (interactive)
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
   (cistern-input-disarm cistern--st)
   (cistern--refresh))
 
@@ -161,6 +168,7 @@ no arm-then-fail noise."
 
 (defun cistern-demolish ()
   (interactive)
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
   (cistern--cmd-demolish cistern--st
                          (car (cistern-st-cursor cistern--st))
                          (cdr (cistern-st-cursor cistern--st)))
@@ -168,6 +176,7 @@ no arm-then-fail noise."
 
 (defun cistern-decon ()
   (interactive)
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
   (cistern--cmd-decon cistern--st
                       (car (cistern-st-cursor cistern--st))
                       (cdr (cistern-st-cursor cistern--st)))
@@ -175,6 +184,7 @@ no arm-then-fail noise."
 
 (defun cistern-purge ()
   (interactive)
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
   (cistern--cmd-purge cistern--st
                       (car (cistern-st-cursor cistern--st))
                       (cdr (cistern-st-cursor cistern--st)))
@@ -186,6 +196,7 @@ and the chain callback live in the input adapter; the handle is
 `cistern--auto-run-timer' (Pinned D2).  Q29: a prefix arg runs
 slow mode — 1 tick/second."
   (interactive "P")
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
   (setq cistern-input--refresh #'cistern--refresh)
   (cistern-input-auto-run-toggle cistern--st slow))
 

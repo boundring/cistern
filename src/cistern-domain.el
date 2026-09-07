@@ -691,6 +691,8 @@ permanent scarring: stop bleeding and the marks fade."
              (>= (cistern-st-contam st) cistern-contam-limit))
     (setf (cistern-st-over st) "SECTOR CONDEMNED — CONTAMINATION LIMIT")
     (cistern--log-sev st 'error "%s" (cistern-st-over st))
+    ;; R2-Q06: condemnation clears any posted hint
+    (setf (cistern-st-hint st) nil)
     ;; Q22: bank the run summary AT TRIGGER TIME — commit-first, the
     ;; death panel (Q23) only ever reads it
     (setf (cistern-st-summary st)

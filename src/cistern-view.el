@@ -509,9 +509,12 @@ lines precede the map rows."
      (propertize (concat (cistern-view--inspector st) "\n")
                  'face 'cistern-dim)
      ;; Q17: the one-tick transient hint slot, under the inspector —
-     ;; empty string when no hint is posted (no permanent layout shift)
-     (let ((h (cistern-st-hint st)))
-       (if h (propertize (concat h "\n") 'face 'cistern-dim) ""))
+     ;; R2-Q06: the row is RESERVED (dim blank when idle) so the
+     ;; pressure line never shifts; lifetime is intent-tied — cursor
+     ;; moves and renders preserve the hint, non-cursor commands
+     ;; drain it (see the driver commands)
+     (propertize (concat (or (cistern-st-hint st) "") "\n")
+                 'face 'cistern-dim)
      (propertize (concat (cistern-view--pressure-line st) "\n")
                  'face (cistern-view--pressure-face st))
      (cistern-view--tutorial-line st)
