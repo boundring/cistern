@@ -62,7 +62,8 @@
     cistern-test-ux-q07-purge-economy
     cistern-test-ux-q08-pressure-gradient
     cistern-test-ux-q11-copy-table
-    cistern-test-ux-q09-domain-split))
+    cistern-test-ux-q09-domain-split
+    cistern-test-ux-q10-severed-rewire))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

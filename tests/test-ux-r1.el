@@ -292,5 +292,32 @@ gone."
     (cl-assert (null (cistern--toilets-severed-p st))
                t "backed-up is not severed")))
 
+;; --- Q10: pressure re-branch + offender coords --------------------------------
+
+(defun cistern-test-ux-q10-severed-rewire ()
+  "ANTAG-05: with the starter line severed the pressure line
+advises REWIRE — never purge — and names the tank cell to wire
+to; the inspector agrees (LAY PIPE)."
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-demolish st 4 2)            ; sever the starter line
+    (let* ((line (cistern-view--pressure-line st))
+           (inspector (cistern-test-ux--plain (cistern-view--inspector st))))
+      (cl-assert (string-match-p "LINES SEVERED — REWIRE (p)" line)
+                 t "severed branch advises rewiring")
+      (cl-assert (null (string-match-p "PURGE" line))
+                 t "severed never advises purge")
+      (cl-assert (string-match-p "TANK AT (5,2)" line)
+                 t "the line names the offending tank cell")
+      (cl-assert (string-match-p "SEVERED" inspector)
+                 t "inspector reads severed")
+      (cl-assert (string-match-p "LAY PIPE" inspector)
+                 t "inspector advises laying pipe — the two agree"))
+    ;; backed-up keeps the purge advice, byte-identical
+    (let ((st2 (cistern--new-game 42)))
+      (puthash (cons 5 2) (list :load 60) (cistern-st-tanks st2))
+      (cl-assert (string= (cistern-view--pressure-line st2)
+                          "PRESSURE CRITICAL — TOILETS BACKED UP / PURGE THE TANKS")
+                 t "backed-up keeps its purge advice verbatim"))))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
