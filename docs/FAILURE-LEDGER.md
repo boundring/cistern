@@ -2204,3 +2204,139 @@ One entry per dead/failed/retried run.
   to refresh the docs' before/after evidence.
 
 ---
+
+## L-060 (2026-09-07, run: impl-ux-r2-1 — R2-Q01 width contract for all permanent rows)
+
+- Attempt: Red test `tests/test-ux-r2.el :: cistern-test-ux2-q01-
+  width-contract` (red commit; red run: "row B carries the Q19 arm
+  phrase", 1/65). Green `7d13c14`.
+- Help reflowed into TWO deliberate dim rows (single-space
+  separators; row A cursor/act verbs ending [SPC]tick at 94 cols,
+  row B arm/meta via the help-arm table key).  The 168-col help and
+  the 103-col legend both wrapped in 95-col frames — the N1/N8
+  class.  The legend wraps on a GLYPHS:-aligned continuation row
+  (row 1 through Ω toilet at 85; continuation = 9-space indent with
+  ▣ tank + α worker — never orphaned).
+- LAYOUT READING (least-active, ledgered): the two-row help and the
+  two-row legend cannot both stay pre-map with the acceptance's
+  "cold header block = 3 rows".  Resolution: the legend renders at
+  the FRAME FOOT (after the log tail) — the banner→inspector
+  adjacency (r5's pinned contract) and the header-lines-tall
+  pre-map block both stay pinned.  The legend's width contract is
+  unchanged; its position is the unpinned variable.
+- Trim: row A's "cursor" became "move" to fit 94 (the noun lives in
+  the strip and briefing).
+- Outcome: GREEN. Canonical suite: ALL 65 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q02 badge budget + the geometry
+  re-derivation (the round's one geometric change).
+
+## L-061 (2026-09-07, run: impl-ux-r2-1 — R2-Q02 badge budget + header-append contract)
+
+- Attempt: Red test `cistern-test-ux2-q02-badge-geometry` (red
+  commit; red run: void-function header-block-height, 1/66). Green
+  `d5793a5`.
+- The badges moved OFF the strip onto ONE reserved dim row directly
+  below it (armed and auto-run coexist: `ARMED: PIPE · AUTO-RUN`,
+  no row when idle).  THE constant: `cistern-view--header-block-
+  height` (cold 3 = strip + two help rows; badge live 4) is
+  derived from `cistern-view--header-lines` and consumed by BOTH
+  the renderer and `cistern-view--cell-at` — never two numbers.
+  The condemn append shortened to `!! CONDEMNED` (table key); the
+  long cause lives on the Q23 death panel only.
+- Geometry probe GREEN: with the badge row live, cell-at of the
+  map's first cell is unchanged (line 5 cold/4+1) — every r1-click/
+  r5-hook render-geometry test stayed green.
+- Contract updates: q19/q29 badge asserts now read the badge row
+  (the strip teaches nothing); q01's idle-slot assert reads nil.
+- Outcome: GREEN. Canonical suite: ALL 66 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q03 copy sweep (legalizes Q07/Q09/
+  Q10/Q12 copy).
+
+## L-062 (2026-09-07, run: impl-ux-r2-1 — R2-Q03 one copy table, one verb)
+
+- Attempt: Red test `cistern-test-ux2-q03-copy-sweep` (red commit;
+  red run: "every PRESS n occurrence says RESTART", 1/67). Green
+  `0726be5`.
+- RESTART unified: the driver's post-over log line now reads
+  `SECTOR CONDEMNED — PRESS n TO RESTART` (restart-log key) — and
+  the sweep found one MORE straggler the directive didn't name: the
+  condemned PRESSURE LINE hard-coded the same NEW-GAME-era wording
+  in cistern-view.el — routed through restart-log too, so panel,
+  pressure line and log all say RESTART (q11's drift test flushed
+  it out).  TUTORIAL strings (complete/step/skipped/line-fmt) routed
+  through the table; the line-fmt dropped its trailing \n into the
+  call site (format strings don't carry layout).
+- Drift-test lesson: table strings containing escape sequences
+  (e.g. a literal \n) never match the source file's two-character
+  encoding — keep layout out of copy strings.
+- Outcome: GREEN. Canonical suite: ALL 67 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q04 claimed-only GOALS.
+
+## L-063 (2026-09-07, run: impl-ux-r2-1 — R2-Q04 GOALS never regresses)
+
+- Attempt: Red test `cistern-test-ux2-q04-goals-claimed` (red
+  commit; red run: "the claimed goal stays counted", 1/69). Green
+  `338b2d7` (with R2-Q05).
+- Claimed-only: the evaluator writes a sticky `:claimed` flag per
+  goal (once satisfied, counted forever); the ceiling goal at
+  contamination ZERO is not yet claimed (nothing achieved — the
+  fresh strip reads GOALS 0/2).  The readout counts :claimed;
+  :satisfied and the completion check are UNTOUCHED (a card can
+  still complete on check-time satisfaction — asserted).
+- Outcome: GREEN. Canonical suite: ALL 69 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q05 M1 dust into the Q25 contract.
+
+## L-064 (2026-09-07, run: impl-ux-r2-1 — R2-Q05 M1 dust obeys the particle contract)
+
+- Attempt: Red test `cistern-test-ux2-q05-dust-contract` (red
+  commit; red run: "dust present immediately after the demolish",
+  1/69 — the dust waited for the next rewards-eval). Green
+  `338b2d7`.
+- The dust spawns AT THE DEMOLISH (zero tick delay), glyphs only
+  from the M9 set (* ! §), placement over the now-plain floor; the
+  demolish event's only consumer was the dust branch — event and
+  branch deleted (clean cutover).  Draw order preserved (count,
+  then per particle: glyph, ttl, vel-x, vel-y) so the L-023/L-029
+  fixture discipline held: the m6 dust fixture was RE-PINNED
+  (glyphs only; ttl band, velocities, positions unchanged).
+- m1's child-stream assert moved with the draws (prng captured
+  before the demolish).
+- HARVEST: rewriting the M3 goal mapcar in place cost three broken
+  intermediate states (void-variable kind at load, mapcar arity,
+  unbalanced forms) — the block is load-bearing across 30+ tests;
+  full-block atomic rewrites via a script, not incremental parens.
+- Outcome: GREEN. Canonical suite: ALL 69 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q06 hint lifetime.
+
+## L-065 (2026-09-07, run: impl-ux-r2-1 — R2-Q06 hint lifetime tied to intent)
+
+- Attempt: Red test `cistern-test-ux2-q06-hint-lifetime` (red
+  commit; red run: "hint survives a cursor move", 1/71 — the
+  round-1 refresh drained on every render).  Green `6185feb`.
+- Lifetime: the refresh no longer drains; each NON-cursor driver
+  command (tick, armed click, arm-and-build, disarm, demolish,
+  decon, purge, disarm, new-game, skip-tutorial, auto-run, log)
+  consumes the hint BEFORE acting — a new refusal posts after the
+  drain and replaces the old.  Unarmed clicks and cursor moves
+  preserve it.  Condemnation clears the hint in phase-check.
+- The hint row is PERMANENTLY RESERVED (dim blank when idle) — the
+  pressure line's row index is identical with and without a live
+  hint (asserted).
+- Outcome: GREEN. Canonical suite: ALL 71 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q07 dead pipe inspector.
+
+## L-066 (2026-09-07, run: impl-ux-r2-1 — R2-Q07 dead pipe inspects as dead)
+
+- Attempt: Red test `cistern-test-ux2-q07-dead-pipe-inspector` (red
+  commit; red run: "the dead pipe names its state and fix", 1/71).
+  Green with the pipe-dead table key (R2-Q03's sweep legalized it).
+- The inspector's pipe branch splits: unconnected →
+  `PIPE — DEAD: NOT CONNECTED — REWIRE (p)`; connected → the
+  round-1 line byte-identical (pinned exactly in the test — S1
+  zero-regression probe).
+- Outcome: GREEN. Canonical suite: ALL 71 TESTS PASSED, exit 0
+  (64 round-1 + 7 round-2 entries).
+- Change for next attempt: batch R2-2 (R2-Q08..Q15), then the
+  ROUND-2 END SUMMARY.
+
+---
