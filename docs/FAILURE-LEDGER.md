@@ -2909,3 +2909,32 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-089 (2026-09-07, run: impl-v4-w2a — V4-13 envelope guard + BATCH 2A END SUMMARY)
+
+- Outcome: LANDED (red commit `git log a3a0fc4..HEAD~1`, green this
+  commit).
+- Green: batch A12 guard — the window inequality
+  (120 − seek_eff)/2 − use_ticks_eff swept over ALL 16^4 reachable
+  stat blocks (not sampled): seek_eff ∈ [50,68], use_ticks_eff ∈
+  [1,4], window ≥ 22, and the sweep is TIGHT (worst case exactly
+  22 at NERVE-mod −4 + unsuited archive-stall); bladder-rate 2 and
+  burst 120 pinned; A14 — two 300-tick seed-20260830 runs hash
+  identically (prin1 covers rpg-pos/XP/clearance/stats/journey).
+- VERIFY: canonical suite ALL 97 TESTS PASSED (batch).
+
+### BATCH 2A END SUMMARY (RPG primitives: V4-10..V4-13)
+
+- 4/4 directives landed red-first; suite 93 → 97, all green;
+  4a scenario tripwires (win-serve/lose-breach) and M2/M6 fixtures
+  stayed green throughout — the RPG hooks read stream 3 only and
+  never drain rewards events (A10 hygiene asserted batch-side).
+- Commits: 89872d6 (V4-10), 93af366 (V4-11), a3a0fc4 (V4-12),
+  V4-13 pair, each with its red commit registered in run.el.
+- Wave-2b needs from 2a: cistern--rpg-band (shared banding), the
+  cistern--matrix-hash shape (V4-19 consolidation point), the
+  rpg-pos pos-in/pos-out pattern (story :roll-pos mirrors it),
+  toilet catalog suits (dialogue :pair selectors), XP/clearance
+  enums (RPG check actors).
+
+---

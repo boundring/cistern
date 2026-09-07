@@ -1050,7 +1050,7 @@ deterministic including rpg-pos, XP and clearance."
     (setq cistern--st (cistern--new-game 20260830))
     (dotimes (_ 300) (cistern--do-tick cistern--st))
     (cl-assert (equal h1 (secure-hash 'sha1 (prin1-to-string cistern--st)))
-               t "300-tick runs diverged")))
+               t "300-tick runs diverged"))
   (message "CISTERN-V4-13-OK"))
 
 (provide 'test-v4)
