@@ -82,6 +82,8 @@ by the view, not here).")
   (alloy 20) (tick 0) (contam 0) over
   (log nil) (cursor (cons 3 6))
   (armed-verb nil)           ; build verb armed for click-to-place (§3.4)
+  (hint nil)                 ; Q17: one-tick transient cursor hint — posted
+                             ; by use-cases, read by the view, drained once
   (seed 0)                   ; the game seed; child streams derive from it (REWARDS-DESIGN §4)
   (rng 1)                    ; LCG state; determinism lives here
   (purges 0) (built-pipe 0) (built-toilet 0) (built-tank 0) (earned 0) (migrants 0)

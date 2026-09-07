@@ -34,6 +34,8 @@ pure render.  Every state-mutating command ends here."
   (let ((inhibit-read-only t))
     (erase-buffer)
     (insert (cistern-view--render cistern--st))
+    ;; Q17: the hint is a one-tick transient — the render consumed it
+    (cistern--cmd-consume-hint cistern--st)
     (goto-char (point-min))))
 
 (defvar cistern-mode-map

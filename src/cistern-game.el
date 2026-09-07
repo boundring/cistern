@@ -496,6 +496,14 @@ clears it on placement).  No arming setter may exist in the driver
 or adapter layers (L-013: no second arming site)."
   (setf (cistern-st-armed-verb st) verb))
 
+(defun cistern--cmd-consume-hint (st)
+  "Drain ST's transient cursor hint (Q17): the driver calls this
+after each render cycle, so a posted hint is visible for exactly
+one render — same drain-once pattern as `cistern-st-rewards-events'
+\(no double consumption)."
+  (setf (cistern-st-hint st) nil)
+  st)
+
 (defun cistern--cmd-decon (st x y)
   "Clean a hazard tile (cistern.el:527-538 verbatim semantics:
 hazard tiles ONLY — R8 keeps demolish distinct from decon)."

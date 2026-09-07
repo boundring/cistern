@@ -392,6 +392,10 @@ lines precede the map rows."
      (propertize (concat banner "\n") 'face 'cistern-header)
      (propertize (concat (cistern-view--inspector st) "\n")
                  'face 'cistern-dim)
+     ;; Q17: the one-tick transient hint slot, under the inspector —
+     ;; empty string when no hint is posted (no permanent layout shift)
+     (let ((h (cistern-st-hint st)))
+       (if h (propertize (concat h "\n") 'face 'cistern-dim) ""))
      (propertize (concat (cistern-view--pressure-line st) "\n")
                  'face 'cistern-dim)
      (cistern-view--tutorial-line st)
