@@ -516,5 +516,38 @@ tick."
                              (cistern-st-log st))
                  t "log still records the refusal"))))
 
+;; --- Q19: armed verb visible, cancelable, taught ---------------------------------
+
+(defun cistern-test-ux-q19-armed-badge ()
+  "After `p' the header badge names the verb and the cancel key;
+ESC/u clear the verb through a use-case; the help line teaches
+arm-then-click; an at-cursor keypress refuses CLEANLY instead of
+arm-then-fail noise."
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-arm-verb st 'pipe)
+    (cl-assert (string-match-p "ARMED: PIPE — CLICK PLACES, ESC CANCELS"
+                               (cistern-test-ux--header st))
+               t "armed verb visible in the badge slot")
+    (cistern--cmd-disarm st)
+    (cl-assert (null (cistern-st-armed-verb st))
+               t "disarm clears the verb via the use-case")
+    (cl-assert (eq (lookup-key cistern-mode-map "u") #'cistern-disarm)
+               t "u bound to disarm")
+    (cl-assert (eq (lookup-key cistern-mode-map (kbd "<escape>"))
+                   #'cistern-disarm)
+               t "escape bound to disarm (unbound before Q19)")
+    (cl-assert (string-match-p "t/p/K arm — click to place"
+                               (cistern-view--help-line))
+               t "help line gains the arm phrase"))
+  ;; at-cursor keypress refuses cleanly: no arm-then-fail noise
+  (let ((st (cistern--new-game 42)))
+    (setq cistern--st st)
+    (setf (cistern-st-cursor st) (cons 0 0))   ; wall
+    (cistern--arm-and-build 'tank)
+    (cl-assert (null (cistern-st-armed-verb st))
+               t "a refused at-cursor build does not arm")
+    (cl-assert (cistern-st-hint st)
+               t "the refusal posts its hint")))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
