@@ -128,15 +128,19 @@ Pure — never touches cistern-st-rng."
   (mod (+ (* pos 1103515245) 12345) 2147483648))
 
 (defun cistern--log (st fmt &rest args)
-  "Append a plain line.  Q13: entries are (LINE . SEVERITY-ENUM),
-so color persists with the text; nil severity renders dim.  Q16:
-the log is UNCAPPED — tail clipping is the view's concern."
-  (push (cons (apply #'format fmt args) nil) (cistern-st-log st)))
+  "Append a plain line.  Q13: entries are (LINE SEVERITY TICK)
+so color persists with the text and V4-01 stamps the append-time
+tick; nil severity renders dim.  Q16: the log is UNCAPPED — tail
+clipping is the view's concern."
+  (push (list (apply #'format fmt args) nil (cistern-st-tick st))
+        (cistern-st-log st)))
 
 (defun cistern--log-sev (st sev fmt &rest args)
   "Append a line carrying SEVERITY-ENUM (Q13): info = minor,
-error = major — the view maps the enum through its palette."
-  (push (cons (apply #'format fmt args) sev) (cistern-st-log st)))
+error = major — the view maps the enum through its palette.
+V4-01: the entry is (LINE SEVERITY TICK), stamped at append."
+  (push (list (apply #'format fmt args) sev (cistern-st-tick st))
+        (cistern-st-log st)))
 
 ;; Q14: the ONE worker-identity table + helper, hosted in the
 ;; domain (innermost layer) so the accident log, the map and the

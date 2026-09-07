@@ -430,12 +430,15 @@ Q11 from the domain table."
   "Three-line tail (Q15): consecutive identical lines collapse
 with a silent ×N count; majors (breach/condemnation) keep max
 severity weight inside the recent window; older flavor ages out
-like any line.  Q13: each entry is (LINE . SEVERITY), so faces
-persist with the text across ticks.  Suppression is silent."
+like any line.  V4-01: each entry is (LINE SEVERITY TICK); the
+collapse projects entries to their (LINE . SEVERITY) 2-list
+first, so faces persist with the text and the triple stays
+(LINE SEVERITY COUNT).  Suppression is silent."
   (let* ((log (cistern-st-log st))
          (boot (car (car (last log))))         ; the boot LINE: oldest entry
          (collapsed (cistern-view--collapse-log
-                     (reverse log)))           ; chronological
+                     (mapcar (lambda (e) (cons (car e) (cadr e)))
+                             (reverse log))))  ; chronological
         ;; ponytail: window 12 = the old log cap; a ranking constant,
         ;; revisit only if tails feel stale
         (window (last collapsed (min 12 (length collapsed))))
@@ -456,8 +459,9 @@ persist with the text across ticks.  Suppression is silent."
 
 (defun cistern-view--collapse-log (chron)
   "Collapse consecutive identical lines (Q15): chronological
-input of (LINE . SEVERITY) entries → (LINE SEVERITY COUNT)
-triples.  Silent except the count."
+input of (LINE . SEVERITY) 2-lists (the V4-01 3-list entries are
+projected by the caller) → (LINE SEVERITY COUNT) triples.
+Silent except the count."
   (let ((out nil))
     (dolist (e chron)
       (let ((top (car out)))

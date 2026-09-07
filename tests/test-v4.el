@@ -63,8 +63,7 @@ and the uncapped ring is untouched."
       (cistern--log-sev st2 'error "BREACH — WORKER β OVERFLOWED AT (5,6)")
       (let* ((tail (cistern-view--log-tail st2))
              (rows (cl-remove-if (lambda (r) (string= r ""))
-                                 (split-string
-                                  (cistern-test-v4--plain tail) "\n"))))
+                                 (split-string tail "\n"))))
         (cl-assert (cl-some (lambda (r) (string-match-p "×4" r)) rows)
                    t "collapse still emits the ×N count")
         (let ((hit (cl-find-if (lambda (r) (string-match-p "BREACH" r)) rows)))
@@ -76,9 +75,11 @@ and the uncapped ring is untouched."
     ;; contract: (caar log) is the newest LINE; boot = oldest LINE)
     (let ((st3 (cistern--new-game 42)))
       (cl-assert (string= (caar (cistern-st-log st3))
-                          (car (car (last (cistern-st-log st3))))
                           "SECTOR-7 ONLINE — KEEP THE WATER MOVING")
-                 t "dedup and boot pick read the LINE field")))
+                 t "dedup reads the LINE field")
+      (cl-assert (string= (car (car (last (cistern-st-log st3))))
+                          "SECTOR-7 ONLINE — KEEP THE WATER MOVING")
+                 t "boot pick reads the LINE field")))
   (message "CISTERN-V4-01-OK"))
 
 (provide 'test-v4)
