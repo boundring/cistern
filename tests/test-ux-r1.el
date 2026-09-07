@@ -464,5 +464,57 @@ silent — no new copy beyond the count."
                                                "\n")))
                t "boot flavor ages out like any line")))
 
+;; --- Q17: transient cursor-hint surface -----------------------------------------
+
+(defun cistern-test-ux-q17-cursor-hint ()
+  "A posted hint renders one row UNDER the inspector and is
+consumed — gone by the next render, no permanent layout shift.
+Transport: a state slot posted by use-cases, read by the view,
+drained once (rewards-events pattern)."
+  (let ((st (cistern--new-game 42)))
+    (cl-assert (null (cistern-st-hint st)) t "no hint by default")
+    (setf (cistern-st-hint st) "HINT TEXT")
+    (let* ((lines (cistern-test-ux--render-lines st))
+           (insp-idx (cl-position-if (lambda (l) (string-match-p "^CURSOR" l))
+                                     lines)))
+      (cl-assert insp-idx t "inspector row found")
+      (cl-assert (string-match-p "HINT TEXT" (nth (1+ insp-idx) lines))
+                 t "hint renders in the transient slot under the inspector"))
+    (cistern--cmd-consume-hint st)
+    (let ((lines (cistern-test-ux--render-lines st)))
+      (cl-assert (null (cl-position-if (lambda (l) (string-match-p "HINT TEXT" l))
+                                       lines))
+                 t "consumed: absent from the next render"))))
+
+;; --- Q18: refusal copy names the next action -------------------------------------
+
+(defun cistern-test-ux-q18-refusal-hints ()
+  "Refusals post through the hint surface with fix-naming copy
+\(copy-table text); the log still records the refusal — history
+intact — and the cursor inspector reflects the state for that
+tick."
+  (let ((st (cistern--new-game 42)))
+    ;; build on wall
+    (cistern--cmd-build st 'tank 0 0)         ; wall cell
+    (cl-assert (equal (cistern-st-hint st)
+                      "NO FLOOR THERE — AIM FOR OPEN FLOOR")
+               t "wall refusal posts the fix-naming hint")
+    (cl-assert (cl-find-if (lambda (e) (string-match-p "CANNOT BUILD THERE"
+                                                      (car e)))
+                           (cistern-st-log st))
+               t "log still records the refusal")
+    (cistern--cmd-consume-hint st)
+    ;; insufficient alloy
+    (let ((spot (cistern-test-game--floor-run st 1)))
+      (setf (cistern-st-alloy st) 0)
+      (cistern--cmd-build st 'tank (car spot) (cadr spot))
+      (cl-assert (equal (cistern-st-hint st)
+                        "NEED 15 ALLOY — PURGE (x) PAYS")
+                 t "alloy refusal names the cost and the paying move")
+      (cl-assert (cl-find-if (lambda (e) (string-match-p "INSUFFICIENT ALLOY"
+                                                        (car e)))
+                             (cistern-st-log st))
+                 t "log still records the refusal"))))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here

@@ -68,7 +68,9 @@
     cistern-test-ux-q13-severity-persists
     cistern-test-ux-q16-full-log
     cistern-test-ux-q14-worker-identity
-    cistern-test-ux-q15-log-ranking))
+    cistern-test-ux-q15-log-ranking
+    cistern-test-ux-q17-cursor-hint
+    cistern-test-ux-q18-refusal-hints))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
