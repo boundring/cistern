@@ -78,7 +78,9 @@
     cistern-test-ux-q23-death-panel
     cistern-test-ux-q24-goal-narration
     cistern-test-ux-q25-particle-placement
-    cistern-test-ux-q26-non-modal-guard))
+    cistern-test-ux-q26-non-modal-guard
+    cistern-test-ux-q27-tutorial-table
+    cistern-test-ux-q28-briefing-proofread))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

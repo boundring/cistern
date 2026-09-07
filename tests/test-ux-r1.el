@@ -688,6 +688,58 @@ banked summary — committed at trigger time, nothing pending."
     (cl-assert (plist-get (cistern-st-summary st) :ticks)
                t "the banked summary is intact")))
 
+;; --- Q27: tutorial table ships ----------------------------------------------------
+
+(defun cistern-test-ux-q27-tutorial-table ()
+  "The default tutorial table ships 3 steps over real predicates:
+cursor onto a worker, purge a filling tank, watch alloy pay.  The
+prompt renders as a persistent line, not log lines."
+  (let ((st (cistern--new-game 42)))
+    ;; step 1 prompt visible from the start (persistently)
+    (cl-assert (string-match-p "TUTORIAL 1/3"
+                               (cistern-test-ux--plain (cistern-view--render st)))
+               t "step 1 prompt visible on a new game")
+    (cistern--do-tick st) (cistern--do-tick st) (cistern--do-tick st)
+    (cl-assert (string-match-p "TUTORIAL 1/3"
+                               (cistern-test-ux--plain (cistern-view--render st)))
+               t "step 1 still the prompt by tick 3")
+    ;; drive step 1: move the cursor onto a worker
+    (let ((w (car (cistern-st-creators st))))
+      (setf (cistern-st-cursor st)
+            (cons (cistern--worker-x w) (cistern--worker-y w))))
+    (cistern--do-tick st)
+    (cl-assert (string-match-p "TUTORIAL 2/3"
+                               (cistern-test-ux--plain (cistern-view--render st)))
+               t "cursor-on-worker advances to step 2")
+    ;; drive step 2: purge the filling starter tank
+    (cistern--cmd-purge st 5 2)
+    (cistern--do-tick st)
+    (cl-assert (string-match-p "TUTORIAL 3/3"
+                               (cistern-test-ux--plain (cistern-view--render st)))
+               t "the purge advances to step 3")
+    ;; drive step 3: the alloy paid
+    (cl-assert (> (cistern-st-alloy st) 20) t "the purge paid alloy")
+    (cistern--do-tick st)
+    (cl-assert (null (string-match-p "TUTORIAL 3/3"
+                                     (cistern-test-ux--plain
+                                      (cistern-view--render st))))
+               t "watching the pay completes the tutorial")))
+
+;; --- Q28: briefing proofread --------------------------------------------------------
+
+(defun cistern-test-ux-q28-briefing-proofread ()
+  "The ? briefing prints real percentages (no %% artifacts),
+carries the arm-then-click line and the seed mention (Q01)."
+  (cistern-help)
+  (let ((text (with-current-buffer "*cistern help*" (buffer-string))))
+    (cl-assert (string-match-p "60%" text) t "60% renders")
+    (cl-assert (string-match-p "100%" text) t "100% renders")
+    (cl-assert (null (string-match-p "%%" text))
+               t "no %% artifacts anywhere in the briefing")
+    (cl-assert (string-match-p "click to place" text)
+               t "the briefing carries the arm-then-click line")
+    (cl-assert (string-match-p "seed" text) t "the briefing mentions the seed")))
+
 ;; --- Q23: death summary panel -------------------------------------------------------
 
 (defun cistern-test-ux-q23-death-panel ()
