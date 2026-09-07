@@ -761,7 +761,9 @@ game layer (Phase 2)."
                   (golden-pipe . "GOLDEN PIPE ONLINE")))
     (pressure-rising . "PRESSURE RISING — TANK %d%%")
     (pressure-severed . "LINES SEVERED — REWIRE (p) — TANK AT (%d,%d)")
-    (pressure-severed-bare . "LINES SEVERED — REWIRE (p)"))
+    (pressure-severed-bare . "LINES SEVERED — REWIRE (p)")
+    (refusal-no-floor . "NO FLOOR THERE — AIM FOR OPEN FLOOR")
+    (refusal-alloy . "NEED %d ALLOY — PURGE (x) PAYS"))
   "Q11 copy table, keyed by surface (Q05/Q08/Q10 milestones and
 pressure lines so far).")
 

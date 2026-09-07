@@ -24,11 +24,15 @@ cistern.el:498-525, rendered calls stripped."
     (cond
      ((not (cistern--in-bounds-p st x y)) (cistern--log st "OUT OF SECTOR"))
      ((not (eq (cistern--cell st x y) 'floor))
-      (cistern--log st "CANNOT BUILD THERE"))
+      (cistern--log st "CANNOT BUILD THERE")
+      (setf (cistern-st-hint st)                       ; Q18: the hint
+            (cdr (assq 'refusal-no-floor cistern--copy)))) ; names the fix
      ((gethash (cons x y) (cistern--occupied-cells st nil))
       (cistern--log st "WORKER IN THE WAY"))
      ((< (cistern-st-alloy st) cost)
-      (cistern--log st "INSUFFICIENT ALLOY — %d REQUIRED" cost))
+      (cistern--log st "INSUFFICIENT ALLOY — %d REQUIRED" cost)
+      (setf (cistern-st-hint st)                       ; Q18: the hint
+            (format (cdr (assq 'refusal-alloy cistern--copy)) cost)))
      (t
       (setf (cistern-st-alloy st) (- (cistern-st-alloy st) cost))
       (cistern--set-cell st x y kind)
