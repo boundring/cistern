@@ -255,6 +255,236 @@ predicate.  Returns the final state; signals on an unmet expect."
                (plist-get scenario :name) (car exp) (cdr exp))))
     st))
 
+;; ---------------------------------------------------------------------------
+;; V4-16/V4-17 (STORY §6/§7/§8): story evaluation.  ONE call per tick,
+;; before rewards-eval (§1 pinned ordering); reads pending events,
+;; drains NOTHING (rewards-eval stays the sole drainer).  Stream 2
+;; only (:roll-pos); the sim LCG and particle stream are forbidden
+;; (S7 — asserted in tests).
+
+(defun cistern--story-stat (st stat)
+  "STORY §6.1: banded story stats (−2..+2) read existing state."
+  (pcase stat
+    ('tolerance
+     (let* ((story (cistern-st-story st))
+            (cast (plist-get story :cast))
+            (w (nth (car (car cast)) (cistern-st-creators st)))
+            (ttb (/ (- 120 (cistern--worker-bladder w)) 2)))
+       (cond ((<= ttb 6) -2) ((<= ttb 18) 0) (t 2))))
+    ('integrity
+     (cond ((cistern--toilets-severed-p st) -2)
+           ((cistern--toilets-backed-up-p st) -1)
+           ((and (> (cistern--tank-capacity-total st) 0)
+                 (>= (cistern--tank-load-max st)
+                     (* 0.85 (cistern--tank-capacity-total st)))) 0)
+           (t 2)))
+    ('standing
+     (let ((rep (cistern-st-reputation st)))
+       (cond ((>= rep 80) 2) ((>= rep 50) 1) (t 0))))))
+
+(defun cistern--story-tick-act (tick)
+  "The act whose window TICK falls in (STORY §3.5)."
+  (cond ((< tick 120) 1) ((< tick 240) 2) (t 3)))
+
+(defun cistern--story-condition-p (st h events)
+  "Does hook H's :condition hold this tick (STORY §7.1/§7.5)?
+Events are the pending tick event kinds."
+  (let ((c (plist-get h :condition)))
+    (pcase (car c)
+      ('event (memq (cadr c) events))
+      ('tick t)
+      ('stat-band
+       (let ((band (cistern--story-stat st (cadr c))))
+         (pcase (nth 2 c)
+           ('>= (>= band (nth 3 c)))
+           ('<= (<= band (nth 3 c)))
+           (_ nil)))))))
+
+(defun cistern--story-draw (st n)
+  "One stream-2 draw in [0,N) (bit-6 slice), advancing :roll-pos."
+  (let* ((story (cistern-st-story st))
+         (p (cistern--stream-next (plist-get story :roll-pos))))
+    (plist-put story :roll-pos p)
+    (% (ash p -6) n)))
+
+(defun cistern--story-render (story h)
+  "The hook's resolution line (§7.3): the required hook HELD or
+BREACHED rides the callback variant; a MISSED requirement renders
+the -fallback standalone variant."
+  (let* ((req (plist-get h :requires))
+         (key (plist-get h :resolve-copy))
+         (req-hook (and req
+                        (cl-find req (plist-get story :hooks)
+                                 :key (lambda (x) (plist-get x :id)))))
+         (req-state (and req-hook (plist-get req-hook :state)))
+         (req-as (and req-hook (plist-get req-hook :resolved-as))))
+    (cond ((and req-hook (eq req-state 'resolved))
+           (format (cistern--story-copy-key key)
+                   (if (eq req-as 'pass) "HELD" "BREACHED")))
+          ((and req-hook (eq req-state 'missed))
+           (cistern--story-copy-key
+            (intern (concat (symbol-name key) "-fallback"))))
+          (t (cistern--story-copy-key key)))))
+
+(defun cistern--story-apply-effect (st outcome cell)
+  "STORY §6.4: commit-first application of the sim-visible
+effects.  Returns presentation intents (popup), possibly nil."
+  (let ((effect (plist-get outcome :effect))
+        (arg (plist-get outcome :arg)))
+    (pcase effect
+      ('hazard-spawn
+       (let* ((floors nil) (i 0))
+         (while (< i (length (cistern-st-map st)))
+           (when (eq (aref (cistern-st-map st) i) 'floor)
+             (push (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st)))
+                   floors))
+           (cl-incf i))
+         (setq floors (nreverse floors))
+         (when floors
+           (let* ((p (cistern--stream-next
+                      (plist-get (cistern-st-story st) :roll-pos)))
+                  (cell2 (nth (% (ash p -6) (length floors)) floors)))
+             (plist-put (cistern-st-story st) :roll-pos p)
+             (cistern--add-hazard st (car cell2) (cdr cell2))))))
+      ('tank-load-delta
+       (let ((tk nil) (ks nil))
+         (maphash (lambda (k _v) (push k ks))
+                  (cistern-st-tanks st))
+         (setq ks (sort ks (lambda (a b)
+                             (or (< (car a) (car b))
+                                 (and (= (car a) (car b))
+                                      (< (cdr a) (cdr b)))))))
+         (setq tk (car ks))
+         (when tk
+           (let ((cap cistern-tank-cap))
+             (puthash tk
+                      (list :load (min cap
+                                       (max 0 (+ (or arg 0)
+                                                 (plist-get
+                                                  (gethash tk
+                                                           (cistern-st-tanks st))
+                                                  :load)))))
+                      (cistern-st-tanks st))))))
+      ('alloy-grant
+       (setf (cistern-st-alloy st) (+ (cistern-st-alloy st) (or arg 0))))
+      ('popup
+       (cistern--field-spawn st cell (cons 0 -1) 3
+                             (or (and (stringp arg) arg) "NOTED")
+                             'success 'popup))
+      (_ nil))
+    nil))
+
+(defun cistern--story-eval (st)
+  "STORY §6-§8: one story evaluation per tick.  Reads pending
+events, drains nothing; advances the hook state machine
+(dormant → armed → open → resolved|missed) with §7.2 force-miss at
+act rollover; applies effects commit-first; returns (st . intents)
+with at most ONE story banner."
+  (let ((story (cistern-st-story st))
+        (intents nil)
+        (banners 0))
+    (when story
+      (let* ((tick (cistern-st-tick st))
+             (tick-act (cistern--story-tick-act tick))
+             (act (plist-get story :act))
+             (hooks (plist-get story :hooks))
+             (events (mapcar #'cistern--event-kind
+                             (cistern-st-rewards-events st)))
+             (ev-cell (let ((ev (cl-find-if #'consp
+                                            (cistern-st-rewards-events st))))
+                        (and ev (>= (length ev) 4)
+                             (cons (nth 2 ev) (nth 3 ev)))))
+             (cell (or ev-cell (cistern-st-cursor st))))
+        ;; §7.2 act rollover: force-resolve armed/open hooks as
+        ;; missed, THEN open the next act (the story can fall behind
+        ;; the player; it can never fall apart)
+        (when (> tick-act act)
+          (dolist (h hooks)
+            (when (and (memq (plist-get h :state) '(armed open))
+                       (= (plist-get h :act) act))
+              (plist-put h :state 'missed)
+              (plist-put h :resolved-as 'missed)
+              (push h (plist-get story :callbacks))))
+          (plist-put story :act tick-act)
+          (setq act tick-act))
+        (dolist (h hooks)
+          (let ((hact (plist-get h :act))
+                (win (plist-get h :window))
+                (state (plist-get h :state)))
+            ;; arm at the hook's act open
+            (when (and (= hact act) (eq state 'dormant))
+              (plist-put h :state 'armed)
+              (setq state 'armed))
+            ;; §7.1: armed → missed when the window closes
+            (when (and (eq state 'armed) (> tick (cdr win)))
+              (plist-put h :state 'missed)
+              (plist-put h :resolved-as 'missed)
+              (setq state 'missed))
+            ;; §7.1: armed + condition + window → open + resolve
+            (when (and (eq state 'armed)
+                       (>= tick (car win)) (<= tick (cdr win))
+                       (cistern--story-condition-p st h events))
+              (plist-put h :state 'open)
+              ;; §7.5: tier draw, then roll — pinned order, stream 2
+              (let* ((drift (nth (1- act) cistern--story-tier-drift))
+                     (tiers (plist-get (plist-get story :scenario) :tiers))
+                     (rare (+ (nth 2 tiers) drift))
+                     (tdraw (cistern--story-draw st 100))
+                     (tier (cond ((< tdraw (nth 0 tiers)) 'common)
+                                 ((< tdraw (+ (nth 0 tiers) (nth 1 tiers)))
+                                  'occasional)
+                                 (t 'rare)))
+                     (m (cl-find (plist-get h :matrix)
+                                 (plist-get (plist-get story :scenario)
+                                            :matrices)
+                                 :key (lambda (x) (plist-get x :id))))
+                     (diff (+ (plist-get m :difficulty)
+                              (nth (1- act) (plist-get m :act-mods))))
+                     (roll (cistern--story-draw st 20))
+                     (stat (cistern--story-stat st (plist-get m :stat)))
+                     (margin (+ roll stat (- diff)))
+                     (band (cond ((<= margin -5) 0) ((<= margin -1) 1)
+                                 ((<= margin 4) 2) (t 3)))
+                     (outcomes (plist-get m :outcomes))
+                     (outcome (nth band outcomes))
+                     (line-key (plist-get outcome :line-key))
+                     (effect (plist-get outcome :effect)))
+                (plist-put h :state 'resolved)
+                (plist-put h :resolved-as (if (>= band 2) 'pass 'fail))
+                (plist-put h :tick tick)
+                (plist-put h :tier tier)
+                ;; callbacks list: resolved hook ids, visible to later acts
+                (plist-put story :callbacks
+                           (cons (plist-get h :id)
+                                 (plist-get story :callbacks)))
+                ;; commit-first: sim-visible effects apply here
+                (cistern--story-apply-effect st outcome cell)
+                ;; presentation: hook verdict line + outcome line
+                (let* ((line (cistern--story-render story h))
+                       (face (if (>= band 2) 'success 'error)))
+                  (when line
+                    (push (list :layer 'log :text line :face face)
+                          intents))
+                  (let ((oline (cistern--story-copy-key line-key)))
+                    (when oline
+                      (push (list :layer 'log :text oline :face face)
+                            intents))))))))
+        ;; §8.3: the premise banner announces once at Act I's first
+        ;; rendered tick; ≤1 story banner per tick
+        (when (and (null (plist-get story :announced)) (> tick 0))
+          (plist-put story :announced t)
+          (when (< banners 1)
+            (setq banners (1+ banners))
+            (push (list :layer 'banner
+                        :text (concat (cistern--story-copy-key
+                                       (plist-get (plist-get story
+                                                            :scenario)
+                                                  :premise))
+                                      "\n"))
+                  intents)))
+        (plist-put story :intents (nreverse intents))))
+    (cons st intents)))
+
 (defun cistern--do-tick (st)
   "Exactly one tick per action (R6): over-guard, then one domain
 sim tick, then the tutorial advance.  The legacy multi-tick
@@ -265,10 +495,19 @@ call exists at the use-case layer."
     ;; — a chased worker cannot escape mid-tick
     (cistern--tutorial-advance st)
     (cistern--sim-tick st)
-    ;; per-tick rewards evaluation (L-027 wiring): runs ONCE per
-    ;; tick, after the sim phases and before the tutorial advance;
-    ;; stores outcome+intents in state for the view to read
-    (cistern--rewards-eval st nil)))
+    ;; V4-16 (STORY §8.1, §1 pinned ordering): ONE story-eval call
+    ;; BEFORE rewards-eval — reads pending events, drains nothing
+    (let ((story-out (cistern--story-eval st)))
+      ;; per-tick rewards evaluation (L-027 wiring): runs ONCE per
+      ;; tick, after the sim phases and before the tutorial advance;
+      ;; stores outcome+intents in state for the view to read
+      (cistern--rewards-eval st nil)
+      ;; the story's intents append to the stored intent list —
+      ;; one stored slot, one render read, zero new view query paths
+      (setf (cistern-st-rewards-outcome st)
+            (cons (car (cistern-st-rewards-outcome st))
+                  (append (cdr (cistern-st-rewards-outcome st))
+                          (cdr story-out)))))))
 
 (defconst cistern--rewards-default-outcome
   '(:score 0 :objectives nil :unlocks nil :celebrate nil)

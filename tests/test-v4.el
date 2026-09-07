@@ -1163,5 +1163,170 @@ different seeds produce distinct id sets."
                t "generated flavor bank did not load"))
   (message "CISTERN-V4-18-OK"))
 
+(defun cistern-test-v4-15-story-generation ()
+  "V4-15 (S1/S9): generation from the example bank pins the spine
+for seed 20260830 and the goal-mod routes through the validator."
+  (setq cistern--banks nil cistern--story-copy nil)
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v4--root)))
+  (let ((st (cistern--new-game 20260830)))
+    (let ((story (cistern-st-story st)))
+      (cl-assert story t "story missing with banks loaded")
+      (cl-assert (eq (plist-get story :premise-id) 'sealed-pressure)
+                 t "premise id wrong")
+      (cl-assert (= (plist-get story :act) 1) t "act 1 not open")
+      (cl-assert (= (length (plist-get story :hooks)) 2)
+                 t "hook count wrong")
+      (cl-assert (cl-every (lambda (h) (eq (plist-get h :state) 'dormant))
+                           (plist-get story :hooks))
+                 t "hooks not dormant at generation")
+      (cl-assert (and (>= (length (plist-get story :cast)) 2)
+                      (<= (length (plist-get story :cast)) 3))
+                 t "cast size wrong")
+      (cl-assert (= (plist-get story :roll-pos)
+                    (cistern--stream-init 20260830 2))
+                 t "roll-pos not at the stream-2 init")
+      (let ((goal (cl-find 'relieves-served
+                           (plist-get (cistern-st-goal-card st) :goals)
+                           :key (lambda (g) (plist-get g :kind)))))
+        (cl-assert (= (plist-get goal :target) 5)
+                   t "goal-mod target wrong"))))
+  ;; stream 1 only: a no-story game's rng equals a story game's rng;
+  ;; and no banks = nil story
+  (let ((plain (cistern--new-game 42)))
+    (setq cistern--banks nil)
+    (let ((nostory (cistern--new-game 42)))
+      (cl-assert (= (cistern-st-rng nostory) (cistern-st-rng plain))
+                 t "rng drift")
+      (cl-assert (null (cistern-st-story nostory))
+                 t "story generated without banks")))
+  (message "CISTERN-V4-15-OK"))
+
+(defun cistern-test-v4-16-story-eval ()
+  "V4-16 (S4/S6/S7): an opened hook consumes exactly two stream-2
+draws (tier + roll), resolves with the matrix band, reads events
+without draining them, leaves sim rng/particles untouched, and the
+premise banner announces exactly once (≤1 story banner per tick)."
+  (setq cistern--banks nil cistern--story-copy nil)
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v4--root)))
+  (let ((st (cistern--new-game 20260830)))
+    ;; drive to tick 20 so the act-1 hook's window is open
+    (dotimes (_ 20) (cistern--do-tick st))
+    (let* ((story (cistern-st-story st))
+           (h (car (plist-get story :hooks)))
+           (pos0 (plist-get story :roll-pos))
+           (rng0 (cistern-st-rng st))
+           (prng0 (cistern-st-particle-rng st))
+           (pending (length (cistern-st-rewards-events st))))
+      (cl-assert (memq (plist-get h :state) '(dormant armed))
+                 t "hook state wrong pre-open")
+      ;; a leak event opens the (event leak) hook
+      (push (list 'leak "SEEP LOGGED") (cistern-st-rewards-events st))
+      (cistern--story-eval st)
+      (cl-assert (eq (plist-get h :state) 'resolved)
+                 t "hook did not resolve on its event")
+      (cl-assert (= (plist-get story :roll-pos)
+                    (cistern--stream-next
+                     (cistern--stream-next pos0)))
+                 t "stream-2 advance wrong")
+      (cl-assert (= (cistern-st-rng st) rng0) t "sim LCG moved")
+      (cl-assert (= (cistern-st-particle-rng st) prng0)
+                 t "particle stream moved")
+      (cl-assert (= (length (cistern-st-rewards-events st)) (1+ pending))
+                 t "story drained pending events")
+      ;; no re-roll: a second eval leaves roll-pos alone
+      (let ((p (plist-get story :roll-pos)))
+        (cistern--story-eval st)
+        (cl-assert (= (plist-get story :roll-pos) p)
+                   t "resolved hook re-rolled"))
+      ;; banner cap: exactly one premise banner across both evals
+      (let* ((banners (cl-count-if
+                       (lambda (i) (eq (plist-get i :layer) 'banner))
+                       (plist-get story :intents))))
+        (cl-assert (<= banners 1) t "more than one story banner"))))
+  ;; S6: no story call in view/input sources
+  (dolist (f '("src/cistern-view.el" "src/cistern-input.el"))
+    (with-temp-buffer
+      (insert-file-contents (expand-file-name f cistern-test-v4--root))
+      (cl-assert (not (string-match-p "cistern--story" (buffer-string)))
+                 t "%s touches story internals" f)))
+  (message "CISTERN-V4-16-OK"))
+
+(defun cistern-test-v4-17-story-coherence ()
+  "V4-17 (S5): window-close force-miss, act rollover gating, and
+the callback/fallback rendering branches all resolve with
+authored copy."
+  (setq cistern--banks nil cistern--story-copy nil)
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v4--root)))
+  (let ((st (cistern--new-game 20260830)))
+    (let* ((story (cistern-st-story st))
+           (hooks (plist-get story :hooks)))
+      ;; seal-creak stays dormant through its window → missed
+      (dotimes (_ 120) (cistern--do-tick st))
+      (cl-assert (eq (plist-get (car hooks) :state) 'missed)
+                 t "untriggered hook did not miss")
+      (cl-assert (eq (plist-get story :act) 2)
+                 t "act II did not open after rollover")))
+  ;; callbacks: the terminal verdict renders HELD/BREACHED/fallback
+  (let ((st (cistern--new-game 20260830)))
+    (let* ((story (cistern-st-story st))
+           (creak (car (plist-get story :hooks)))
+           (verdict (cadr (plist-get story :hooks))))
+      ;; requirement HELD: creak resolved as pass
+      (plist-put creak :state 'resolved)
+      (plist-put creak :resolved-as 'pass)
+      (plist-put verdict :state 'armed)
+      (setf (cistern-st-tick st) 240)
+      (plist-put story :act 3)
+      (plist-put verdict :act 3)
+      (cistern--story-eval st)
+      (cl-assert (eq (plist-get verdict :state) 'resolved)
+                 t "terminal hook did not fire")
+      (cl-assert (cl-some (lambda (i)
+                            (and (eq (plist-get i :layer) 'log)
+                                 (string-match-p "HELD" (plist-get i :text))))
+                          (plist-get story :intents))
+                 t "HELD callback copy missing")))
+  (let ((st (cistern--new-game 20260830)))
+    (let* ((story (cistern-st-story st))
+           (creak (car (plist-get story :hooks)))
+           (verdict (cadr (plist-get story :hooks))))
+      ;; requirement BREACHED: creak resolved as fail
+      (plist-put creak :state 'resolved)
+      (plist-put creak :resolved-as 'fail)
+      (plist-put verdict :state 'armed)
+      (setf (cistern-st-tick st) 240)
+      (plist-put story :act 3)
+      (plist-put verdict :act 3)
+      (cistern--story-eval st)
+      (cl-assert (cl-some (lambda (i)
+                            (and (eq (plist-get i :layer) 'log)
+                                 (string-match-p "BREACHED" (plist-get i :text))))
+                          (plist-get story :intents))
+                 t "BREACHED callback copy missing")))
+  (let ((st (cistern--new-game 20260830)))
+    (let* ((story (cistern-st-story st))
+           (creak (car (plist-get story :hooks)))
+           (verdict (cadr (plist-get story :hooks))))
+      ;; requirement MISSED: the fallback variant renders
+      (plist-put creak :state 'missed)
+      (plist-put creak :resolved-as 'missed)
+      (plist-put verdict :state 'armed)
+      (setf (cistern-st-tick st) 240)
+      (plist-put story :act 3)
+      (plist-put verdict :act 3)
+      (cistern--story-eval st)
+      (cl-assert (cl-some (lambda (i)
+                            (and (eq (plist-get i :layer) 'log)
+                                 (string-match-p "STANDALONE" (plist-get i :text))))
+                          (plist-get story :intents))
+                 t "fallback variant missing")))
+  (message "CISTERN-V4-17-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here

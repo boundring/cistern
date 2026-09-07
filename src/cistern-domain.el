@@ -118,7 +118,10 @@ by the view, not here).")
                              ; same-tick regret window
   ;; V4-11 (RPG §2): the armed fixture type — `T` cycles it in
   ;; catalog order
-  (toilet-type 'long-drop))
+  (toilet-type 'long-drop)
+  ;; V4-15 (STORY §3.6): the session story plist; nil = no story
+  ;; (banks not loaded — a legal no-op state for tests)
+  (story nil))
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -1261,7 +1264,70 @@ game layer (Phase 2)."
     ;; without test injection.  One call, via the existing setter.
     (cistern--cmd-set-goal-card st cistern--starter-card)
     (cistern--log st "SECTOR-7 ONLINE — KEEP THE WATER MOVING")
+    ;; V4-15 (STORY §3.1): the spine generates immediately after the
+    ;; starter card; a no-op when no banks are loaded
+    (cistern--story-generate st)
     st))
+
+(defun cistern--story-generate (st)
+  "STORY §3: build the session's story plist from the loaded banks.
+Stream 1 only (one consumption pass); stream 2's :roll-pos is
+initialized but never advanced here.  No banks means nil story (a
+legal no-op state for tests)."
+  (when cistern--banks
+    (let* ((pos (cistern--stream-init (cistern-st-seed st) 1))
+           (scenarios (plist-get cistern--banks :scenarios))
+           (quirks (plist-get cistern--banks :quirks))
+           (draw (lambda (n)
+                   (let ((p (cistern--stream-next pos)))
+                     (setq pos p)
+                     (% (ash p -6) n))))
+           (sc (if (null (cdr scenarios))
+                   (car scenarios)
+                 (nth (funcall draw (length scenarios)) scenarios)))
+           (cast-n (+ 2 (funcall draw 2)))
+           (cast nil))
+      (dotimes (_ cast-n)
+        (let ((idx (funcall draw (length (cistern-st-creators st)))))
+          (push (cons idx
+                      (plist-get (nth (funcall draw (length quirks)) quirks)
+                                 :id))
+                cast)))
+      (setq cast (nreverse cast))
+      (let ((story (list :premise-id (plist-get sc :id)
+                         :cast cast
+                         :act 1
+                         :hooks (mapcar (lambda (h)
+                                          (append h (list :state 'dormant)))
+                                        (plist-get sc :hooks))
+                         :callbacks nil
+                         :roll-pos (cistern--stream-init
+                                    (cistern-st-seed st) 2)
+                         :announced nil
+                         :scenario sc)))
+        (setf (cistern-st-story st) story)
+        (cistern--log-sev st 'info "%s"
+                          (cistern--story-copy-key
+                           (plist-get sc :premise)))
+        (let ((gm (plist-get sc :goal-mod)))
+          (when gm
+            (let* ((card (copy-tree (cistern-st-goal-card st)))
+                   (goals (plist-get card :goals))
+                   (delta 0))
+              (dolist (pair (plist-get gm :target-mod))
+                (dolist (g goals)
+                  (when (eq (plist-get g :kind) (car pair))
+                    (setf (plist-get g :target)
+                          (+ (plist-get g :target) (cdr pair)))
+                    (setq delta (+ delta (cdr pair))))))
+              (plist-put card :goals goals)
+              (cistern--cmd-set-goal-card st card)
+              (when (> delta 0)
+                (cistern--log-sev st 'info "%s"
+                                  (format (cdr (assq 'story-goal-mod
+                                                     cistern--copy))
+                                          delta))))))
+        story))))
 
 ;; Q03 layer note (ledger L-036): the directive pins the call to
 ;; cistern-game.el, but `cistern--new-game' lives here in the
@@ -1339,6 +1405,7 @@ game layer (Phase 2)."
     (exposure-hold . "CONTAMINATION EXPOSURE LOGGED — WORKER %s UNAFFECTED")
     (exposure-fail . "WORKER %s CONTAMINATED — DEGRADATION UNDERWAY")
     (toilet-type-fmt . "FIXTURE — %s — %s")
+    (story-goal-mod . "WATCH ORDER AMENDED — %d SERVED")
     (inspector-stat-fmt . "F%+d G%+d N%+d A%+d")
     (inspector-clear-fmt . "CL.%s")
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
@@ -1380,10 +1447,14 @@ section first, then bank :copy sections in load order (§4.4).")
     beat-open beat-resolve)
   "STORY §6.4 effects whitelist — closed in v4.")
 
-(defconst cistern--story-act-span 100
-  "Act span in ticks (V4-14 pin): act N covers
-((N−1)·span .. N·span); the LAST act is unbounded (the §4.2
-example's act-3 window 240..99999 fixes this reading).")
+(defconst cistern--story-act-ticks
+  '((1 . (0 . 119)) (2 . (120 . 239)) (3 . (240 . 99999)))
+  "STORY §3.5 act windows (v4 pin): Act I 0-119, Act II 120-239,
+Act III 240+ (unbounded).")
+
+(defconst cistern--story-tier-drift '(0 5 10)
+  "STORY §7.4: per-act rare-tier shift added to the premise's
+act-I rare weight (stakes escalation, data only).")
 
 (defun cistern--story-copy-key (key)
   "STORY §4.4 copy chain: cistern--copy's story section first,
@@ -1409,18 +1480,25 @@ act."
     (unless (and (integerp act) (>= act 1) (<= act act-count))
       (cistern--bank-error file "hook %s :act %S outside 1..%d"
                            id act act-count))
-    (unless (and (consp win) (integerp (car win)) (integerp (cdr win))
-                 (>= (car win) (* (1- act) cistern--story-act-span))
-                 (<= (cdr win) (if (= act act-count) 99999
-                                 (* act cistern--story-act-span)))
-                 (<= (car win) (cdr win)))
-      (cistern--bank-error file "hook %s :window %S outside act %d span"
-                           id win act))
+    (let ((span (cdr (assq act cistern--story-act-ticks))))
+      (unless (and (consp win) (integerp (car win)) (integerp (cdr win))
+                   (>= (car win) (car span))
+                   (<= (cdr win) (cdr span))
+                   (<= (car win) (cdr win)))
+        (cistern--bank-error file "hook %s :window %S outside act %d span"
+                             id win act)))
     (unless (and (consp cond-grammar)
                  (memq (car cond-grammar) '(event tick)))
       (cistern--bank-error file "hook %s :condition %S not in the closed
 grammar" id cond-grammar))
     (when req
+      ;; §7.3: the loader validates the -fallback variant key too
+      (unless (cdr (assq (intern (concat (symbol-name
+                                          (plist-get h :resolve-copy))
+                                         "-fallback"))
+                         cistern--story-copy))
+        (cistern--bank-error file "hook %s :resolve-copy has no
+-fallback variant" id))
       (let ((prev (assq req seen-hooks)))
         (unless (and prev (< (cdr prev) act))
           (cistern--bank-error

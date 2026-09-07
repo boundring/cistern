@@ -14,6 +14,7 @@
      (story-seal-creak . "WATCH ORDERED — SEAM (%d,%d) UNDER OBSERVATION")
      (story-seal-creak-fallback . "SEAM (%d,%d) NOTED — NO WATCH ASSIGNED")
      (story-sealed-verdict . "SEAL VERDICT: %s — WATCH DISBANDED")
+     (story-sealed-verdict-fallback . "SEAL STANDALONE — WATCH DISBANDED")
      (story-verdict-pass . "STRUCTURE HOLDS")
      (story-verdict-fail . "STRUCTURE WEEPS")
      (story-drip . "A DRIP IS LOGGED — NOBODY IS DISPATCHED"))

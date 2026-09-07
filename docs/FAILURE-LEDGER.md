@@ -2978,3 +2978,54 @@ the relaunch is on their screen now.
 - VERIFY: canonical suite ALL 99 TESTS PASSED (batch).
 
 ---
+
+## L-091 (2026-09-07, run: impl-v4-w2a — BATCH 2C: V4-15/16/17 story integration + WAVE-2 END SUMMARY)
+
+- Outcome: LANDED (red commits in the batch, green this commit).
+- V4-15: cistern--story-generate (domain, called at the end of
+  cistern--new-game, after the starter card): premise selection on
+  stream 1, cast 2-3 (creators-index . quirk-id) pairs via Q14
+  glyphs, hooks seeded dormant, :roll-pos initialized at seed ⊕ 2
+  (never advanced at generation), goal-mod :target-mod applied
+  through the EXISTING cistern--cmd-set-goal-card validator with
+  the WATCH ORDER AMENDED line.  No banks ⇒ nil story (legal no-op;
+  every pre-2c test runs story-free).
+- V4-16: cistern--story-eval in the game layer, ONE call in do-tick
+  BEFORE rewards-eval (§1 pinned order); reads pending events,
+  drains nothing; hook machine dormant→armed→open→resolved|missed;
+  tier draw then roll (stream 2, §7.5 pinned order); outcome = the
+  premise's matrix band row; the eight-effect whitelist with
+  commit-first hazard-spawn (stream-2-picked floor cell) /
+  tank-load-delta (clamped) / alloy-grant; ≤1 story banner (the
+  premise, once); intents appended to the stored rewards-outcome
+  list — one slot, one render read.  S7 asserted: sim rng and
+  particle-rng are byte-unchanged across story-eval; S6: no story
+  symbol in view/input sources.
+- V4-17: act rollover force-resolves armed/open hooks as missed
+  THEN opens the next act (§7.2); window-close misses; callbacks
+  render HELD/BREACHED from the recorded verdict; a missed
+  requirement renders the -fallback standalone variant (loader now
+  validates the -fallback key whenever :requires is present).
+- Fixture rulings: the §7 d20 fixtures start at rpg-pos-after-stats
+  (1156891213), not the bare stream init; the roll-pos advance is
+  MULTIPLICATIVE (the recurrence) — assert via
+  cistern--stream-next recomposition, never by subtraction.
+- Integration: 4a tripwires, M2/M6 fixtures, and the A12/A14
+  envelope + determinism sweeps all stayed green with story-eval
+  live in the tick path (story consumes stream 2 only; sim LCG and
+  particle positions tick-for-tick identical to no-story runs).
+- VERIFY: canonical suite ALL 102 TESTS PASSED (batch).
+
+### WAVE-2 END SUMMARY (narrative core: V4-10..V4-19)
+
+- Directives: 6/6 across batches 2a/2b/2c (V4-10..V4-13 RPG
+  primitives; V4-14+V4-18 data layer; V4-15..V4-17 integration).
+  V4-19 (matrix loader consolidation) remains — the shared
+  cistern--matrix-hash exists; folding bank matrices into it is a
+  small batch-3 follow-up alongside dialogue.
+- Suite: 97 → 102 (batch 2c), 81 → 102 across wave 2; all green;
+  no regressions in the 4a/4b scenario, particle, or determinism
+  suites.
+- Ledger: L-086..L-091 (per-directive + batch end summaries).
+
+---
