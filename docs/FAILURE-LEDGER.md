@@ -2938,3 +2938,43 @@ the relaunch is on their screen now.
   enums (RPG check actors).
 
 ---
+
+## L-090 (2026-09-07, run: impl-v4-w2a — BATCH 2B: banks loader + copy chain + example bank (V4-14) + gen-bank script (V4-18))
+
+- Outcome: LANDED (red commits `git log 3620208..HEAD~1`, green this
+  commit).
+- V4-14: `cistern--banks` registry, `cistern--banks-load` (fail-first,
+  §4.3 validation list: unknown kind, duplicate :id per kind, empty
+  entries, hook act/window/strictly-earlier :requires, 4-band
+  matrices, :stat whitelist, :act-mods length 3, effects whitelist,
+  resolvable :premise/:resolve-copy/:copy-key/:line-key AFTER the
+  bank's own :copy folds in, :goal-mod kinds, tiers sum 100),
+  `cistern--story-copy-key` chain (cistern--copy story section first,
+  bank :copy in load order, resolved once at load), and
+  data/banks/example.el (1 scenario / 2 hooks / 1 matrix / 3 quirks /
+  2 flavor lines per §10; three defconsts, one per kind, in one file).
+- V4-18: tools/gen-bank.el — batch-only, draws from seed ⊕ #x6A6E
+  through cistern--stream-next + the shared bit-6 slice (no second
+  RNG); minimal fragment pools (1 scenario skeleton, 4 quirks, 6
+  flavors, 4 keywords) composed under the structural constraints;
+  entries emitted SORTED by :id; self-validating (runs the REAL
+  loader on its own output before writing; aborts nonzero on a
+  rejected composition); same args ⇒ byte-identical file.
+- Briefing follow-through: the CONTROLS row for T updated in
+  cistern--help-text (T cycles fixture type, C-t skips tutorial) —
+  in-scope per the V4-11 key change.
+- Defect class (the batch's hard lesson): loading a bank file twice
+  breaks the new-symbol diff (boundp snapshot finds nothing new) —
+  the loader now reads the file's load-history entry (bare symbols
+  in modern Emacs, NOT (t . sym) pairs) for defconst detection; the
+  generator's self-validation pre-loaded its own temp file, making
+  the loader's diff find nothing — removed the pre-load (the loader
+  loads by itself).  Also: plist-put/nreverse on plists — nreverse
+  flips key/value pairs; strip-copy now appends pairs intact.
+  Process note: hand-written nested elisp-in-string fixtures were
+  the recurring paren-disease source; the defect banks are now
+  built PROGRAMMATICALLY from one good bank via mutation lambdas
+  and emitted with %S — misbalancing is structurally impossible.
+- VERIFY: canonical suite ALL 99 TESTS PASSED (batch).
+
+---

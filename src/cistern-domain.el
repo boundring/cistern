@@ -1355,6 +1355,221 @@ game layer (Phase 2)."
   "Q11 copy table, keyed by surface (Q05/Q08/Q10 milestones and
 pressure lines so far).")
 
+;; ---------------------------------------------------------------------------
+;; V4-14 (STORY §4): the banks — registry, copy chain, loader.  Loading
+;; is fail-first: a malformed bank errors with the offending field
+;; named, never a silent skip (same ruling as the goal-card setter).
+
+(defvar cistern--banks nil
+  "Registry plist (:scenarios ... :quirks ... :keywords ... :
+flavor ...) — each slot a list of validated entry plists.  Nil
+until `cistern--banks-load'.")
+
+(defvar cistern--story-copy nil
+  "Folded copy alist built once at load: cistern--copy's story
+section first, then bank :copy sections in load order (§4.4).")
+
+(defconst cistern--bank-kinds '(scenario quirk keyword flavor)
+  "The four bank kinds (STORY §4.2; dialogue arrives in wave 3).")
+
+(defconst cistern--story-stats '(tolerance integrity standing)
+  "Story stat keys (STORY §6.1) — matrix :stat must be one of these.")
+
+(defconst cistern--story-effects
+  '(none log-line popup hazard-spawn tank-load-delta alloy-grant
+    beat-open beat-resolve)
+  "STORY §6.4 effects whitelist — closed in v4.")
+
+(defconst cistern--story-act-span 100
+  "Act span in ticks (V4-14 pin): act N covers
+((N−1)·span .. N·span); the LAST act is unbounded (the §4.2
+example's act-3 window 240..99999 fixes this reading).")
+
+(defun cistern--story-copy-key (key)
+  "STORY §4.4 copy chain: cistern--copy's story section first,
+then bank :copy sections in load order, else load-time error.
+The loader pre-resolves every key, so runtime lookup is one assq."
+  (or (cdr (assq key cistern--story-copy))
+      (cdr (assq key (cdr (assq 'story cistern--copy))))
+      (error "UNRESOLVED STORY COPY KEY %S" key)))
+
+(defun cistern--bank-error (file fmt &rest args)
+  (error "BANK %s: %s" file (apply #'format fmt args)))
+
+(defun cistern--bank-validate-hook (file h act-count seen-hooks)
+  "Validate one scenario hook (STORY §4.3): act in 1..3, window
+inside its act span, :requires names a hook of a STRICTLY EARLIER
+act."
+  (let ((id (plist-get h :id))
+        (act (plist-get h :act))
+        (win (plist-get h :window))
+        (req (plist-get h :requires))
+        (cond-grammar (plist-get h :condition)))
+    (unless id (cistern--bank-error file "hook without :id"))
+    (unless (and (integerp act) (>= act 1) (<= act act-count))
+      (cistern--bank-error file "hook %s :act %S outside 1..%d"
+                           id act act-count))
+    (unless (and (consp win) (integerp (car win)) (integerp (cdr win))
+                 (>= (car win) (* (1- act) cistern--story-act-span))
+                 (<= (cdr win) (if (= act act-count) 99999
+                                 (* act cistern--story-act-span)))
+                 (<= (car win) (cdr win)))
+      (cistern--bank-error file "hook %s :window %S outside act %d span"
+                           id win act))
+    (unless (and (consp cond-grammar)
+                 (memq (car cond-grammar) '(event tick)))
+      (cistern--bank-error file "hook %s :condition %S not in the closed
+grammar" id cond-grammar))
+    (when req
+      (let ((prev (assq req seen-hooks)))
+        (unless (and prev (< (cdr prev) act))
+          (cistern--bank-error
+           file "hook %s :requires %s is not a hook of a strictly
+earlier act" id req))))
+    (cons id act)))
+
+(defun cistern--bank-validate-matrix (file m)
+  (let ((id (plist-get m :id))
+        (outs (plist-get m :outcomes))
+        (stat (plist-get m :stat))
+        (mods (plist-get m :act-mods)))
+    (unless id (cistern--bank-error file "matrix without :id"))
+    (unless (= (length outs) 4)
+      (cistern--bank-error file "matrix %s has %d outcomes (need 4)"
+                           id (length outs)))
+    (unless (memq stat cistern--story-stats)
+      (cistern--bank-error file "matrix %s :stat %S unknown" id stat))
+    (unless (= (length mods) 3)
+      (cistern--bank-error file "matrix %s :act-mods not length 3" id))
+    (dolist (o outs)
+      (unless (memq (plist-get o :effect) cistern--story-effects)
+        (cistern--bank-error file "matrix %s effect %S off the whitelist"
+                             id (plist-get o :effect)))
+      (unless (cdr (assq (plist-get o :line-key) cistern--story-copy))
+        (cistern--bank-error file "matrix %s :line-key %S unresolvable"
+                             id (plist-get o :line-key))))))
+
+(defun cistern--bank-validate-goal-mod (file gm)
+  (let ((mods (plist-get gm :target-mod)))
+    (when mods
+      (dolist (pair mods)
+        (unless (memq (car pair) cistern--goal-kinds)
+          (cistern--bank-error file "goal-mod kind %S outside :goal-kinds"
+                               (car pair)))))))
+
+(defun cistern--bank-registry-key (kind)
+  "Registry slot (plural) for a bank KIND (STORY §4.1)."
+  (pcase kind
+    ('scenario :scenarios) ('quirk :quirks)
+    ('keyword :keywords) ('flavor :flavor)))
+
+(defun cistern--bank-validate-entry (file kind e registry)
+  "Validate one entry of KIND; returns its :id.  REGISTRY carries
+the ids seen so far (duplicate detection across banks)."
+  (let ((id (plist-get e :id)))
+    (unless id (cistern--bank-error file "%s entry without :id" kind))
+    (when (member id (cdr (assq (cistern--bank-registry-key kind)
+                                registry)))
+      (cistern--bank-error file "duplicate :id %s in kind %s" id kind))
+    (pcase kind
+      ('scenario
+       (unless (cdr (assq (plist-get e :premise) cistern--story-copy))
+         (cistern--bank-error file "scenario %s :premise %S unresolvable"
+                              id (plist-get e :premise)))
+       (unless (memq (plist-get e :acts) '(1 2 3))
+         (cistern--bank-error file "scenario %s :acts %S invalid"
+                              id (plist-get e :acts)))
+       (cistern--bank-validate-goal-mod file (plist-get e :goal-mod))
+       (let ((seen nil))
+         (dolist (h (plist-get e :hooks))
+           (push (cistern--bank-validate-hook file h (plist-get e :acts)
+                                              seen)
+                 seen)))
+       (dolist (m (plist-get e :matrices))
+         (cistern--bank-validate-matrix file m))
+       (let ((tiers (plist-get e :tiers)))
+         (unless (and (= (apply #'+ tiers) 100) (= (length tiers) 3))
+           (cistern--bank-error file "scenario %s :tiers %S do not sum
+to 100 over 3 acts" id tiers)))
+       (dolist (ev (plist-get e :events))
+         (unless (cdr (assq (plist-get ev :copy-key) cistern--story-copy))
+           (cistern--bank-error file "event %s :copy-key unresolvable"
+                                (plist-get ev :id)))))
+      ('quirk
+       (unless (memq (plist-get e :context) cistern--story-stats)
+         (cistern--bank-error file "quirk %s :context %S unknown"
+                              id (plist-get e :context)))
+       (unless (cdr (assq (plist-get e :copy-key) cistern--story-copy))
+         (cistern--bank-error file "quirk %s :copy-key unresolvable" id)))
+      ('keyword
+       (unless (memq (plist-get e :class) '(place sector designation))
+         (cistern--bank-error file "keyword %s :class %S unknown"
+                              id (plist-get e :class))))
+      ('flavor
+       (unless (cdr (assq (plist-get e :copy-key) cistern--story-copy))
+         (cistern--bank-error file "flavor %s :copy-key unresolvable" id))))
+    id))
+
+(defun cistern--banks-load (files)
+  "STORY §4: load each bank FILE, validate fail-first, fold the
+entries into `cistern--banks' and the copy chain.  Each file is
+one (or more) defconsts of pure data named cistern-bank-*."
+  (let ((loaded nil))
+    (dolist (f files)
+      (let ((new-syms nil))
+        (load f nil t)
+        ;; the file's load-history entry lists the defconst'd symbols —
+        ;; robust across repeated loads (a boundp diff would find
+        ;; nothing on a second load of the same bank)
+        (dolist (e (cdr (assoc f load-history)))
+          (when (and (symbolp e)
+                     (string-match-p "\\`cistern-bank-" (symbol-name e)))
+            (push e new-syms)))
+        (setq new-syms (sort new-syms #'string<))
+        (unless new-syms
+          (cistern--bank-error f "no cistern-bank-* defconst found"))
+        (dolist (sym new-syms)
+          (let ((bank (symbol-value sym)))
+            (unless (and (listp bank) (plist-get bank :kind))
+              (cistern--bank-error f "%s is not a bank plist" sym))
+            (let ((kind (plist-get bank :kind)))
+              (unless (memq kind cistern--bank-kinds)
+                (cistern--bank-error f "unknown :kind %S" kind))
+              (let ((entries (plist-get bank :entries)))
+                (unless (and (listp entries) (consp entries))
+                  (cistern--bank-error f "empty :entries"))
+                ;; fold the bank copy into the chain BEFORE entry
+                ;; validation: keys resolve after the bank's own :copy
+                ;; is folded in (STORY §4.4)
+                (setq cistern--story-copy
+                      (append cistern--story-copy
+                              (plist-get bank :copy)))
+                (let ((seen nil))
+                  (dolist (e entries)
+                    (let ((id (plist-get e :id)))
+                      (when (member id seen)
+                        (cistern--bank-error
+                         f "duplicate :id %s in kind %s" id kind))
+                      (push id seen)
+                      (cistern--bank-validate-entry
+                       f kind e cistern--banks))))
+                (setq loaded
+                      (plist-put loaded
+                                 (pcase kind
+                                   ('scenario :scenarios)
+                                   ('quirk :quirks)
+                                   ('keyword :keywords)
+                                   ('flavor :flavor))
+                                 (append (plist-get loaded
+                                                     (pcase kind
+                                                       ('scenario :scenarios)
+                                                       ('quirk :quirks)
+                                                       ('keyword :keywords)
+                                                       ('flavor :flavor)))
+                                         entries)))))))))
+    (setq cistern--banks loaded)
+    cistern--banks))
+
 (defun cistern--cmd-set-goal-card (st card)
   "Set ST's active goal card (M3).  Validates the §5 shape — max 3
 goals, known kinds — and stamps :map-id from the game seed (the

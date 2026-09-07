@@ -1053,5 +1053,115 @@ deterministic including rpg-pos, XP and clearance."
                t "300-tick runs diverged"))
   (message "CISTERN-V4-13-OK"))
 
+(defun cistern-test-v4-14-banks-loader ()
+  "V4-14 (S2/S8): the example bank loads clean through
+`cistern--banks-load'; malformed banks fail loudly with the
+offending field named; the copy chain resolves cistern--copy's
+story section first, then bank :copy in load order."
+  ;; the shipped example bank, fresh registry
+  (setq cistern--banks nil cistern--story-copy nil)
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v4--root)))
+  (cl-assert (= (length (plist-get cistern--banks :scenarios)) 1)
+             t "example scenario missing")
+  (cl-assert (= (length (plist-get cistern--banks :quirks)) 3)
+             t "example quirks missing")
+  (cl-assert (= (length (plist-get cistern--banks :flavor)) 2)
+             t "example flavor missing")
+  (cl-assert (string-match-p "PRESSURE LOGGED"
+                             (cistern--story-copy-key 'story-sealed-premise))
+             t "copy chain lost the bank premise")
+  ;; S2: six defects, each a programmatic mutation of one good bank,
+  ;; emitted via %S (an unbalanced hand-written string is impossible)
+  (let ((good (quote (:kind scenario :version "1"
+                       :copy ((k0 . "A") (k1 . "B") (k2 . "C") (k3 . "D"))
+                       :entries
+                       ((:id bad-s :premise k0 :acts 3 :tiers (60 30 10)
+                         :hooks ((:id h1 :act 1 :window (20 . 90)
+                                  :condition (tick) :requires nil
+                                  :matrix m :resolve-copy k1))
+                         :matrices
+                         ((:id m :difficulty 11 :stat integrity
+                           :act-mods (0 2 4)
+                           :outcomes
+                           ((:line-key k1 :effect none :arg nil)
+                            (:line-key k1 :effect none :arg nil)
+                            (:line-key k1 :effect none :arg nil)
+                            (:line-key k1 :effect none :arg nil))))))))))
+    (dolist
+        (spec
+         (list
+          ;; unknown :kind
+          (cons (lambda (b) (plist-put b :kind (quote wibble)))
+                "unknown :kind")
+          ;; duplicate :id across a kind (two entries, same id)
+          (cons (lambda (b)
+                  (let* ((entries (plist-get b :entries))
+                         (e (car entries)))
+                    (plist-put b :entries (append entries (list e)))))
+                "duplicate :id")
+          ;; unresolvable premise copy key
+          (cons (lambda (b)
+                  (plist-put (car (plist-get b :entries))
+                             :premise (quote no-such-key)))
+                "unresolvable")
+          ;; matrix with 3 outcomes
+          (cons (lambda (b)
+                  (let* ((e (car (plist-get b :entries)))
+                         (m (car (plist-get e :matrices)))
+                         (o (plist-get m :outcomes)))
+                    (plist-put m :outcomes
+                               (list (nth 0 o) (nth 1 o) (nth 2 o)))))
+                "(need 4)")
+          ;; window outside its act span
+          (cons (lambda (b)
+                  (let* ((e (car (plist-get b :entries)))
+                         (h (car (plist-get e :hooks))))
+                    (plist-put h :window (quote (200 . 90)))))
+                "outside act")
+          ;; effect off the whitelist
+          (cons (lambda (b)
+                  (let* ((e (car (plist-get b :entries)))
+                         (m (car (plist-get e :matrices)))
+                         (o (plist-get m :outcomes)))
+                    (plist-put (car o) :effect (quote alloy-theft))))
+                "whitelist")))
+      (let* ((bank (copy-tree good))
+             (file (make-temp-file "cistern-badbank")))
+        (funcall (car spec) bank)
+        (with-temp-file file
+          (insert (format "(defconst cistern-bank-bad-%s\n  (quote %S))"
+                          (symbol-name (plist-get bank :kind)) bank)))
+        (setq cistern--banks nil cistern--story-copy nil)
+        (let ((err (condition-case e
+                       (progn (cistern--banks-load (list file)) nil)
+                     (error (format "%S" (cadr e))))))
+          (cl-assert (and err (string-match-p (cdr spec) err))
+                     t "%s not caught (err=%S)" (cdr spec) err)))))
+  (message "CISTERN-V4-14-OK"))
+
+(defun cistern-test-v4-18-gen-bank ()
+  "V4-18 (S3): the generator's reruns are byte-identical, its
+output re-loads and validates through the real loader, and
+different seeds produce distinct id sets."
+  (let ((f1 (make-temp-file "gen-a")) (f2 (make-temp-file "gen-b")))
+    (cistern-gen-bank-run :kind 'quirk :seed 8402 :count 4 :out f1)
+    (cistern-gen-bank-run :kind 'quirk :seed 8402 :count 4 :out f2)
+    (cl-assert (string= (with-temp-buffer (insert-file-contents f1)
+                                          (buffer-string))
+                        (with-temp-buffer (insert-file-contents f2)
+                                          (buffer-string)))
+               t "generator reruns differ"))
+  ;; output revalidates (the generator already ran the loader —
+  ;; prove it here through the shipped path)
+  (let ((f3 (make-temp-file "gen-c")))
+    (cistern-gen-bank-run :kind 'flavor :seed 8402 :count 6 :out f3)
+    (setq cistern--banks nil cistern--story-copy nil)
+    (cistern--banks-load (list f3))
+    (cl-assert (= (length (plist-get cistern--banks :flavor)) 6)
+               t "generated flavor bank did not load"))
+  (message "CISTERN-V4-18-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here

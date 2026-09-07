@@ -581,7 +581,8 @@ the power layer is framed as pairings the player already knows."
     (princ "  L full log             u cancel armed verb (ESC on GUI)\n")
     (princ "  C-u r slow auto-run (1 tps)\n")
     (princ "  r   auto-run (5 ticks/s)\n")
-    (princ "  T   skip tutorial         n   new game\n")
+    (princ "  T   cycle fixture type   C-t skip tutorial\n")
+    (princ "  n   new game\n")
     (princ "  ?   this briefing         q   quit\n\n")
     ;; V4-08 (S4.4 §4): the emacs power layer — pairings, not a new
     ;; language (briefing prose, not table copy)

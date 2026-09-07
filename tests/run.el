@@ -12,6 +12,8 @@
               (file-name-directory (or load-file-name buffer-file-name))))))
   (load (expand-file-name "src/cistern-domain.el" root) nil t)
   (load (expand-file-name "src/cistern-game.el" root) nil t)
+  ;; V4-18: the bank generator joins the canonical suite's load set
+  (load (expand-file-name "tools/gen-bank.el" root) nil t)
   (dolist (f (directory-files (expand-file-name "tests" root)
                               t "\\(domain\\|game\\|test\\)-.*\\.el\\'"))
     (load f nil t)))
@@ -118,7 +120,9 @@
     cistern-test-v4-10-stat-blocks
     cistern-test-v4-11-toilet-catalog
     cistern-test-v4-12-rpg-machinery
-    cistern-test-v4-13-envelope-guard))
+    cistern-test-v4-13-envelope-guard
+    cistern-test-v4-14-banks-loader
+    cistern-test-v4-18-gen-bank))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
