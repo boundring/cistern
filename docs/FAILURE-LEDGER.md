@@ -2819,3 +2819,28 @@ the relaunch is on their screen now.
   (rule, not list: new face = new role, zero literals).
 
 ---
+
+## L-086 (2026-09-07, run: impl-v4-w2a — V4-10 RPG stat blocks, RPG §1/§1.1/§3.1)
+
+- Outcome: LANDED (red commit `git log 3812b73..HEAD~1`, green this
+  commit).
+- Red: void cistern--worker-stats (no stat blocks).
+- Green: worker slots :stats :xp :clearance; state slot rpg-pos
+  (init seed ⊕ 3 before the cast, sequential consumption);
+  cistern--rpg-advance/d6-pos/d20-pos (glibc recurrence, bit-6
+  slice per §3.2) + stateful d6; 4d6-drop-lowest stat gen in fixed
+  F/G/N/A order at spawn (new-game cast + migrants);
+  cistern--rpg-mod floor((s−10)/2); §1 clamp functions
+  (seek-eff/sick-duration/mine-rate) pinned — wiring is V4-12's
+  hook sweep.
+- Fixture ruling: the spec's rpg-pos fixture (1156891213) covers
+  ONE spawn-roll sequence (worker α's 16 d6s — the worked example
+  tracks α); the full cast consumes 4×16 sequentially.  The test
+  asserts α's block from a real new-game AND replays the exact
+  sequence on a fresh stream to pin the pos.  XOR init mattered:
+  seed ⊕ 3 is logxor (20260829), not +3 — first chain computed
+  wrong from addition.
+- VERIFY: canonical suite ALL 94 TESTS PASSED (batch).
+
+---
+

@@ -754,14 +754,21 @@ child stream 3 at spawn (seed ⊕ 3, mid-bits d6), fixture-pinned:
 seed 20260830 → α FLOW 15 GRIT 15 NERVE 9 ARCHIVE 14, rpg-pos
 1156891213 after spawn; modifiers are floor((score−10)/2) and all
 scores land in [3,18]."
-  ;; A1: the pinned fixture
+  ;; A1: the pinned fixture — the worked example tracks worker α, so
+  ;; the pos fixture covers ONE spawn-roll sequence (16 d6s); the
+  ;; whole cast consumes 4×16 sequentially (spec §1.1).
   (let ((st (cistern--new-game 20260830)))
     (let ((w (car (cistern-st-creators st))))
       (cl-assert (equal (cistern--worker-stats w) '(15 15 9 14))
                  t "fixture stat block wrong: %S"
                  (cistern--worker-stats w))
       (cl-assert (eq (cistern--worker-clearance w) 1) t "spawn clearance")
-      (cl-assert (= (cistern--worker-xp w) 0) t "spawn xp"))
+      (cl-assert (= (cistern--worker-xp w) 0) t "spawn xp")))
+  (let ((st (cistern--new-game 20260830)))
+    ;; replay exactly one spawn-roll sequence on a fresh stream
+    (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
+    (cl-assert (equal (cistern--rpg-roll-stats st) '(15 15 9 14))
+               t "replayed fixture block wrong")
     (cl-assert (= (cistern-st-rpg-pos st) 1156891213)
                t "rpg-pos fixture wrong: %S" (cistern-st-rpg-pos st)))
   ;; the sim LCG is untouched by stat generation (stream discipline)

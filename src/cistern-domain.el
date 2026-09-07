@@ -80,7 +80,10 @@ by the view, not here).")
 ;; 2. State — one object, threaded everywhere.
 
 (cl-defstruct (cistern--worker (:constructor cistern--worker-make))
-  x y (bladder 20) (sick 0) (mine 0) (use-t 0) (using nil) (toilet nil))
+  x y (bladder 20) (sick 0) (mine 0) (use-t 0) (using nil) (toilet nil)
+  ;; V4-10 (RPG §1): the maintenance dossier — (FLOW GRIT NERVE
+  ;; ARCHIVE) scores 3-18, XP ledger, clearance level 1..3
+  (stats nil) (xp 0) (clearance 1))
 
 (cl-defstruct cistern-st
   (w cistern-w) (h cistern-h)
@@ -100,6 +103,8 @@ by the view, not here).")
   score objectives unlocks   ; rewards-owned; shape DEFERRED to REWARDS-DESIGN
   (rewards-events nil)       ; events emitted since the last rewards-eval read (§5)
   (particle-rng 0)           ; the particle field's child-stream position (§4 ParticleField.rng)
+  (rpg-pos 0)                ; V4-10: RPG child-stream position (seed ⊕ 3) —
+                             ; pos-in/pos-out like particle-rng, NEVER the sim LCG
   (goal-card nil)            ; active goal card (§5): (:map-id :tier :goals :completed)
   (reputation 0)             ; 0-100 clamped; M4 deltas: +1 relief −5 burst −2 leak
   (rewards-outcome nil)      ; stored per-tick (outcome . intents) 2-list; the view reads it
@@ -129,6 +134,65 @@ by the view, not here).")
 §4).  STREAM-ID 0 is reserved — it would reproduce the sim LCG's
 own sequence."
   (logxor seed stream-id))
+
+;; ---------------------------------------------------------------------------
+;; V4-10 (RPG §1/§3.1): worker stat blocks from child stream 3.
+;; Draw procedure pinned for BOTH docs (STORY §6.3): the glibc LCG
+;; recurrence, sliced at bit 6 — the low bits cycle (RPG §3.2).
+
+(defconst cistern--rpg-stat-names '(FLOW GRIT NERVE ARCHIVE))
+
+(defun cistern--rpg-advance (pos)
+  (% (+ (* pos 1103515245) 12345) 2147483648))
+
+(defun cistern--rpg-d6-pos (pos)
+  (let ((p (cistern--rpg-advance pos)))
+    (cons (1+ (% (ash p -6) 6)) p)))
+
+(defun cistern--rpg-d20-pos (pos)
+  (let ((p (cistern--rpg-advance pos)))
+    (cons (1+ (% (ash p -6) 20)) p)))
+
+(defun cistern--rpg-d6 (st)
+  "Stateful stream-3 d6 draw (pos-in/pos-out on `cistern-st-rpg-pos')."
+  (let ((r (cistern--rpg-d6-pos (cistern-st-rpg-pos st))))
+    (setf (cistern-st-rpg-pos st) (cdr r))
+    (car r)))
+
+(defun cistern--rpg-mod (score)
+  "D&D-standard modifier: floor((score − 10) / 2), −4..+4."
+  (floor (- score 10) 2))
+
+(defun cistern--rpg-roll-stat (st)
+  "4d6 drop lowest, summed — one stat score (3-18)."
+  (let ((rolls (sort (list (cistern--rpg-d6 st) (cistern--rpg-d6 st)
+                           (cistern--rpg-d6 st) (cistern--rpg-d6 st))
+                     #'<)))
+    (+ (nth 1 rolls) (nth 2 rolls) (nth 3 rolls))))
+
+(defun cistern--rpg-roll-stats (st)
+  "Roll the four stat scores in fixed order FLOW, GRIT, NERVE,
+ARCHIVE, consuming stream 3 sequentially."
+  (list (cistern--rpg-roll-stat st) (cistern--rpg-roll-stat st)
+        (cistern--rpg-roll-stat st) (cistern--rpg-roll-stat st)))
+
+(defun cistern--rpg-seek-eff (nerve-mod)
+  "NERVE coupling (§1): seek threshold clamp(60 − 5·mod, 50, 68).
+High NERVE files the relief request BEFORE the spike."
+  (clamp 50 (- 60 (* 5 nerve-mod)) 68))
+
+(defun cistern--rpg-sick-duration (grit-mod)
+  "GRIT coupling (§1): sickness clamp(30 − 4·mod, 18, 42) ticks."
+  (clamp 18 (- 30 (* 4 grit-mod)) 42))
+
+(defun cistern--rpg-mine-rate (flow-mod)
+  "FLOW coupling (§1): healthy ore-ticks per alloy
+clamp(3 − mod, 2, 6); sick workers take twice as many (§1)."
+  (clamp 2 (- 3 flow-mod) 6))
+
+(defun clamp (lo v hi)
+  "V4-10 helper: clamp V into [LO, HI]."
+  (min hi (max lo v)))
 
 (defun cistern--stream-next (pos)
   "One raw child-stream step from POS: the domain LCG recurrence.
@@ -522,7 +586,8 @@ entering a toilet IS seating yourself.  Toilets are rooms, not floors."
 ;; 5. Worker lifecycle (cistern.el:236-258).
 
 (defun cistern--spawn-worker (st x y)
-  (let ((w (cistern--worker-make :x x :y y :bladder 20)))
+  (let ((w (cistern--worker-make :x x :y y :bladder 20
+                                 :stats (cistern--rpg-roll-stats st))))
     (setf (cistern-st-creators st)
           (append (cistern-st-creators st) (list w)))
     (setf (cistern-st-migrants st) (1+ (cistern-st-migrants st)))
@@ -875,8 +940,13 @@ game layer (Phase 2)."
   "Build fresh state.  SEED (integer) makes the run reproducible."
   (let ((st (make-cistern-st)))
     (cistern--gen-map st (or seed 20260830))
+    ;; V4-10 (RPG §1.1): the RPG child stream (seed ⊕ 3) initializes
+    ;; before the cast so spawn stat draws consume it sequentially
+    (setf (cistern-st-rpg-pos st)
+          (cistern--stream-init (cistern-st-seed st) 3))
     (dolist (p cistern--procgen-spawns)
-      (let ((w (cistern--worker-make :x (nth 0 p) :y (nth 1 p))))
+      (let ((w (cistern--worker-make :x (nth 0 p) :y (nth 1 p)
+                                     :stats (cistern--rpg-roll-stats st))))
         (setf (cistern-st-creators st) (append (cistern-st-creators st)
                                                (list w)))))
     (setf (cistern-st-migrants st) 0)
