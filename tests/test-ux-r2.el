@@ -59,5 +59,52 @@ orphaned)."
                  t "render row over 95 cols (len %d): %S"
                  (length row) (substring row 0 (min 40 (length row)))))))
 
+;; --- R2-Q02: badge budget + header-append contract ---------------------------
+
+(defun cistern-test-ux2-q02-badge-geometry ()
+  "The badges live on ONE reserved dim row directly below the
+strip; the block height is one constant both the renderer and
+cell-at derive from (cold 3, badge live 4); the condemn append is
+short.  THE probe: with the badge row live, cell-at of the map's
+first cell is unchanged."
+  (let ((st (cistern--new-game 42)))
+    ;; cold: strip + two help rows = 3; the map starts at line 4
+    (cl-assert (= (cistern-view--header-block-height st) 3)
+               t "cold block height is 3")
+    (cl-assert (equal (cistern-view--cell-at st 4 0) '(0 . 0))
+               t "cold: map's first cell at line 4")
+    ;; armed: the badge row is line 2, the map starts at line 5
+    (cistern--cmd-arm-verb st 'pipe)
+    (setf (cistern-st-auto-run st) t)
+    (cl-assert (= (cistern-view--header-block-height st) 4)
+               t "badge live: block height 4")
+    (let ((lines (cistern-test-ux2--render-lines st)))
+      (cl-assert (string= (nth 0 lines)
+                          (cistern-test-ux2--plain
+                           (cistern-view--header-line st)))
+                 t "the strip is line 0")
+      (cl-assert (string-match-p "ARMED: PIPE" (nth 1 lines))
+                 t "the badge row sits directly below the strip")
+      (cl-assert (string-match-p "AUTO-RUN" (nth 1 lines))
+                 t "armed and auto-run coexist on the one badge row")
+      (cl-assert (string-match-p "\\[SPC\\]tick" (nth 2 lines))
+                 t "help row A follows the badge row")
+      (dolist (row lines)
+        (cl-assert (<= (length row) 95)
+                   t "badge-live row over 95 cols")))
+    ;; THE geometry probe: cell-at of the map's first cell, badge live
+    (cl-assert (equal (cistern-view--cell-at st 5 0) '(0 . 0))
+               t "badge live: map's first cell at line 5 — clicks land")
+    ;; the condemn append is short
+    (setf (cistern-st-over st) "SECTOR CONDEMNED — CONTAMINATION LIMIT")
+    (cl-assert (string-match-p "!! CONDEMNED"
+                               (cistern-test-ux2--plain
+                                (cistern-view--header-line st)))
+               t "condemn append shortened")
+    (cl-assert (null (string-match-p "SECTOR CONDEMNED — CONTAM"
+                                     (cistern-test-ux2--plain
+                                      (cistern-view--header-line st))))
+               t "the long cause lives on the death panel, not the strip")))
+
 (provide 'test-ux-r2)
 ;;; test-ux-r2.el ends here
