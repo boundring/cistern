@@ -431,5 +431,38 @@ the view's private copy is retired."
         (cl-assert (string= cell glyph)
                    t "map and log agree on the identity glyph")))))
 
+;; --- Q15: log consequence ranking + spam suppression ----------------------------
+
+(defun cistern-test-ux-q15-log-ranking ()
+  "With breach + relief spam the 3-line tail keeps the breach;
+identical consecutive relief lines collapse to one with an ×N
+count; boot flavor ages out like any line.  Suppression is
+silent — no new copy beyond the count."
+  ;; (a) breach survives relief spam; identical lines shown once
+  (let ((st (cistern--new-game 42)))
+    (dotimes (_ 12) (cistern--log-sev st 'info "CREATOR RELIEVED AT (3,3)"))
+    (cistern--log-sev st 'error "BREACH — CREATOR β OVERFLOWED AT (5,6)")
+    (let* ((tail (cistern-view--log-tail st))
+           (rows (cl-remove-if (lambda (r) (string= r ""))
+                               (split-string tail "\n")))
+           (breach-row (cl-find-if (lambda (r) (string-match-p "BREACH" r))
+                                   rows)))
+      (cl-assert breach-row t "the breach keeps a tail slot")
+      (cl-assert (= 1 (cl-count-if (lambda (r) (string-match-p "RELIEVED" r))
+                                   rows))
+                 t "identical consecutive relief lines collapse")
+      (cl-assert (cl-find-if (lambda (r) (string-match-p "×12" r)) rows)
+                 t "the collapse carries the ×12 count")
+      (cl-assert (eq (get-text-property 0 'face breach-row)
+                     'cistern-toilet-down)
+                 t "the breach keeps its red face")))
+  ;; (b) boot flavor ages out: 13 distinct later lines push it out
+  (let ((st (cistern--new-game 42)))
+    (dotimes (i 13) (cistern--log st "TICK NOISE %d" i))
+    (cl-assert (null (cl-find-if (lambda (r) (string-match-p "ONLINE" r))
+                                 (split-string (cistern-view--log-tail st)
+                                               "\n")))
+               t "boot flavor ages out like any line")))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
