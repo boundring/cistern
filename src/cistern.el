@@ -9,6 +9,11 @@
 ;;; Code:
 
 (require 'cl-lib)
+;; The optional filename makes `emacs -Q -l src/cistern.el' work:
+;; load never adds the loaded file's directory to load-path (smoke
+;; L-034), and a bare top-level `when' bootstrap would trip the
+;; source-integrity gate (every src/ top-level form must be a
+;; defining head).  Falls back to load-path when load-file-name is nil.
 (require 'cistern-game (and load-file-name (expand-file-name "cistern-game.el" (file-name-directory load-file-name))))
 (require 'cistern-input (and load-file-name (expand-file-name "cistern-input.el" (file-name-directory load-file-name))))
 (require 'cistern-view (and load-file-name (expand-file-name "cistern-view.el" (file-name-directory load-file-name))))
@@ -185,14 +190,19 @@ and the chain callback live in the input adapter; the handle is
     (princ "  the ▣: free, and it PAYS 1 alloy per 3 units of waste.\n\n")
     (princ "  At 100%% a worker breaches: the tile turns ▒, contamination\n")
     (princ "  rises, neighbors fall sick.  ▒ spreads to adjacent floor.\n")
-    (princ "  Decon with c.  At %d the sector is condemned.\n\n" cistern-contam-limit)
-    (princ "  Every %d ticks a migrant arrives.  Population means load.\n\n" cistern-migrant-every)
+    (princ (format "  Decon with c.  At %d the sector is condemned.\n\n"
+                   cistern-contam-limit))
+    (princ (format "  Every %d ticks a migrant arrives.  Population means load.\n\n"
+                   cistern-migrant-every))
     (princ "CONTROLS\n")
     (princ "  SPC / RET   advance one tick\n")
     (princ "  arrows / mouse   move cursor\n")
-    (princ "  t   build toilet (12)     p   lay pipe (2)\n")
-    (princ "  K   build tank (15)       c   decontaminate (4)\n")
-    (princ "  x   purge tank (pays)     d   demolish (3)\n")
+    (princ (format "  t   build toilet (%d)     p   lay pipe (%d)\n"
+                   cistern-cost-toilet cistern-cost-pipe))
+    (princ (format "  K   build tank (%d)       c   decontaminate (%d)\n"
+                   cistern-cost-tank cistern-cost-decon))
+    (princ (format "  x   purge tank (pays)     d   demolish (%d)\n"
+                   cistern-cost-demolish))
     (princ "  r   auto-run (5 ticks/s)\n")
     (princ "  T   skip tutorial         n   new game\n")
     (princ "  ?   this briefing         q   quit\n")))
