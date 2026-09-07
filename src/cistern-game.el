@@ -397,6 +397,12 @@ state for the view to read (L-027); the view never calls this."
               (cistern--field-spawn st (cons x y) (cons 0 -1) 3
                                     (format "+%d" pay)
                                     (if tip 'bonus 'success) 'popup))))))
+    ;; V4-12 (RPG §4, S3): clearance-up fires an at-the-act popup —
+    ;; a field particle over the worker, same grammar as relieve-pay
+    (dolist (e events)
+      (when (and (consp e) (eq (cistern--event-kind e) 'clearance))
+        (cistern--field-spawn st (cons (nth 2 e) (nth 3 e)) (cons 0 -1) 3
+                              "CLEARANCE UP" 'success 'popup)))
     ;; M7 three-tier log grammar: faced log intents ride the stored
     ;; slot; the view's log-tail applies the faces to the matching
     ;; log lines.  Game-changing events present via the banner row

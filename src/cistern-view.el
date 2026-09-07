@@ -412,12 +412,16 @@ can never be listed twice."
          (base
           (cond
            ((eq kind 'toilet)
-            (let ((s (cistern--toilet-state st x y)))
-              (cond ((eq s 'busy) "TOILET — IN USE")
-                    ((eq s 'usable) "TOILET — WIRED AND SERVICED")
-                    ((cistern--connected-tanks st x y)
-                     "TOILET — BACKED UP: PURGE THE TANKS (x)")
-                    (t "TOILET — SEVERED: LAY PIPE TO A TANK (p)"))))
+            ;; V4-12 (RPG §1.2): the toilet inspector names its type
+            (let* ((s (cistern--toilet-state st x y))
+                   (state (cond ((eq s 'busy) "IN USE")
+                                ((eq s 'usable) "WIRED AND SERVICED")
+                                ((cistern--connected-tanks st x y)
+                                 "BACKED UP: PURGE THE TANKS (x)")
+                                (t "SEVERED: LAY PIPE TO A TANK (p)")))
+                   (type (cistern--toilet-type-at st x y)))
+              (format (cdr (assq 'toilet-type-fmt cistern--copy))
+                      (upcase (symbol-name type)) state)))
            ((eq kind 'tank)
             (format "TANK — LOAD %d/%d — PURGE WITH x (pays 1 alloy per %d)"
                     (or (cistern--tank-load st x y) 0)
@@ -448,14 +452,40 @@ can never be listed twice."
                                    (cistern--worker-use-t w)))
                           ((> (cistern--worker-sick w) 0)
                            (format "sick (%d ticks)" (cistern--worker-sick w)))
-                          (t "working"))))))
+                          (t "working")))))
+         ;; V4-12 (RPG §1.2): clearance + stat segments after the
+         ;; status; width-safe degradation drops the stat segment
+         ;; FIRST and changes nothing else (A13)
+         (who-with-cl
+          (when who
+            (concat who " — "
+                    (format (cdr (assq 'inspector-clear-fmt cistern--copy))
+                            (nth (1- (cistern--worker-clearance w))
+                                 '("I" "II" "III"))))))
+         (who-full
+          (when who-with-cl
+            (let ((stats (cistern--worker-stats w)))
+              (concat who-with-cl " — "
+                      (format (cdr (assq 'inspector-stat-fmt cistern--copy))
+                              (cistern--rpg-mod (nth 0 stats))
+                              (cistern--rpg-mod (nth 1 stats))
+                              (cistern--rpg-mod (nth 2 stats))
+                              (cistern--rpg-mod (nth 3 stats))))))))
     ;; R2-Q09: a demolishable cell built this tick advertises the
     ;; free undo where the cursor rests
     (when (and (memq kind '(pipe toilet tank))
                (cistern--built-this-tick-p st x y))
       (setq base (concat base (cdr (assq 'same-tick-free cistern--copy)))))
-    (concat "CURSOR (" (number-to-string x) "," (number-to-string y)
-            "): " base (if who (concat "  —  " who) ""))))
+    ;; V4-12 (A13): the stat segment drops first when the assembled
+    ;; line would exceed 95 cols; nothing else changes
+    (let* ((head (concat "CURSOR (" (number-to-string x) ","
+                         (number-to-string y) "): " base))
+           (with-stats (concat head
+                               (if who-full (concat "  —  " who-full) "")))
+           (without-stats (concat head
+                                  (if who-with-cl
+                                      (concat "  —  " who-with-cl) ""))))
+      (if (<= (length with-stats) 95) with-stats without-stats))))
 
 (defun cistern-view--pressure-face (st)
   "Q21: colors, not new words — CRITICAL (and SEVERED, the other

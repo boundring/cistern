@@ -2873,3 +2873,39 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-088 (2026-09-07, run: impl-v4-w2a — V4-12 RPG checks + matrices + XP/clearance + inspector, RPG §3/§4/§1.2)
+
+- Outcome: LANDED (red commit `git log 93af366..HEAD~1`, green this
+  commit).
+- Red: void cistern--matrix-effect etc.
+- Green: cistern--rpg-const (DCs 12/10/16); cistern--matrix-hash —
+  the shared (matrix-id . band 0..3) → effect-plist hash (§1.3
+  ruling 5; story matrices fold in at V4-19) with fail-first
+  unknown-id errors; cistern--rpg-band/check (nat-20/1 promotion
+  pre-lookup); suit classification (dominant stat, fixed tie order,
+  CL.II never-unsuited); use_ticks_eff clamp(±1, 1, 4); XP ledger
+  (+1 relief, +1 suited relief, +1 band-3, +1 shift boundary at
+  tick%40) with clearance-up log + at-the-act popup (rewards-event
+  payload 'clearance consumed by rewards-eval as a field particle —
+  S3 register, rewards stays the sole drainer); hooks: exposure
+  replaces auto-sick in accident, composure spike on the 100-
+  crossing (can early-burst), stride on the journey's first
+  step-toward (adds steps only, journey-pinned, shuffle never
+  rolls), NERVE seek_eff, FLOW mining rate (sick = 2×rate), GRIT
+  sick duration; inspector gains clearance + stat segments with
+  A13 width degradation, toilet lines name the fixture type
+  (toilet-type-fmt), worker slot :journey for stride.
+- Process notes: (1) the fixture d20s (9,1,10,10,6,14,14,17) start
+  AFTER α's 16 stat draws (pos 1156891213) — seeding from the bare
+  stream init was wrong; (2) three paren-balance escapes in the
+  test defun (cl-assert bodies executing at load) and one in the
+  accident hook — the multi-let + hook-sweep pattern needs a
+  balance check before every suite run from here on; (3) the
+  inspector's :type read initially violated D6/R5 (view touching
+  the toilets hash) — routed through the new domain accessor
+  cistern--toilet-type-at.
+- VERIFY: canonical suite ALL 96 TESTS PASSED (batch).
+
+---
+

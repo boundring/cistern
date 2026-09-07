@@ -883,7 +883,9 @@ names it."
   "Pinned first d20s at (seed 20260830, stream 3) — RPG §7.")
 
 (defun cistern-test-v4-12--seed-d20 (st n)
-  "Advance ST's stream past the first N pinned d20 draws."
+  "Position ST's stream at the RPG §7 fixture point (rpg-pos after
+α's 16 stat draws) and consume N of the pinned d20s."
+  (setf (cistern-st-rpg-pos st) 1156891213)
   (dotimes (_ n) (cistern--rpg-d20 st)))
 
 (defun cistern-test-v4-12-rpg-machinery ()
@@ -917,8 +919,9 @@ dominant stat; stream hygiene holds."
   ;; pinned d20 sequence at the fixture seed
   (let ((st (cistern--new-game 20260830)))
     (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
+    (cistern--rpg-roll-stats st)          ; α's 16 stat draws come first
     (dolist (d cistern-test-v4-12--d20s)
-      (cl-assert (= (cistern--rpg-d20 st) d) t "pinned d20 drift"))))
+      (cl-assert (= (cistern--rpg-d20 st) d) t "pinned d20 drift")))
   ;; A6: exposure — band-2 draw does not sicken; band-0 adds +5
   (let ((st (cistern--new-game 20260830)))
     (let ((victim (car (cistern-st-creators st)))
@@ -928,7 +931,6 @@ dominant stat; stream hygiene holds."
       (setf (cistern--worker-x breacher) 8)
       (setf (cistern--worker-y breacher) 7)
       ;; victim is α: GRIT 15 → mod +2; d20 #3 = 10 → 10+2−12 = 0 → band 2
-      (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
       (cistern-test-v4-12--seed-d20 st 2)
       (cistern--accident st breacher)
       (cl-assert (= (cistern--worker-sick victim) 0)
@@ -944,18 +946,16 @@ dominant stat; stream hygiene holds."
       (setf (cistern--worker-x breacher) 8)
       (setf (cistern--worker-y breacher) 7)
       ;; d20 #2 = 1 → nat-1 demotes to band 0: sick = clamp(30−8)+5 = 27
-      (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
-      (cistern--rpg-d20 st)
+      (cistern-test-v4-12--seed-d20 st 1)
       (cistern--accident st breacher)
       (cl-assert (= (cistern--worker-sick victim) 27)
                  t "band-0 exposure sick duration wrong: %S"
-                 (cistern--worker-sick victim)))))
+                 (cistern--worker-sick victim)))
   ;; A7: composure — spike on the 100-crossing, only there
   (let ((st (cistern--new-game 20260830)))
     (let ((w (cistern--worker-make :x 8 :y 6 :stats '(10 10 10 10))))
       (setf (cistern--worker-bladder w) 101)
-      (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
-      (cistern--rpg-d20 st)                    ; d20 #1 = 9 → 9+0−10 = band 1 → +5
+      (cistern-test-v4-12--seed-d20 st 0)      ; d20 #1 = 9 → 9+0−10 = band 1 → +5
       (cistern--rpg-composure st w 99)
       (cl-assert (= (cistern--worker-bladder w) 106)
                  t "composure spike wrong: %S"
@@ -972,7 +972,6 @@ dominant stat; stream hygiene holds."
       (setf (cistern--worker-x w) 8)
       (setf (cistern--worker-y w) 6)
       (setf (cistern--worker-stats w) '(10 10 10 20)) ; ARCHIVE mod +2
-      (setf (cistern-st-rpg-pos st) (cistern--stream-init 20260830 3))
       (cistern-test-v4-12--seed-d20 st 7)      ; d20 #8 = 17 → 17+2−16 pass
       (cistern--step-toward st w 8 4)
       (let ((pos (cistern-st-rpg-pos st))

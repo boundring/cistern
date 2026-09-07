@@ -83,7 +83,7 @@ by the view, not here).")
   x y (bladder 20) (sick 0) (mine 0) (use-t 0) (using nil) (toilet nil)
   ;; V4-10 (RPG §1): the maintenance dossier — (FLOW GRIT NERVE
   ;; ARCHIVE) scores 3-18, XP ledger, clearance level 1..3
-  (stats nil) (xp 0) (clearance 1))
+  (stats nil) (xp 0) (clearance 1) (journey nil))
 
 (cl-defstruct cistern-st
   (w cistern-w) (h cistern-h)
@@ -159,6 +159,12 @@ own sequence."
 (defun cistern--rpg-d6 (st)
   "Stateful stream-3 d6 draw (pos-in/pos-out on `cistern-st-rpg-pos')."
   (let ((r (cistern--rpg-d6-pos (cistern-st-rpg-pos st))))
+    (setf (cistern-st-rpg-pos st) (cdr r))
+    (car r)))
+
+(defun cistern--rpg-d20 (st)
+  "Stateful stream-3 d20 draw (pos-in/pos-out on `cistern-st-rpg-pos')."
+  (let ((r (cistern--rpg-d20-pos (cistern-st-rpg-pos st))))
     (setf (cistern-st-rpg-pos st) (cdr r))
     (car r)))
 
@@ -243,6 +249,161 @@ clamp(3 − mod, 2, 6); sick workers take twice as many (§1)."
                    (cistern--neighbors st x y))
           t
         (plist-get (cistern--toilet-type-entry type) :place-fail))))))
+
+;; ---------------------------------------------------------------------------
+;; V4-12 (RPG §3/§4): checks, matrices, XP/clearance.  All rolls are
+;; pos-in/pos-out on stream 3 — the sim LCG and particle stream are
+;; never touched (A10).
+
+(defconst cistern--rpg-const
+  '((exposure-dc . 12) (composure-dc . 10) (stride-dc . 16))
+  "RPG §3.5: DCs live in one block beside the catalog.")
+
+(defconst cistern--matrix-hash
+  (let ((h (make-hash-table :test #'equal)))
+    (dolist (m '((exposure-grit . ((:sick 5) (:sick 0) (:sick 0) (:sick 0 :xp 1)))
+                 (composure-nerve . ((:spike 10) (:spike 5) (:spike 0)
+                                     (:spike 0 :xp 1)))))
+      (let ((i 0))
+        (dolist (b (cdr m))
+          (puthash (cons (car m) i) b h)
+          (setq i (1+ i)))))
+    h)
+  "Shared (MATRIX-ID . BAND 0..3) → effect plist (§1.3 ruling 5;
+the story engine folds its matrices into this same hash in
+V4-19).")
+
+(defun cistern--matrix-effect (matrix-id band)
+  "Resolve (MATRIX-ID . BAND); an unknown matrix-id errors
+fail-first (A9)."
+  (or (gethash (cons matrix-id band) cistern--matrix-hash)
+      (error "UNKNOWN MATRIX %S" matrix-id)))
+
+(defun cistern--rpg-band (st dc mod)
+  "One d20 check band (RPG §3.3): stat = clamp(mod, −2, +2),
+D&D banding, nat-20 promotes to band 3 / nat-1 demotes to band 0."
+  (let* ((r (cistern--rpg-d20-pos (cistern-st-rpg-pos st)))
+         (roll (car r))
+         (margin (+ roll (clamp -2 mod 2) (- dc)))
+         (band (cond ((<= margin -5) 0) ((<= margin -1) 1)
+                     ((<= margin 4) 2) (t 3))))
+    (setf (cistern-st-rpg-pos st) (cdr r))
+    (cond ((= roll 20) 3) ((= roll 1) 0) (t band))))
+
+(defun cistern--rpg-check (st matrix-id dc mod)
+  "Full matrix check: (BAND . EFFECT-PLIST) — one d20, then the
+shared hash lookup (no runtime hashing)."
+  (let ((band (cistern--rpg-band st dc mod)))
+    (cons band (cistern--matrix-effect matrix-id band))))
+
+(defun cistern--rpg-stat-mod (w idx)
+  (cistern--rpg-mod (nth idx (cistern--worker-stats w))))
+
+(defun cistern--rpg-dominant (w)
+  "Index of the highest stat score; ties break in fixed
+FLOW, GRIT, NERVE, ARCHIVE order (§2.1)."
+  (let ((stats (cistern--worker-stats w)) (best 0))
+    (dotimes (i 4)
+      (when (> (nth i stats) (nth best stats)) (setq best i)))
+    best))
+
+(defun cistern--rpg-suit (w type)
+  "SUITED/NEUTRAL/UNSUITED for W on TYPE (§2.1).  CL.II
+cross-cert: never unsuited again (worst case neutral)."
+  (let* ((entry (cistern--toilet-type-entry type))
+         (dom (cistern--rpg-dominant w))
+         (pri (cl-position (plist-get entry :primary)
+                           cistern--rpg-stat-names))
+         (sec (cl-position (plist-get entry :secondary)
+                           cistern--rpg-stat-names))
+         (suit (cond ((= dom pri) 'suited)
+                     ((= dom sec) 'neutral)
+                     (t 'unsuited))))
+    (if (and (eq suit 'unsuited) (>= (cistern--worker-clearance w) 2))
+        'neutral
+      suit)))
+
+(defun cistern--rpg-use-ticks (w type)
+  "§2.2: clamp(type-ticks − 1·suited + 1·unsuited, 1, 4)."
+  (let ((base (plist-get (cistern--toilet-type-entry type) :ticks))
+        (suit (cistern--rpg-suit w type)))
+    (clamp 1 (+ base (pcase suit ('suited -1) ('unsuited 1) (_ 0))) 4)))
+
+(defun cistern--rpg-grant-xp (st w n)
+  "Add N XP and apply clearance unlocks (§4): CL.II at 12,
+CL.III at 30 (+2 to the lowest stat, fixed F/G/N/A order).
+Clearance-up logs one line; the popup rides the rewards stream
+(S3, at the act)."
+  (let* ((old (cistern--worker-clearance w))
+         (xp (+ (cistern--worker-xp w) n))
+         (new (cond ((>= xp 30) 3) ((>= xp 12) 2) (t 1))))
+    (setf (cistern--worker-xp w) xp)
+    (when (> new old)
+      (setf (cistern--worker-clearance w) new)
+      (cistern--log-sev st 'success "%s"
+                        (format (cdr (assq (if (= new 3)
+                                               'clearance-up-3
+                                             'clearance-up)
+                                           cistern--copy))
+                                (cistern--worker-glyph st w)))
+      (push (list 'clearance (cistern--worker-glyph st w)
+                  (cistern--worker-x w) (cistern--worker-y w))
+            (cistern-st-rewards-events st))
+      (when (= new 3)
+        (let* ((stats (cistern--worker-stats w))
+               (idx 0) (low (nth 0 stats)))
+          (dotimes (i 4)
+            (when (< (nth i stats) low) (setq low (nth i stats) idx i)))
+          (setf (nth idx stats) (+ low 2)))))))
+
+(defun cistern--rpg-composure (st w prev)
+  "RPG §3.4 #3: the composure check fires when an unseated
+worker's bladder CROSSES 100 (prev < 100 ≤ now) — crossing tick
+only.  Band 0/1 spike the bladder mid-walk: an early burst is
+possible (A7)."
+  (let ((now (cistern--worker-bladder w)))
+    (when (and (< prev 100) (>= now 100) (not (cistern--worker-using w)))
+      (let* ((r (cistern--rpg-check st 'composure-nerve
+                                    (cdr (assq 'composure-dc
+                                               cistern--rpg-const))
+                                    (cistern--rpg-stat-mod w 2)))
+             (band (car r))
+             (spike (plist-get (cdr r) :spike)))
+        (when (> spike 0)
+          (setf (cistern--worker-bladder w) (+ now spike))
+          (cistern--log-sev st 'error "%s"
+                            (format (cdr (assq (if (= band 0)
+                                                   'composure-broken
+                                                 'composure-slip)
+                                               cistern--copy))
+                                    (cistern--worker-glyph st w))))))))
+
+(defun cistern--rpg-exposure (st victim)
+  "V4-12 (RPG §3.4 #2): the exposure check for VICTIM beside a
+breach — REPLACES the automatic sick (A6).  Band 0/1 sicken for
+clamp(30 − 4·GRIT-mod, 18, 42) ticks (+5 on band 0); bands 2/3
+hold (band 3 pays +1 XP)."
+  (let* ((r (cistern--rpg-check st 'exposure-grit
+                                (cdr (assq 'exposure-dc cistern--rpg-const))
+                                (cistern--rpg-stat-mod victim 1)))
+         (band (car r))
+         (effect (cdr r))
+         (glyph (cistern--worker-glyph st victim)))
+    (if (<= band 1)
+        (progn
+          (setf (cistern--worker-sick victim)
+                (+ (plist-get effect :sick)
+                   (cistern--rpg-sick-duration
+                    (cistern--rpg-stat-mod victim 1))))
+          (cistern--log-sev st 'error "%s"
+                            (format (cdr (assq 'exposure-fail
+                                               cistern--copy))
+                                    glyph)))
+      (when (plist-get effect :xp)
+        (cistern--rpg-grant-xp st victim (plist-get effect :xp)))
+      (cistern--log-sev st 'info "%s"
+                        (format (cdr (assq 'exposure-hold cistern--copy))
+                                glyph)))))
 
 (defun cistern--cmd-cycle-toilet-type (st)
   "V4-11: `T` — advance the armed fixture type in catalog order."
@@ -499,6 +660,12 @@ OR is anchored to a manifold."
           ((cistern--toilet-usable-p st x y) 'usable)
           (t 'down))))
 
+(defun cistern--toilet-type-at (st x y)
+  "V4-12 view query: the fixture type placed at (X,Y) — long-drop
+for pre-catalog toilets."
+  (or (plist-get (gethash (cons x y) (cistern-st-toilets st)) :type)
+      'long-drop))
+
 (defun cistern--tank-load (st x y)
   "Stored waste in the tank at (X,Y), or nil when absent."
   (let ((tp (gethash (cons x y) (cistern-st-tanks st))))
@@ -660,7 +827,10 @@ entering a toilet IS seating yourself.  Toilets are rooms, not floors."
         (progn
           (setf (cistern--worker-mine w) (1+ (cistern--worker-mine w)))
           (when (>= (cistern--worker-mine w)
-                    (if (> (cistern--worker-sick w) 0) 6 3))
+                    (let ((rate (cistern--rpg-mine-rate
+                                 (cistern--rpg-stat-mod w 0))))
+                      ;; sickness halves throughput (RPG §1), never mobility
+                      (if (> (cistern--worker-sick w) 0) (* 2 rate) rate)))
             (setf (cistern--worker-mine w) 0)
             (setf (cistern-st-alloy st) (1+ (cistern-st-alloy st)))
             (setf (cistern-st-earned st) (1+ (cistern-st-earned st)))))
@@ -700,16 +870,56 @@ occupancy grid so two workers can never share a tile."
                        (not best))
               (setq best n))))
         (when best
-          (setf (cistern--worker-x w) (car best))
-          (setf (cistern--worker-y w) (cdr best))
-          (when (and (eq (cistern--cell st (car best) (cdr best)) 'toilet)
-                     (= (car best) tx) (= (cdr best) ty)
-                     (>= (cistern--worker-bladder w) cistern-bladder-seek))
-            ;; stepping onto the target toilet = seating
-            (puthash best (list :busy t) (cistern-st-toilets st))
-            (setf (cistern--worker-using w) t)
-            (setf (cistern--worker-use-t w) cistern-use-ticks)
-            (setf (cistern--worker-toilet w) best))
+          ;; V4-12 (RPG §3.4 #4): stride — one roll per journey (a
+          ;; journey = a contiguous walk toward one target); a pass
+          ;; moves 2 steps this tick, never fewer than the base 1
+          (let* ((fresh (not (equal (cistern--worker-journey w)
+                                    (cons tx ty))))
+                 (steps (if (and fresh
+                                 (>= (cistern--rpg-band
+                                      st
+                                      (cdr (assq 'stride-dc
+                                                 cistern--rpg-const))
+                                      (cistern--rpg-stat-mod w 3))
+                                     2))
+                            2 1)))
+            (when fresh
+              (setf (cistern--worker-journey w) (cons tx ty)))
+            (dotimes (_ steps)
+              (let ((d (gethash (cons (cistern--worker-x w)
+                                      (cistern--worker-y w))
+                                dist)))
+                (when (and d (> d 0))
+                  (let (nxt)
+                    (dolist (n (cistern--neighbors st
+                                                   (cistern--worker-x w)
+                                                   (cistern--worker-y w)))
+                      (let ((dd (gethash n dist)))
+                        (when (and dd (= dd (1- d))
+                                   (not (gethash n blocked)))
+                          (unless nxt (setq nxt n)))))
+                    (when nxt
+                      (setf (cistern--worker-x w) (car nxt))
+                      (setf (cistern--worker-y w) (cdr nxt))
+                      (when (and (eq (cistern--cell st (car nxt)
+                                                (cdr nxt))
+                                     'toilet)
+                                 (= (car nxt) tx) (= (cdr nxt) ty)
+                                 (>= (cistern--worker-bladder w)
+                                     (cistern--rpg-seek-eff
+                                      (cistern--rpg-stat-mod w 2))))
+                        ;; stepping onto the target toilet = seating
+                        (let ((type (or (plist-get
+                                         (gethash nxt
+                                                  (cistern-st-toilets st))
+                                         :type)
+                                        'long-drop)))
+                          (puthash nxt (list :busy t :type type)
+                                   (cistern-st-toilets st))
+                          (setf (cistern--worker-using w) t)
+                          (setf (cistern--worker-use-t w)
+                                (cistern--rpg-use-ticks w type))
+                          (setf (cistern--worker-toilet w) nxt)))))))))
           t)))))
 
 (defun cistern--shuffle (st w)
@@ -738,7 +948,13 @@ bug class where plumbing state pointed elsewhere cannot exist."
     (setf (cistern--worker-bladder w) 0)
     (setf (cistern--worker-toilet w) nil)
     (when tp
-      (puthash tp (list :busy nil) (cistern-st-toilets st)))
+      ;; V4-11/V4-12: release preserves the fixture's :type
+      (puthash tp (list :busy nil
+                        :type (or (plist-get (gethash tp
+                                                        (cistern-st-toilets st))
+                                             :type)
+                                  'long-drop))
+               (cistern-st-toilets st)))
     (let ((tanks (cistern--connected-tanks st (cistern--worker-x w)
                                             (cistern--worker-y w))))
       (cond
@@ -751,7 +967,18 @@ bug class where plumbing state pointed elsewhere cannot exist."
                           (format (cdr (assq 'relief-log cistern--copy))
                                   x y))
         (push (list 'relief bladder x y)
-              (cistern-st-rewards-events st)))
+              (cistern-st-rewards-events st))
+        ;; V4-12: manifold relief earns XP too (suited check on the
+        ;; seated fixture)
+        (cistern--rpg-grant-xp
+         st w
+         (if (eq (cistern--rpg-suit
+                  w (or (plist-get (gethash (cons x y)
+                                            (cistern-st-toilets st))
+                                  :type)
+                       'long-drop))
+               'suited)
+             2 1)))
        ((null tanks)
         (progn
           (cistern--add-hazard st x y)
@@ -773,6 +1000,16 @@ bug class where plumbing state pointed elsewhere cannot exist."
                   (cistern-st-tanks st))
           (push (list 'relief bladder x y)
                 (cistern-st-rewards-events st))
+          ;; V4-12 (RPG §4): +1 per relief, +1 extra on a SUITED fixture
+          (cistern--rpg-grant-xp st w
+                                 (if (eq (cistern--rpg-suit
+                                          w (or (plist-get
+                                                 (gethash (cons x y)
+                                                          (cistern-st-toilets st))
+                                                 :type)
+                                                 'long-drop))
+                                         'suited)
+                                     2 1))
           (cistern--log-sev st 'info "%s"
                             (format (cdr (assq 'relief-log cistern--copy))
                                     x y))))))))
@@ -816,7 +1053,7 @@ limit — it steals ticks, not health."
         (when (and (not (eq o w))
                    (= (cistern--worker-x o) (car n))
                    (= (cistern--worker-y o) (cdr n)))
-          (setf (cistern--worker-sick o) cistern-sick-ticks))))
+          (cistern--rpg-exposure st o))))
     ;; Q14: the log names the worker's identity glyph — the same one
     ;; the map renders at this cell (one helper, one source).
     ;; R2-Q12: the noun is WORKER everywhere
@@ -867,12 +1104,18 @@ limit — it steals ticks, not health."
         ;; still reaches toilets in time but mines at half rate
         (when (> (cistern--worker-sick w) 0)
           (setf (cistern--worker-sick w) (1- (cistern--worker-sick w))))
-        (setf (cistern--worker-bladder w)
-              (+ cistern-bladder-rate (cistern--worker-bladder w)))
+        (let ((prev (cistern--worker-bladder w)))
+          (setf (cistern--worker-bladder w)
+                (+ cistern-bladder-rate (cistern--worker-bladder w)))
+          ;; V4-12 (RPG §3.4 #3): composure on the 100-crossing; a
+          ;; spike can push past burst → the cond below bursts early
+          (cistern--rpg-composure st w prev))
         (cond
          ((>= (cistern--worker-bladder w) cistern-bladder-burst)
           (cistern--accident st w))
-         ((>= (cistern--worker-bladder w) cistern-bladder-seek)
+         ;; V4-12 (RPG §1): NERVE files the relief request early or late
+         ((>= (cistern--worker-bladder w)
+              (cistern--rpg-seek-eff (cistern--rpg-stat-mod w 2)))
           (cistern--seek-toilet st w))
          (t (cistern--seek-work st w))))))
 
@@ -908,6 +1151,11 @@ permanent scarring: stop bleeding and the marks fade."
             (cistern--set-cell st (car h) (cdr h) 'floor))))))))
 
 (defun cistern--phase-migration (st)
+  ;; V4-12 (RPG §4): +1 XP per shift survived, at the boundary tick
+  (when (and (> (cistern-st-tick st) 0)
+             (= 0 (% (cistern-st-tick st) cistern-migrant-every)))
+    (dolist (w (cistern-st-creators st))
+      (cistern--rpg-grant-xp st w 1)))
   ;; V4-09 (S5.5): the arrival announces itself three ticks out —
   ;; exactly once per cycle, and only when an arrival will actually
   ;; happen (pop cap not reached)
@@ -1083,6 +1331,16 @@ game layer (Phase 2)."
     ;; V4-09 (SURFACE S5.3/S5.5)
     (death-log-hint . "L — FULL HISTORY")
     (migrant-in-fmt . "MIGRANT IN %d TICKS")
+    ;; V4-12 (RPG §8): clearance/composure/exposure/inspector copy
+    (clearance-up . "CLEARANCE II — %s CROSS-CERTIFIED")
+    (clearance-up-3 . "CLEARANCE III — %s FIELD-CERTIFIED")
+    (composure-slip . "COMPOSURE SLIP — WORKER %s — PRESSURE MOUNTING")
+    (composure-broken . "COMPOSURE LOST — WORKER %s — PRESSURE CRITICAL")
+    (exposure-hold . "CONTAMINATION EXPOSURE LOGGED — WORKER %s UNAFFECTED")
+    (exposure-fail . "WORKER %s CONTAMINATED — DEGRADATION UNDERWAY")
+    (toilet-type-fmt . "FIXTURE — %s — %s")
+    (inspector-stat-fmt . "F%+d G%+d N%+d A%+d")
+    (inspector-clear-fmt . "CL.%s")
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
     (capacity-none . "NO WIRED TOILET ON THE GRID — LAY PIPE (p)")
     (teach-arrows . "C-n/C-p/C-f/C-b MOVE TOO")
