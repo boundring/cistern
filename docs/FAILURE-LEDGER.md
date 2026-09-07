@@ -1754,3 +1754,164 @@ One entry per dead/failed/retried run.
   `cistern--copy-*` domain tables per Q11.
 
 ---
+## L-039 (2026-09-07, run: impl-ux-r1-b2 — Q08 pressure gradient + Q11 copy table)
+
+- Attempt: Red tests `cistern-test-ux-q08-pressure-gradient` +
+  `cistern-test-ux-q11-copy-table` (red commit `dd427f1`; red run:
+  "RISING at 0.9 cap with the fill %" + "one domain copy table
+  exists", 2/43, exit 1). Green `4192f0e`.
+- Gradient: middle tier fires at ≥ 0.85 × Σ tank-cap and names the
+  most-loaded tank's fill % (`PRESSURE RISING — TANK 90%`); the raw
+  ">100 units" branch is DELETED (101 units across two half tanks is
+  not pressure — asserted: 51+50 stays NOMINAL).  No-hash backstop
+  honored: the view reads `cistern--tank-capacity-total` /
+  `cistern--tank-load-max` (r5-hook's projection backstop caught the
+  first draft reading the tanks hash directly — the gate works).
+- SEMANTIC RULING (least-active, ledgered): Q08's acceptance (0.9 ×
+  cap → RISING, not CRITICAL) is unreachable with the legacy
+  can't-seat predicate — a 54/60 tank already turns the toilet
+  'down.  Backed-up therefore means "path exists AND tanks FULL to
+  cap" (Q09's first half landed inside this green); the near-full
+  51–59 band belongs to RISING — the line anticipates instead of
+  lying.  DIRECTOR NOTE: the chain Q08 → Q09 was realized as one
+  green pair (Q08's red came first; Q09's red for the severed half
+  followed).
+- Pacing quirk (pinned reading, for the docs pass): use-load 10 vs
+  cap 60 makes the [85%,100%) band SKIPPABLE in a one-tank game —
+  natural fills step 50 → 60; RISING is only observed from
+  near-full states (the LEG-02 capture injects 55/60).  Threshold
+  stays at the pinned 0.85.
+- Form-span gate incident: rewards-eval grew past the 10k L-026
+  limit with the Q05 block; `cistern--announce-unlock` was extracted
+  (decomposition, not gate-dodging).
+- Q11: single `cistern--copy` table in the domain now holds ALL new
+  copy (milestones consolidated away from `cistern--copy-milestones`,
+  pressure strings added); the idle pressure line stays byte-
+  identical in the view.  The drift test checks each table string
+  appears in cistern-domain.el and in NO other src file (substring
+  overlaps inside the table's own file are fine — long strings
+  contain the short ones).
+- Outcome: GREEN. Canonical suite: ALL 43 TESTS PASSED, exit 0.
+- Change for next attempt: Q09 severed half + Q10 re-branch.
+
+## L-040 (2026-09-07, run: impl-ux-r1-b2 — Q09 severed/backed-up domain split)
+
+- Attempt: Red test `cistern-test-ux-q09-domain-split` (red commit
+  `f947497`; red run: "severed half of the split exists", 1/44,
+  exit 1). Green `9f020ff`.
+- Split complete: `cistern--toilets-severed-p` (down, NO tank
+  reachable through plumbing) vs `cistern--toilets-backed-up-p`
+  (down, path, tanks full).  The collapsed
+  `cistern--toilets-backed-p` is RETIRED (clean cutover — its only
+  consumer was the pressure line, already migrated).  Both flags
+  exposed to the view as domain queries (D6).  M2 solvability and
+  the 4a scenarios stay green: the split changes a predicate the
+  view reads, not the sim.
+- Outcome: GREEN. Canonical suite: ALL 44 TESTS PASSED, exit 0.
+- Change for next attempt: Q10 re-branch + offender coords.
+
+## L-041 (2026-09-07, run: impl-ux-r1-b2 — Q10 pressure re-branch + offender coords)
+
+- Attempt: Red test `cistern-test-ux-q10-severed-rewire` (red
+  commit `68461a9`; red run: "severed branch advises rewiring",
+  1/45 — the ANTAG-05 lie reproduced: a severed toilet read
+  CRITICAL/purge).  Green `e3815f1`.
+- SEVERED branch: `LINES SEVERED — REWIRE (p) — TANK AT (5,2)` —
+  names the tank cell to wire toward via `cistern--severed-remedy`
+  (first severed toilet in coordinate order → `cistern--nearest-tank`
+  over the flood-fill distance map); never purge advice.  BACKED-UP
+  branch byte-identical (purge advice kept).  Pressure line and
+  inspector now agree at the losing moment (both say lay pipe).
+- Test-side lesson: the inspector half of the assert needs the
+  cursor PARKED ON the severed toilet (ANTAG-05's actual setup) —
+  the first draft forgot the cursor move.
+- Outcome: GREEN. Canonical suite: ALL 45 TESTS PASSED, exit 0.
+- Change for next attempt: Q12 dead pipe glyph + legend from table.
+
+## L-042 (2026-09-07, run: impl-ux-r1-b2 — Q12 dead pipe glyph + legend from the table)
+
+- Attempt: Red test `cistern-test-ux-q12-dead-pipe-glyph` (red
+  commit `ca13298`; red run: "dead pipe carries the table's dead
+  glyph", 1/46 — the unconnected pipe rendered "·", byte-identical
+  to floor: ANTAG-06 confirmed).  Green `e4b693f`.
+- Pipe tile row gains `:dead-glyph "╌"`; accessor
+  `cistern--tile-dead-glyph` (base-glyph fallback for kinds without
+  one).  The view's dead branch reads the table.  The legend is now
+  GENERATED from the tile table: a kind with :dead-glyph lists the
+  dead glyph ("╌ dead pipe") instead of its base glyph — the base
+  never renders, and the floor's "·" can never be listed twice.
+- Contract change landed on r7: "isolated pipe renders the
+  tile-table glyph" now asserts the table's DEAD glyph (same
+  table-driven guarantee, new glyph).
+- Tooling lesson: `how-many` cannot match this multibyte glyph
+  (returns 0 where string-match-p matches) — the test counts via
+  split-string instead.
+- Outcome: GREEN. Canonical suite: ALL 46 TESTS PASSED, exit 0.
+- Change for next attempt: Q13+Q16 together (director: one
+  migration, no double shape change).
+
+## L-043 (2026-09-07, run: impl-ux-r1-b2 — Q13 severity on entries + Q16 uncapped log)
+
+- Attempt: Red tests `cistern-test-ux-q13-severity-persists` +
+  `cistern-test-ux-q16-full-log` (red commit `794e970`; red run:
+  "breach renders red for every tail tick" + wrong-type on the
+  first log entry, 2/48 — the intent re-match lost the breach's
+  face on the very next tick, and the 12-cut destroyed the boot
+  line).  Green `ccd6d08`.
+- Log entries are now (LINE . SEVERITY-ENUM) conses: `cistern--log`
+  pushes nil severity, `cistern--log-sev` carries it (relief info;
+  breach/leak/condemnation error; milestone success).  The view's
+  log-tail maps the entry enum through the palette — NO intent
+  re-matching (the M7 intents still exist for the m7 contract).
+  Q16: the 12-entry nbutlast is GONE (uncapped ring); `L` opens
+  "*cistern log*" — oldest first, read-only — while the main screen
+  keeps the 3-line tail.
+- Migration sweep: game's log-contains expect, 4a scenarios,
+  4a-tutorial's log-has, m7's two find-ifs, r7's (car ...) — all
+  now unwrap (car entry).  Lesson: the first 4a edit dropped a
+  `let*` closer (check-parens caught it); the second draft of the
+  m7 patch left a lambda matching raw conses.
+- Outcome: GREEN. Canonical suite: ALL 48 TESTS PASSED, exit 0.
+- Change for next attempt: Q14 identity helper at the source.
+
+## L-044 (2026-09-07, run: impl-ux-r1-b2 — Q14 shared worker-identity helper)
+
+- Attempt: Red test `cistern-test-ux-q14-worker-identity` (red
+  commit `e656e34`; red run: "shared helper exists in the domain",
+  1/49).  Green `7f5600e`.
+- The ONE identity helper — `cistern--worker-glyph` + the glyph
+  table — is hosted in the DOMAIN (innermost layer), because the
+  accident log must reach it; the view's private copy is deleted
+  and the map/inspector/legend read the same helper.  This
+  SUPERSEDES L-012 finding 1's view-only placement (binding
+  directive; no format drift, no off-by-one).  Breach line:
+  `BREACH — CREATOR β OVERFLOWED AT (x,y)` — CREATOR #N retired;
+  the test pins log-glyph == map-glyph at the breach cell.
+- r7's L-012 source greps rewritten to the Q14 contract (domain
+  hosts the helper; the view carries no PRIVATE copy).
+- Outcome: GREEN. Canonical suite: ALL 49 TESTS PASSED, exit 0.
+- Change for next attempt: Q15 ranking + suppression (last of
+  batch 2).
+
+## L-045 (2026-09-07, run: impl-ux-r1-b2 — Q15 log consequence ranking + spam suppression)
+
+- Attempt: Red test `cistern-test-ux-q15-log-ranking` (red commit
+  `39ac671`; red run: "identical consecutive relief lines collapse",
+  1/50 — twelve identical relief lines filled the tail two-wide
+  beside the breach).  Green `4519963`.
+- Tail = collapse-then-rank: (1) consecutive identical lines
+  collapse to one with a silent ×N count (the count is the only
+  new text — PROTECT #20 honored); (2) inside the recent window
+  (12, the old log cap — ponytail-commented constant), majors
+  (breach/condemnation, error severity) always make the tail,
+  remaining slots fill by recency; (3) boot flavor ages out like
+  any line.  Output order stays chronological; faces persist from
+  the entries (Q13).
+- Outcome: GREEN. Canonical suite: ALL 50 TESTS PASSED, exit 0
+  (34 baseline + 16 UX entries).
+- Change for next attempt: batch 3 (Q17–Q21 + Q16's L is done) —
+  Q17 cursor-hint surface FIRST (Q18 refusals ride it); Q19 badge
+  rides Q01's reserved slot; Q20 is extension-only (existing
+  inspector lines byte-identical).
+
+---
