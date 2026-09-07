@@ -2556,3 +2556,29 @@ Fixed at 7px, all else Iosevka at 7px
 the relaunch is on their screen now.
 
 ---
+
+## L-077 (2026-09-07, run: impl-v4-w1 — v4 wave 1, replacement run state reconciliation)
+
+- Attempt: v4 wave 1 (V4-01..V4-09). Prior run died mid-V4-02 on an
+  upstream request abort while drafting the browser red tests.
+- Outcome: RECONCILED, CONTINUED (replacement run).
+- Evidence: git log confirms V4-01 fully landed — red commit `ab50381`
+  (test: V4-01 red-first) + green commit `09abd3c` (V4-01 log entries
+  gain tick stamps, suite at 81). Canonical suite ALL 81 TESTS PASSED
+  (batch, GUI probe registered+skipped). Uncommitted remains only the
+  prior run's drafted V4-02 red tests in `tests/test-v4.el`
+  (cistern-test-v4-02-log-browser / -log-width, not yet registered in
+  run.el).  Untracked: docs/v4/{SURFACE,RPG-LAYER,STORY-ENGINE}.md.
+- Lesson: a run's own narration claimed a green commit "attempted" —
+  verify against git log, not narration: the commit had landed.  Last
+  committed state is the recovery point; uncommitted test drafts were
+  recoverable work, not loss.
+- Change for next attempt: commit after EVERY green directive, never
+  hold multiple directives uncommitted (prior-run failure-informed
+  constraint); keep individual tool calls small (upstream aborts
+  correlate with long generations).  Continuation: land drafted V4-02
+  red (register + capture red + commit), then V4-03..V4-09 in the
+  §4 wave-1 order (V4-02 before V4-07; V4-05→V4-06→V4-08; V4-03
+  before V4-06), ledger entry per directive.
+
+---
