@@ -413,15 +413,18 @@ Q11 from the domain table."
     out))
 
 (defun cistern-view--tutorial-line (st)
-  (let ((idx (cistern-st-tutorial st))
-        (steps (cistern--tutorial-steps)))
-    (when (and (numberp idx) (< idx (length steps)))
-      (propertize (concat (format (cdr (assq 'tutorial-line-fmt
-                                        cistern--copy))
-                          (1+ idx) (length steps)
-                          (car (nth idx steps)))
-                          "\n")
-                  'face 'cistern-tutorial))))
+  ;; R2-Q11 (c): suppressed while over — the death frame is the
+  ;; tutorial's end
+  (unless (cistern-st-over st)
+    (let ((idx (cistern-st-tutorial st))
+          (steps (cistern--tutorial-steps)))
+      (when (and (numberp idx) (< idx (length steps)))
+        (propertize (concat (format (cdr (assq 'tutorial-line-fmt
+                                              cistern--copy))
+                                    (1+ idx) (length steps)
+                                    (car (nth idx steps)))
+                            "\n")
+                    'face 'cistern-tutorial)))))
 
 (defun cistern-view--log-tail (st)
   "Three-line tail (Q15): consecutive identical lines collapse
@@ -429,12 +432,16 @@ with a silent ×N count; majors (breach/condemnation) keep max
 severity weight inside the recent window; older flavor ages out
 like any line.  Q13: each entry is (LINE . SEVERITY), so faces
 persist with the text across ticks.  Suppression is silent."
-  (let* ((collapsed (cistern-view--collapse-log
-                     (reverse (cistern-st-log st))))  ; chronological
+  (let* ((log (cistern-st-log st))
+         (boot (car (car (last log))))         ; the boot LINE: oldest entry
+         (collapsed (cistern-view--collapse-log
+                     (reverse log)))           ; chronological
         ;; ponytail: window 12 = the old log cap; a ranking constant,
         ;; revisit only if tails feel stale
         (window (last collapsed (min 12 (length collapsed))))
-        (picked (cistern-view--pick-tail window))
+        ;; R2-Q15: an empty player era still renders the boot line
+        (picked (or (cistern-view--pick-tail window boot)
+                    (last window (min 3 (length window)))))
         (out ""))
     (dolist (e picked out)
       (setq out (concat out
@@ -459,7 +466,7 @@ triples.  Silent except the count."
           (push (list (car e) (cdr e) 1) out))))
     (nreverse out)))
 
-(defun cistern-view--pick-tail (window)
+(defun cistern-view--pick-tail (window boot)
   "Choose ≤3 lines from the chronological WINDOW of triples:
 majors keep max severity weight (breach/condemnation always make
 the tail), remaining slots fill by recency; output order stays
@@ -473,7 +480,12 @@ chronological."
          ;; newest first — the descending index stream is already in
          ;; recency order, so the fill takes its HEAD
          (rest-idx (let ((cand (cl-loop for i from (1- n) downto 0
-                                        unless (memq i major-idx)
+                                       unless (or (memq i major-idx)
+                                                  ;; R2-Q15: boot flavor
+                                                  ;; ranks below any
+                                                  ;; player-era line
+                                                  (string= (nth 0 (nth i window))
+                                                           boot))
                                         collect i)))
                      (cl-subseq cand 0
                                 (min (length cand)

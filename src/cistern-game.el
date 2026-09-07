@@ -135,23 +135,23 @@ never passes one)."
                   (lambda (st) (> (cistern-st-alloy st) 20))))))
 
 (defun cistern--tutorial-advance (st &optional table)
-  "Advance the tutorial index one gated step per tick (legacy
-cistern.el:589-599 semantics): the current step's predicate gates,
-already-satisfied steps resolve instantly on their tick, and
-completing the final step sets the index to `t' with the
-completion line."
+  "R2-Q11: the gate is PER-STEP — every step's predicate counts
+each tick (a satisfied later step advances even when an earlier
+one hasn't; purge-first players reach step 2 without step 1), the
+index never regresses, and completing the final step sets the
+index to `t' with the completion line."
   (let ((steps (cistern--tutorial-steps table))
         (idx (cistern-st-tutorial st)))
-    (when (and (numberp idx)
-               (< idx (length steps))
-               (funcall (cdr (nth idx steps)) st))
-      (setf (cistern-st-tutorial st) (1+ idx))
-      (if (>= (1+ idx) (length steps))
-          (progn
-            (setf (cistern-st-tutorial st) t)
-            (cistern--log st "%s" (cdr (assq 'tutorial-complete
-                                             cistern--copy))))
-        (cistern--log st "%s" (cdr (assq 'tutorial-step cistern--copy)))))))
+    (when (numberp idx)
+      (let ((done (cl-count-if (lambda (step) (funcall (cdr step) st))
+                               steps)))
+        (when (> done idx)
+          (setf (cistern-st-tutorial st) (if (>= done (length steps)) t done))
+          (cistern--log st "%s"
+                        (cdr (assq (if (>= done (length steps))
+                                       'tutorial-complete
+                                     'tutorial-step)
+                                   cistern--copy))))))))
 
 (defun cistern--cmd-skip-tutorial (st)
   "T skip (R4): mark the tutorial done so advance is a no-op.
@@ -239,12 +239,14 @@ sim tick, then the tutorial advance.  The legacy multi-tick
 command is NOT ported — no way to advance more than one tick per
 call exists at the use-case layer."
   (unless (cistern-st-over st)
+    ;; R2-Q11 (a): the step predicates check BEFORE the wander phase
+    ;; — a chased worker cannot escape mid-tick
+    (cistern--tutorial-advance st)
     (cistern--sim-tick st)
     ;; per-tick rewards evaluation (L-027 wiring): runs ONCE per
     ;; tick, after the sim phases and before the tutorial advance;
     ;; stores outcome+intents in state for the view to read
-    (cistern--rewards-eval st nil)
-    (cistern--tutorial-advance st)))
+    (cistern--rewards-eval st nil)))
 
 (defconst cistern--rewards-default-outcome
   '(:score 0 :objectives nil :unlocks nil :celebrate nil)
@@ -381,7 +383,8 @@ state for the view to read (L-027); the view never calls this."
       (let ((sev (cistern--event-severity e)))
         (when (and (consp e) sev (not (eq sev 'game-changing)))
           (let ((line (pcase (cistern--event-kind e)
-                        (`relief (format "CREATOR RELIEVED AT (%d,%d)"
+                        (`relief (format (cdr (assq 'relief-log
+                                                   cistern--copy))
                                          (nth 2 e) (nth 3 e)))
                         (`burst (nth 1 e))
                         (`leak (nth 1 e)))))

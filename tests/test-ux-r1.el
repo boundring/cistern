@@ -388,10 +388,13 @@ read-only buffer; the main screen keeps the 3-line tail."
       (cl-assert buf t "L opens the log buffer")
       (with-current-buffer buf
         (goto-char (point-min))
-        (cl-assert (string-match-p "SECTOR-7 ONLINE"
-                                   (buffer-substring
-                                    (point) (line-end-position)))
-                   t "the log buffer shows line 1, oldest first")
+        ;; R2-Q13: the press-q hint is the buffer's first line; the
+      ;; oldest log line follows it
+      (forward-line 1)
+      (cl-assert (string-match-p "SECTOR-7 ONLINE"
+                                 (buffer-substring
+                                  (point) (line-end-position)))
+                 t "the log buffer shows the oldest line after the hint")
         (cl-assert buffer-read-only t "the log buffer is read-only")))
     (cl-assert (null (cl-find-if (lambda (r) (string-match-p "SECTOR-7 ONLINE" r))
                                  (split-string (cistern-view--log-tail st) "\n")))
@@ -422,7 +425,7 @@ the view's private copy is retired."
            (breach (cl-find-if (lambda (e) (string-match-p "BREACH" (car e)))
                                (cistern-st-log st))))
       (cl-assert (string-match-p
-                  (format "CREATOR %s OVERFLOWED" glyph) (car breach))
+                  (format "WORKER %s OVERFLOWED" glyph) (car breach))
                  t "the log names the worker's glyph, not #N")
       ;; the map at the breach cell shows the same glyph (the worker
       ;; occludes the tile at D5 precedence)
@@ -441,8 +444,8 @@ count; boot flavor ages out like any line.  Suppression is
 silent — no new copy beyond the count."
   ;; (a) breach survives relief spam; identical lines shown once
   (let ((st (cistern--new-game 42)))
-    (dotimes (_ 12) (cistern--log-sev st 'info "CREATOR RELIEVED AT (3,3)"))
-    (cistern--log-sev st 'error "BREACH — CREATOR β OVERFLOWED AT (5,6)")
+    (dotimes (_ 12) (cistern--log-sev st 'info "WORKER RELIEVED AT (3,3)"))
+    (cistern--log-sev st 'error "BREACH — WORKER β OVERFLOWED AT (5,6)")
     (let* ((tail (cistern-view--log-tail st))
            (rows (cl-remove-if (lambda (r) (string= r ""))
                                (split-string tail "\n")))
@@ -724,8 +727,13 @@ prompt renders as a persistent line, not log lines."
     (cl-assert (string-match-p "TUTORIAL 3/3"
                                (cistern-test-ux--plain (cistern-view--render st)))
                t "the purge advances to step 3")
-    ;; drive step 3: the alloy paid
+    ;; drive step 3: the alloy paid; R2-Q11's per-step gate needs the
+    ;; cursor step too — park the cursor on a worker's tick-start cell
+    ;; (pre-wander check, deterministic) and complete the table
     (cl-assert (> (cistern-st-alloy st) 20) t "the purge paid alloy")
+    (let ((w0 (car (cistern-st-creators st))))
+      (setf (cistern-st-cursor st)
+            (cons (cistern--worker-x w0) (cistern--worker-y w0))))
     (cistern--do-tick st)
     (cl-assert (null (string-match-p "TUTORIAL 3/3"
                                      (cistern-test-ux--plain

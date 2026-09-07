@@ -570,7 +570,9 @@ bug class where plumbing state pointed elsewhere cannot exist."
                   (cistern-st-tanks st))
           (push (list 'relief bladder x y)
                 (cistern-st-rewards-events st))
-          (cistern--log-sev st 'info "CREATOR RELIEVED AT (%d,%d)" x y))))))
+          (cistern--log-sev st 'info "%s"
+                            (format (cdr (assq 'relief-log cistern--copy))
+                                    x y)))))))
 
 (defun cistern--add-hazard (st x y)
   "Contaminate (X,Y) if it is floor.  Everything else — ore,
@@ -598,8 +600,9 @@ base can never be destroyed by unserved need."
                    (= (cistern--worker-y o) (cdr n)))
           (setf (cistern--worker-sick o) cistern-sick-ticks))))
     ;; Q14: the log names the worker's identity glyph — the same one
-    ;; the map renders at this cell (one helper, one source)
-    (let ((line (format "BREACH — CREATOR %s OVERFLOWED AT (%d,%d)"
+    ;; the map renders at this cell (one helper, one source).
+    ;; R2-Q12: the noun is WORKER everywhere
+    (let ((line (format (cdr (assq 'breach-fmt cistern--copy))
                         (cistern--worker-glyph st w) x y)))
       (cistern--log-sev st 'error "%s" line)
       ;; breach (M4): payload carries the logged line for the M7
@@ -813,6 +816,8 @@ game layer (Phase 2)."
     (badge-auto . "AUTO-RUN")
     (condemn-append . "!! CONDEMNED")
     (restart-log . "SECTOR CONDEMNED — PRESS n TO RESTART")
+    (breach-fmt . "BREACH — WORKER %s OVERFLOWED AT (%d,%d)")
+    (relief-log . "WORKER RELIEVED AT (%d,%d)")
     (tutorial-complete . "TUTORIAL COMPLETE — THE SECTOR IS YOURS")
     (tutorial-step . "TUTORIAL: OBJECTIVE COMPLETE")
     (tutorial-skipped . "TUTORIAL SKIPPED")

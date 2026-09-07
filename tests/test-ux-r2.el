@@ -340,10 +340,12 @@ step 2 without step 1); the prompt is suppressed while over."
     ;; (c) suppressed while over
     (setf (cistern-st-contam st) cistern-contam-limit)
     (cistern--phase-check st)
-    (cl-assert (null (string-match-p "TUTORIAL"
+    ;; the PROMPT line is suppressed; history (log tail) may still
+    ;; carry the completion line
+    (cl-assert (null (string-match-p "TUTORIAL [0-9]/[0-9]"
                                      (cistern-test-ux2--plain
                                       (cistern-view--render st))))
-               t "death frame contains no TUTORIAL line"))
+               t "death frame contains no tutorial prompt line"))
   ;; (b) per-step gate: purge-first without step 1
   (let ((st2 (cistern--new-game 42)))
     (cistern--cmd-purge st2 5 2)

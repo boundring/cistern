@@ -202,16 +202,18 @@ slow mode — 1 tick/second."
 
 (defun cistern-log ()
   "Q16: the full uncapped log, oldest first, in a read-only
-buffer.  The main screen keeps its 3-line tail."
+buffer — R2-Q13: a special-mode buffer, q closes it like every
+other surface.  The main screen keeps its 3-line tail."
   (interactive)
   (let ((buf (get-buffer-create "*cistern log*")))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)
+        (insert "— press q to close —\n")
         (dolist (e (reverse (cistern-st-log cistern--st)))
           (insert (car e) "\n"))
         (goto-char (point-min)))
-      (setq buffer-read-only t))
+      (special-mode))
     (pop-to-buffer buf)))
 
 (defun cistern-help ()

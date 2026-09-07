@@ -101,7 +101,7 @@ the render is a pure, propertized projection of state."
     (let ((line (caar (cistern-st-log st))))
       ;; Q14: the log names the identity glyph the map renders
       (cl-assert (string-match-p
-                  (format "CREATOR %s OVERFLOWED" (cistern--worker-glyph st w))
+                  (format "WORKER %s OVERFLOWED" (cistern--worker-glyph st w))
                   line)
                  t "domain log names the worker's glyph")))
   ;; the view renders identity from the stable per-worker position
