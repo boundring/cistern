@@ -27,34 +27,128 @@ auto-run) makes 4.  Never two independent numbers."
 ;; ---------------------------------------------------------------------------
 ;; Faces (ported from legacy :604-621; pipe gains connection faces).
 
-(defface cistern-wall '((t :foreground "grey35")) "CISTERN walls.")
-(defface cistern-floor '((t :foreground "grey40")) "CISTERN floor.")
-(defface cistern-door '((t :foreground "grey60")) "CISTERN doors.")
-(defface cistern-ore '((t :foreground "yellow3")) "CISTERN ore veins.")
-(defface cistern-pipe-live '((t :foreground "cyan" :weight bold))
+(defface cistern-wall '((t)) "CISTERN walls.")
+(defface cistern-floor '((t)) "CISTERN floor.")
+(defface cistern-door '((t)) "CISTERN doors.")
+(defface cistern-ore '((t)) "CISTERN ore veins.")
+(defface cistern-pipe-live '((t :weight bold))
   "Pipe connected to capacity (R7).")
-(defface cistern-pipe-dead '((t :foreground "grey50"))
+(defface cistern-pipe-dead '((t))
   "Isolated pipe (R7).")
-(defface cistern-toilet '((t :foreground "white" :weight bold)) "Toilet.")
-(defface cistern-toilet-busy '((t :foreground "magenta" :weight bold))
+(defface cistern-toilet '((t :weight bold)) "Toilet.")
+(defface cistern-toilet-busy '((t :weight bold))
   "Toilet in use.")
-(defface cistern-toilet-down '((t :foreground "red" :weight bold))
+(defface cistern-toilet-down '((t :weight bold))
   "Toilet out of service.")
-(defface cistern-tank-ok '((t :foreground "green")) "Tank below 50% load.")
-(defface cistern-tank-high '((t :foreground "yellow")) "Tank at 50-85% load.")
-(defface cistern-tank-full '((t :foreground "red" :weight bold))
+(defface cistern-tank-ok '((t)) "Tank below 50% load.")
+(defface cistern-tank-high '((t)) "Tank at 50-85% load.")
+(defface cistern-tank-full '((t :weight bold))
   "Tank near capacity.")
-(defface cistern-hazard '((t :foreground "red" :weight bold))
+(defface cistern-hazard '((t :weight bold))
   "Contamination.")
-(defface cistern-worker '((t :foreground "green" :weight bold)) "Worker.")
-(defface cistern-worker-sick '((t :foreground "orange" :weight bold))
+(defface cistern-worker '((t :weight bold)) "Worker.")
+(defface cistern-worker-sick '((t :weight bold))
   "Sick worker.")
 (defface cistern-cursor '((t :inverse-video t :weight bold)) "Cursor cell.")
-(defface cistern-header '((t :foreground "white" :weight bold))
-  "Header line.")
-(defface cistern-dim '((t :foreground "grey55")) "Dim UI text.")
-(defface cistern-tutorial '((t :foreground "cyan" :weight bold))
-  "Tutorial line.")
+(defface cistern-header '((t :weight bold)) "Header line.")
+(defface cistern-dim '((t)) "Dim UI text.")
+(defface cistern-tutorial '((t :weight bold)) "Tutorial line.")
+
+;; ---------------------------------------------------------------------------
+;; Theme-contrast palette (V4-03, SURFACE S2.1/S2.2).  PURE MATH: the
+;; derivation calls no frame/buffer/color-resolver (A2.3 probe) — the
+;; CALLER resolves the theme's background to "#RRGGBB".  Every glyph
+;; face takes its color from a role below, never a literal (rule, not
+;; list — new faces add roles).
+
+(defconst cistern-view--face-roles
+  '((wall . (0 0.0 recessive))
+    (floor . (30 0.12 recessive))
+    (door . (45 0.25 standard))
+    (ore . (50 0.55 standard))
+    (pipe-live . (180 0.65 emphatic))
+    (pipe-dead . (210 0.12 recessive))
+    (toilet . (150 0.55 emphatic))
+    (toilet-busy . (300 0.5 emphatic))
+    (toilet-down . (0 0.85 alert))
+    (tank-ok . (120 0.5 standard))
+    (tank-high . (55 0.6 standard))
+    (tank-full . (10 0.8 alert))
+    (hazard . (0 0.75 alert))
+    (worker . (140 0.5 standard))
+    (worker-sick . (70 0.6 standard))
+    (header . (210 0.45 emphatic))
+    (dim . (0 0.0 recessive))
+    (tutorial . (280 0.4 standard)))
+  "Face/role → (HUE SAT CLASS); CLASS ∈ recessive/standard
+\(target 4.5:1) or emphatic/alert (7.0:1).")
+
+(defvar cistern--palette-cache nil
+  "V4-04 memo (BG . PALETTE) — a cache, never an input (A2.6).")
+
+(defun cistern--hsl-to-hex (h s l)
+  "HUE 0-360, SAT/LIGHT 0-1 → \"#RRGGBB\"."
+  (let* ((c (* (- 1 (abs (- (* 2 l) 1))) s))
+         (hp (/ (mod h 360.0) 60.0))
+         (x (* c (- 1 (abs (- (mod hp 2) 1)))))
+         (m (- l (/ c 2)))
+         (rgb (cond ((< hp 1) (list c x 0)) ((< hp 2) (list x c 0))
+                    ((< hp 3) (list 0 c x)) ((< hp 4) (list 0 x c))
+                    ((< hp 5) (list x 0 c)) (t (list c 0 x)))))
+    (apply #'format "#%02X%02X%02X"
+           (mapcar (lambda (v) (round (* 255 (+ v m)))) rgb))))
+
+(defun cistern--lum (hex)
+  "WCAG 2.x relative luminance of \"#RRGGBB\"."
+  (let ((lin (lambda (v)
+               (let ((c (/ v 255.0)))
+                 (if (<= c 0.04045) (/ c 12.92)
+                   (expt (/ (+ c 0.055) 1.055) 2.4))))))
+    (+ (* 0.2126 (funcall lin (string-to-number (substring hex 1 3) 16)))
+       (* 0.7152 (funcall lin (string-to-number (substring hex 3 5) 16)))
+       (* 0.0722 (funcall lin (string-to-number (substring hex 5 7) 16))))))
+
+(defun cistern--ratio (fg bg)
+  (/ (+ (max (cistern--lum fg) (cistern--lum bg)) 0.05)
+     (+ (min (cistern--lum fg) (cistern--lum bg)) 0.05)))
+
+(defun cistern--scan-role (bg hue sat target dark-p)
+  "Scan HSL lightness 0..1 at HUE/SAT; return the closest color
+to BG (on the polarity side when DARK-P says lighter, else darker)
+meeting TARGET, or nil."
+  (let ((lb (cistern--lum bg)) best best-d)
+    (dotimes (i 513)
+      (let* ((l (/ i 512.0))
+             (hex (cistern--hsl-to-hex hue sat l))
+             (lf (cistern--lum hex))
+             (side-ok (if dark-p (> lf lb) (< lf lb))))
+        (when (and side-ok (>= (cistern--ratio hex bg) target))
+          (let ((d (abs (- lf lb))))
+            (when (or (not best) (< d best-d))
+              (setq best hex best-d d))))))
+    best))
+
+(defun cistern--derive-palette (bg)
+  "BG \"#RRGGBB\" → alist (ROLE . \"#RRGGBB\") per SURFACE S2.1.
+Dark bgs (L < 0.5) get lighter ink, light bgs darker; a role that
+cannot meet its class target at its saturation retries grey (sat
+clamp), then emits the best-effort extreme (still ≥ 4.5 for
+greys)."
+  (let* ((lb (cistern--lum bg))
+         (dark-p (< lb 0.5))
+        (out nil))
+    (dolist (e cistern-view--face-roles out)
+      (let* ((hue (nth 0 (cdr e))) (sat (nth 1 (cdr e)))
+             (class (nth 2 (cdr e)))
+             (target (if (memq class '(emphatic alert)) 7.0 4.5))
+             (hit (or (cistern--scan-role bg hue sat target dark-p)
+                      (cistern--scan-role bg hue 0 target dark-p)
+                      ;; best effort: the extreme grey with the most
+                      ;; contrast against BG (either side)
+                      (let ((white (cistern--ratio "#FFFFFF" bg))
+                            (black (cistern--ratio "#000000" bg)))
+                        (if (> white black) "#FFFFFF" "#000000")))))
+        (push (cons (car e) hit) out)))))
 
 ;; ---------------------------------------------------------------------------
 ;; View-local tables: enum→face, kind→legend/inspector text.  Worker

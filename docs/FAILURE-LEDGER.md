@@ -2617,3 +2617,27 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-079 (2026-09-07, run: impl-v4-w1 — V4-03 palette derivation pure function, S2.1/S2.2)
+
+- Outcome: LANDED (red `0d51d0d`, green this commit).
+- Red: both tests failed (void-function cistern--derive-palette;
+  deffaces still carried literal :foreground).
+- Green: `cistern--derive-palette` + role table
+  `cistern-view--face-roles` (HUE SAT CLASS; 18 roles) + pure WCAG
+  helpers (hsl-to-hex, lum, ratio) in cistern-view.el; 512-step
+  lightness scan keeps the recessive smallest-luminance rule and the
+  polarity side; unreachable targets (pure red / mid-grey bgs at
+  7.0) clamp sat to 0 and retry once, then emit the max-contrast
+  grey extreme — every role lands ≥ 4.5 everywhere.  All 18 deffaces
+  dropped their literal :foreground (cistern-cursor inverse-video
+  stays); `cistern--palette-cache` defvar declared (cache never an
+  input — A2.6 probe).  Application is V4-04 (next directive).
+- Two draft fixes inside the same commit: defvar→let* (lb used in a
+  parallel let binding — void-variable), and a duplicated
+  cistern-test-v4--root defconst removed; test now pins its own repo
+  root instead of borrowing test-r7's (L-008 pattern).
+- VERIFY: canonical suite ALL 85 TESTS PASSED (batch).
+
+---
+

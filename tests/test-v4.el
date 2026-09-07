@@ -7,7 +7,7 @@
 
 (require 'cl-lib)
 
-;; Repo root pinned at load time (L-008 pattern).
+;; Repo root pinned at load time (L-008 pattern from test-r7-glyphs).
 (defconst cistern-test-v4--root
   (file-name-directory
    (directory-file-name
@@ -270,7 +270,7 @@ the view carries a literal :foreground (cistern-cursor excepted)."
   ;; A2.4: deffaces take colors from roles, never literals
   (with-temp-buffer
     (insert-file-contents
-     (expand-file-name "src/cistern-view.el" cistern-test-r7--root))
+     (expand-file-name "src/cistern-view.el" cistern-test-v4--root))
     (let ((src (buffer-string)) (pos 0) faces)
       (while (string-match "(defface \\(cistern-[a-z-]+\\)" src pos)
         (push (match-string 1 src) faces)
