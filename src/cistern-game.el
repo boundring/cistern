@@ -21,18 +21,23 @@ cistern.el:498-525, rendered calls stripped."
                 ('toilet cistern-cost-toilet)
                 ('pipe cistern-cost-pipe)
                 ('tank cistern-cost-tank))))
+    ;; returns t on placement, nil on refusal (Q19: the driver's
+    ;; arm-and-build arms only when the at-cursor build lands)
     (cond
-     ((not (cistern--in-bounds-p st x y)) (cistern--log st "OUT OF SECTOR"))
+     ((not (cistern--in-bounds-p st x y))
+      (cistern--log st "OUT OF SECTOR") nil)
      ((not (eq (cistern--cell st x y) 'floor))
       (cistern--log st "CANNOT BUILD THERE")
       (setf (cistern-st-hint st)                       ; Q18: the hint
-            (cdr (assq 'refusal-no-floor cistern--copy)))) ; names the fix
+            (cdr (assq 'refusal-no-floor cistern--copy))) ; names the fix
+      nil)
      ((gethash (cons x y) (cistern--occupied-cells st nil))
-      (cistern--log st "WORKER IN THE WAY"))
+      (cistern--log st "WORKER IN THE WAY") nil)
      ((< (cistern-st-alloy st) cost)
       (cistern--log st "INSUFFICIENT ALLOY — %d REQUIRED" cost)
       (setf (cistern-st-hint st)                       ; Q18: the hint
-            (format (cdr (assq 'refusal-alloy cistern--copy)) cost)))
+            (format (cdr (assq 'refusal-alloy cistern--copy)) cost))
+      nil)
      (t
       (setf (cistern-st-alloy st) (- (cistern-st-alloy st) cost))
       (cistern--set-cell st x y kind)
@@ -47,7 +52,8 @@ cistern.el:498-525, rendered calls stripped."
         ('pipe
          (setf (cistern-st-built-pipe st) (1+ (cistern-st-built-pipe st)))))
       (cistern--log st "%s PLACED AT (%d,%d) — %d ALLOY"
-                    (upcase (symbol-name kind)) x y cost)))))
+                    (upcase (symbol-name kind)) x y cost)
+      t))))
 
 (defun cistern--cmd-demolish (st x y)
   "Remove the player-placed plumbing at (X,Y) (R8).  Legality:
@@ -499,6 +505,13 @@ armed verb is set/cleared BY USE-CASES: this sets it, cmd-click
 clears it on placement).  No arming setter may exist in the driver
 or adapter layers (L-013: no second arming site)."
   (setf (cistern-st-armed-verb st) verb))
+
+(defun cistern--cmd-disarm (st)
+  "Clear the armed build verb (Q19).  Armed state never blocks
+input (PROTECT: no modal) — disarming is a plain use-case
+mutation, mirroring `cistern--cmd-arm-verb'."
+  (setf (cistern-st-armed-verb st) nil)
+  st)
 
 (defun cistern--cmd-consume-hint (st)
   "Drain ST's transient cursor hint (Q17): the driver calls this

@@ -194,10 +194,17 @@ objectives; nil without a card."
 (defun cistern-view--header-badges (st)
   "Reserved dim strip segment after REP (Q01): filled by Q19
 \(armed verb) and Q29 (auto-run).  Empty until then."
-  "")
+  (let ((verb (cistern-st-armed-verb st)))
+    (if verb
+        (format (cdr (assq 'badge-armed cistern--copy))
+                (upcase (symbol-name verb)))
+      "")))
 
 (defun cistern-view--help-line ()
-  (format "[arrows/mouse] cursor  [t]oilet %d  [p]ipe %d  [K]tank %d  [d]emolish %d  [c]decon %d  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit\n"
+  (format (concat "[arrows/mouse] cursor  [t]oilet %d  [p]ipe %d  [K]tank %d"
+                  "  [d]emolish %d  [c]decon %d  [x]purge  [SPC]tick"
+                  "  [r]auto-run  [n]ew  [?]help  [q]uit  "
+                  (cdr (assq 'help-arm cistern--copy)) "\n")
           cistern-cost-toilet cistern-cost-pipe cistern-cost-tank
           cistern-cost-demolish cistern-cost-decon))
 

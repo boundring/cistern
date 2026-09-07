@@ -55,6 +55,8 @@ pure render.  Every state-mutating command ends here."
     (define-key m "x" #'cistern-purge)
     (define-key m "T" #'cistern-skip-tutorial)
     (define-key m "r" #'cistern-auto-run-toggle)
+    (define-key m "u" #'cistern-disarm)
+    (define-key m (kbd "<escape>") #'cistern-disarm)
     (define-key m "L" #'cistern-log)
     (define-key m "n" #'cistern-new-game)
     (define-key m "?" #'cistern-help)
@@ -131,11 +133,18 @@ cursor move, no tick; armed = place at the cell + one tick)."
   "Arm KIND via the input adapter (use-case `cistern--cmd-arm-verb',
 the single arming site per L-010 pin 4) and build it at the cursor
 (Pinned D3: the keyboard build keys keep the legacy at-cursor flow
-while arming the verb for click-to-place)."
-  (cistern-input-arm-verb cistern--st kind)
-  (cistern--cmd-build cistern--st kind
-                      (car (cistern-st-cursor cistern--st))
-                      (cdr (cistern-st-cursor cistern--st)))
+while arming the verb for click-to-place).  Q19: a refused
+at-cursor build posts its hint and does NOT arm — refuse cleanly,
+no arm-then-fail noise."
+  (when (cistern--cmd-build cistern--st kind
+                            (car (cistern-st-cursor cistern--st))
+                            (cdr (cistern-st-cursor cistern--st)))
+    (cistern-input-arm-verb cistern--st kind))
+  (cistern--refresh))
+
+(defun cistern-disarm ()
+  (interactive)
+  (cistern-input-disarm cistern--st)
   (cistern--refresh))
 
 (defun cistern-build-toilet ()

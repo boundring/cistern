@@ -543,11 +543,12 @@ arm-then-fail noise."
   (let ((st (cistern--new-game 42)))
     (setq cistern--st st)
     (setf (cistern-st-cursor st) (cons 0 0))   ; wall
-    (cistern--arm-and-build 'tank)
-    (cl-assert (null (cistern-st-armed-verb st))
-               t "a refused at-cursor build does not arm")
-    (cl-assert (cistern-st-hint st)
-               t "the refusal posts its hint")))
+    (with-temp-buffer
+      (cistern--arm-and-build 'tank)
+      (cl-assert (string-match-p "NO FLOOR THERE" (buffer-string))
+                 t "the refusal's hint rode that render")
+      (cl-assert (null (cistern-st-armed-verb st))
+                 t "a refused at-cursor build does not arm"))))
 
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here

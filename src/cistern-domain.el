@@ -763,7 +763,9 @@ game layer (Phase 2)."
     (pressure-severed . "LINES SEVERED — REWIRE (p) — TANK AT (%d,%d)")
     (pressure-severed-bare . "LINES SEVERED — REWIRE (p)")
     (refusal-no-floor . "NO FLOOR THERE — AIM FOR OPEN FLOOR")
-    (refusal-alloy . "NEED %d ALLOY — PURGE (x) PAYS"))
+    (refusal-alloy . "NEED %d ALLOY — PURGE (x) PAYS")
+    (badge-armed . "  ARMED: %s — CLICK PLACES, ESC CANCELS")
+    (help-arm . "t/p/K arm — click to place"))
   "Q11 copy table, keyed by surface (Q05/Q08/Q10 milestones and
 pressure lines so far).")
 

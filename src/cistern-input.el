@@ -29,6 +29,11 @@ cell and exactly one tick advances (R6)."
 site (L-010 pin 4, L-013 migration)."
   (cistern--cmd-arm-verb st verb))
 
+(defun cistern-input-disarm (st)
+  "Clear the armed verb via the disarm use case (Q19) — same
+adapter chain as arming, per the L-010 use-case-owned precedent."
+  (cistern--cmd-disarm st))
+
 (defvar cistern--auto-run-timer nil
   "Auto-run timer handle.  Timer plumbing, never game state
 (Pinned D2 — the spec §3.3 one-global exception; it never enters
