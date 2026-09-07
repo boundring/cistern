@@ -1,0 +1,25 @@
+CISTERN — SECTOR-7 — v3.0.0-dev  TICK 5   ALLOY 5   POP 4/8   CONTAM 0/20   SEED 1535244752
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  · pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓···················▓············▓
+▓··┌─▣··············▓············▓
+▓··Ω················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓················αδ·▓············▓
++··················β+············▓
+▓···················▓····◆·······▓
+▓·············▓▓+▓▓▓▓▓▓▓▓········▓
+▓··············γ····+··········◆·▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+CURSOR (10,10): FLOOR
+LINES NOMINAL — THE STRUCTURE DOES NOT CARE
+SECTOR-7 ONLINE — KEEP THE WATER MOVING
+CANNOT BUILD THERE
+INSUFFICIENT ALLOY — 15 REQUIRED

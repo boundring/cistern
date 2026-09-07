@@ -1,0 +1,23 @@
+CISTERN — SECTOR-7 — v3.0.0-dev  TICK 0   ALLOY 20   POP 4/8   CONTAM 0/20   SEED 1823504434
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  · pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓····················▓···········▓
+▓··┌─▣···············▓···········▓
+▓··Ω·················▓···········▓
+▓····················▓···········▓
+▓····················▓···········▓
+▓···········α··δ·····▓···········▓
++·············β······▓···········▓
+▓····················+···········▓
+▓··········γ··▓▓▓▓+▓▓▓▓▓▓········▓
+▓····················▓·········◆·▓
+▓····················▓···········▓
+▓····◆···············▓···◆·······▓
+▓····················+···········▓
+▓····················▓···········▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+CURSOR (5,2): TANK — LOAD 60/60 — PURGE WITH x (pays 1 alloy per 3)
+PRESSURE CRITICAL — TOILETS BACKED UP / PURGE THE TANKS
+SECTOR-7 ONLINE — KEEP THE WATER MOVING
+CREATOR RELIEVED AT (3,3)

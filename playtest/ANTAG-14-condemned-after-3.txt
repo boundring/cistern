@@ -1,0 +1,25 @@
+CISTERN — SECTOR-7 — v3.0.0-dev  TICK 1   ALLOY 20   POP 4/8   CONTAM 20/20   SEED 391441865   !! SECTOR CONDEMNED — CONTAMINATION LIMIT
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  · pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓···················▓············▓
+▓··┌─▣··············▓············▓
+▓··Ω················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓···········βα··δ···▓············▓
++···················+············▓
+▓···················▓····◆·······▓
+▓···········γ·▓▓+▓▓▓▓▓▓▓▓········▓
+▓···················+··········◆·▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+CURSOR (3,6): FLOOR
+SECTOR CONDEMNED — PRESS n TO RESTART
+SECTOR CONDEMNED — PRESS n FOR NEW GAME
+SECTOR CONDEMNED — PRESS n FOR NEW GAME
+SECTOR CONDEMNED — PRESS n FOR NEW GAME
