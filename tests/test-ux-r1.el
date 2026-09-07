@@ -396,5 +396,40 @@ read-only buffer; the main screen keeps the 3-line tail."
                                  (split-string (cistern-view--log-tail st) "\n")))
                t "the main screen keeps the 3-line tail")))
 
+;; --- Q14: shared worker-identity helper ----------------------------------------
+
+(defun cistern-test-ux-q14-worker-identity ()
+  "One identity helper, at the SOURCE the accident log can reach
+\(the domain — innermost layer): the breach log names the same
+glyph the map shows at that cell, no off-by-one, no CREATOR #N;
+the view's private copy is retired."
+  (cl-assert (fboundp 'cistern--worker-glyph)
+             t "shared helper exists in the domain")
+  (cl-assert (null (boundp 'cistern-view--worker-glyphs))
+             t "the view's private glyph table is retired")
+  (cl-assert (null (fboundp 'cistern-view--worker-glyph))
+             t "the view's private helper is retired")
+  (let ((st (cistern--new-game 42)))
+    (let ((w (nth 1 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 14)
+      (setf (cistern--worker-y w) 7)
+      (setf (cistern--worker-bladder w)
+            (- cistern-bladder-burst cistern-bladder-rate)))
+    (cistern--do-tick st)
+    (let* ((w (nth 1 (cistern-st-creators st)))
+           (glyph (cistern--worker-glyph st w))
+           (breach (cl-find-if (lambda (e) (string-match-p "BREACH" (car e)))
+                               (cistern-st-log st))))
+      (cl-assert (string-match-p
+                  (format "CREATOR %s OVERFLOWED" glyph) (car breach))
+                 t "the log names the worker's glyph, not #N")
+      ;; the map at the breach cell shows the same glyph (the worker
+      ;; occludes the tile at D5 precedence)
+      (let* ((row (nth (+ cistern-view--header-lines 7)
+                       (cistern-test-ux--render-lines st)))
+             (cell (substring row 14 (1+ 14))))
+        (cl-assert (string= cell glyph)
+                   t "map and log agree on the identity glyph")))))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
