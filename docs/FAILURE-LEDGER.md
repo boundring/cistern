@@ -2661,3 +2661,42 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-081 (2026-09-07, run: impl-v4-w1 — V4-05 tile kinds rubble/flood/manifold, S3.2 sim half)
+
+- Outcome: LANDED (red commit `git log eae1cee..HEAD~2`, green this
+  commit).
+- Red: glyph-charset + missing-kind asserts (void/kinds absent).
+- Green: 3 tile-table entries (▚ 259A / ░ 2591 / ╬ 256C — all inside
+  the L-076 pin ranges); cistern--add-flood spawner (breach floods
+  clean unoccupied neighbors on a spread-pct roll); flood decay
+  folded into phase-hazards' same decay-pct roll (no spread, never
+  touches contam); procgen rubble clusters (2-4 x 1-3) + 0-2
+  manifolds; passability/refusal fall out of the table (build
+  refuses non-floor cells); d on rubble clears to floor (new
+  cistern-cost-clear 2, copy key rubble-cleared); c dries flood at
+  cistern-cost-decon (purge ledger untouched); manifold anchor =
+  cistern--manifold-live-p (network touches a pipe orthogonally
+  adjacent to a manifold) wired into toilet-usable-p (OR with the
+  tank-headroom clause — first draft ANDed it into the and-chain and
+  short-circuited, L-081 lesson 1), severed-p (never severed), and
+  finish-use (relief drains into the manifold: no spill, no tank
+  load); cistern--pipe-live-p view query for live/dead rendering;
+  legend/kind-names stay table-generated.
+- Integration findings (win-serve scenario broke: contamination 1):
+  procgen draws shift the sim trajectory; worker β queued far from
+  the old corridor while seats were busy, then burst at the fixed
+  tick-50 deadline one cell short.  Fix: re-tuned the win-serve
+  walkthrough to seat the need ON the starter cluster (toilets
+  (4,1)/(4,3)/(2,2) — floor neighbors of the already-wired starter
+  pipes, exactly the 30-alloy purge budget, no extra pipe) and
+  reserved those cells in procgen; rubble/manifold draws moved
+  BEFORE the ore draws so vein placement re-rolls.  Scenario :expect
+  contract (contamination 0, served ≥ 40) unchanged — only the
+  script was re-tuned to the new world.
+- Also: charset gate widened to U+03A9 for Ω (shipped toilet glyph,
+  L-076-measured at one cell; the spec's α–ω range starts above it).
+- VERIFY: canonical suite ALL 89 TESTS PASSED (batch).
+
+---
+

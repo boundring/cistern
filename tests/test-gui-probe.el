@@ -37,7 +37,9 @@ gracefully (message, still registered) in pure batch."
                 ;; guarantee full suspect coverage: pipe shapes, dead,
                 ;; table glyphs, workers — even when seed 42 lacks them
                 (goto-char (point-max))
-                (insert "\n┌┐└┘┼│─╌◆▣▓▒Ω·αβγδεζηθ")
+                ;; V4-05 (A3.2): coverage extended with ▚ ░ ╬ before
+                ;; the glyphs shipped (SURFACE S3.1 rule 3)
+                (insert "\n┌┐└┘┼│─╌◆▣▓▒Ω·αβγδεζηθ▚░╬")
                 (goto-char (point-min))))
             (sit-for 0.2 t)
             (let ((cellw (with-selected-frame frm (default-font-width)))

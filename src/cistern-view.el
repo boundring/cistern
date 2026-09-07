@@ -167,7 +167,9 @@ greys)."
 (defconst cistern-view--kind-names
   '((floor . "floor") (wall . "wall") (door . "gate") (ore . "ore vein")
     (hazard . "contamination") (pipe . "pipe") (toilet . "toilet")
-    (tank . "tank")))
+    (tank . "tank")
+    ;; V4-05 (SURFACE S3.2) — the legend stays table-generated
+    (rubble . "rubble") (flood . "flood") (manifold . "manifold")))
 
 (defconst cistern-view--kind-descriptions
   '((wall . "MEGASTRUCTURE WALL") (floor . "FLOOR") (door . "GATE / DOOR")
@@ -265,7 +267,7 @@ variants only — base glyphs never leave the table."
          (face (cdr (assq kind cistern-view--kind-faces))))
     (cond
      ((eq kind 'pipe)
-      (if (cistern--connected-tanks st x y)
+      (if (cistern--pipe-live-p st x y)
           (cons (cistern-view--pipe-shape st x y) 'cistern-pipe-live)
         ;; Q12: the unconnected pipe gets the tile table's distinct
         ;; dead glyph — it is no longer the floor dot

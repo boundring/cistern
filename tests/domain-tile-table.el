@@ -2,7 +2,8 @@
 
 (require 'cl-lib)
 
-(defconst cistern-test-kinds '(floor wall door ore hazard pipe toilet tank))
+(defconst cistern-test-kinds
+  '(floor wall door ore hazard pipe toilet tank rubble flood manifold))
 
 (defun cistern-test--strip-table (txt)
   "Remove the cistern--tile-table defconst form from TXT."
@@ -22,7 +23,8 @@
 (defun cistern-test--any-kind-symbol (form)
   "Non-nil if FORM (recursively) contains a cell-kind symbol."
   (cond ((symbolp form)
-         (memq form '(floor wall door ore hazard pipe toilet tank)))
+         (memq form '(floor wall door ore hazard pipe toilet tank
+                            rubble flood manifold)))
         ((consp form)
          (or (cistern-test--any-kind-symbol (car form))
              (cistern-test--any-kind-symbol (cdr form))))

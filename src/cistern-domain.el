@@ -29,6 +29,10 @@ the view header and the driver help read it inward.")
 (defconst cistern-cost-pipe 2)
 (defconst cistern-cost-tank 15)
 (defconst cistern-cost-decon 3)
+
+(defconst cistern-cost-clear 2
+  "V4-05 (S3.2): alloy cost of `d' on a rubble cell — the same
+demolish verb, a lighter fee than plumbing removal.")
 (defconst cistern-purge-rate 3 "Waste units per recovered alloy on purge.")
 
 ;; ---------------------------------------------------------------------------
@@ -46,7 +50,12 @@ the view header and the driver help read it inward.")
     (pipe   :glyph "·" :dead-glyph "╌"
             :passable t   :buildable nil :firebreak t   :conn nil)
     (toilet :glyph "Ω" :passable nil :buildable nil :firebreak t   :conn nil)
-    (tank   :glyph "▣" :passable nil :buildable nil :firebreak t   :conn nil))
+    (tank   :glyph "▣" :passable nil :buildable nil :firebreak t   :conn nil)
+    ;; V4-05 (SURFACE S3.2 — all three glyphs inside the L-076
+    ;; pin-covered ranges: U+259A, U+2591, U+256C)
+    (rubble   :glyph "▚" :passable nil :buildable nil :firebreak t   :conn nil)
+    (flood    :glyph "░" :passable nil :buildable nil :firebreak nil :conn nil)
+    (manifold :glyph "╬" :passable nil :buildable nil :firebreak t   :conn nil))
   "One entry per cell kind.  No cell-kind pcase/case may exist
 outside this table (the connection-dependent pipe glyph is computed
 by the view, not here).")
@@ -186,9 +195,14 @@ worker by this glyph (Q14: no format drift, no off-by-one)."
 
 (defun cistern--procgen-reserved-p (x y)
   "Cells procgen must never overwrite: the four worker spawn
-cells and the starter plumbing chain."
+cells, the starter plumbing chain, and the tutorial scenario's
+build corridor (win-serve grows the second seat there — V4-05
+procgen keeps it floor)."
   (or (member (list x y) cistern--procgen-spawns)
-      (member (list x y) '((3 2) (4 2) (5 2) (3 3)))))
+      (member (list x y) '((3 2) (4 2) (5 2) (3 3)))
+      ;; V4-05: the win-serve walkthrough builds its seats here —
+      ;; procgen keeps them floor
+      (member (list x y) '((4 1) (4 3) (2 2)))))
 
 (defun cistern--procgen-place (st x y kind)
   "Table-validated placement of KIND at (X,Y): allowed only
@@ -236,6 +250,25 @@ plumbing hashes, and LCG residue."
     (cl-loop for x from 14 to 24 do (cistern--procgen-place st x cy 'wall))
     (unless (cistern--procgen-reserved-p cdoor cy)
       (cistern--set-cell st cdoor cy 'door)))
+  ;; V4-05 (S3.2): map-gen debris fields — 2-4 clusters of 1-3
+  ;; impassable rubble cells that shape routing
+  (let ((n (+ 2 (cistern--rand st 3))))
+    (dotimes (_ n)
+      (let* ((x (+ 2 (cistern--rand st (- cistern-w 4))))
+             (y (+ 2 (cistern--rand st (- cistern-h 4))))
+             (size (+ 1 (cistern--rand st 3))))
+        (cistern--procgen-place st x y 'rubble)
+        (dotimes (_ (1- size))
+          (let ((n (nth (cistern--rand st 4)
+                        '((1 . 0) (0 . 1) (-1 . 0) (0 . -1)))))
+            (cistern--procgen-place st (+ x (car n)) (+ y (cdr n))
+                                    'rubble))))))
+  ;; V4-05 (S3.2): 0-2 manifold anchors — free pipe liveness
+  (let ((n (cistern--rand st 3)))
+    (dotimes (_ n)
+      (let ((x (+ 2 (cistern--rand st (- cistern-w 4))))
+            (y (+ 2 (cistern--rand st (- cistern-h 4)))))
+        (cistern--procgen-place st x y 'manifold))))
   ;; seed-driven ore veins
   (let ((n (+ 2 (cistern--rand st 3))))
     (dotimes (_ n)
@@ -285,15 +318,44 @@ Returns hash (X . Y) -> distance.  The seed is included regardless."
              seen)
     (sort tanks (lambda (a b) (< (car a) (car b))))))
 
+(defun cistern--manifold-live-p (st sx sy)
+  "V4-05 (S3.2): is the plumbing network containing (SX,SY)
+anchored — does it touch a PIPE orthogonally adjacent to a
+manifold?  A manifold is live with unlimited headroom: no tank
+needed, no purge income."
+  (let ((seen (cistern--flood st sx sy
+                              (lambda (px py)
+                                (memq (cistern--cell st px py)
+                                      '(toilet pipe tank)))))
+        (live nil))
+    (maphash (lambda (k _)
+               (when (and (not live)
+                          (eq (cistern--cell st (car k) (cdr k)) 'pipe))
+                 (dolist (n (cistern--neighbors st (car k) (cdr k)))
+                   (when (eq (cistern--cell st (car n) (cdr n)) 'manifold)
+                     (setq live t)))))
+             seen)
+    live))
+
+(defun cistern--pipe-live-p (st x y)
+  "V4-05 view query: a pipe is live when it reaches tank capacity
+OR is anchored to a manifold."
+  (or (cistern--connected-tanks st x y)
+      (cistern--manifold-live-p st x y)))
+
 (defun cistern--toilet-usable-p (st x y)
   (let ((entry (gethash (cons x y) (cistern-st-toilets st))))
     (and entry
          (not (plist-get entry :busy))
-         (cl-some (lambda (tk)
-                    (<= (+ (plist-get (gethash tk (cistern-st-tanks st)) :load)
-                           cistern-use-load)
-                        cistern-tank-cap))
-                  (cistern--connected-tanks st x y)))))
+         (or ;; tanks with headroom on the live path
+             (cl-some (lambda (tk)
+                        (<= (+ (plist-get (gethash tk (cistern-st-tanks st))
+                                          :load)
+                               cistern-use-load)
+                            cistern-tank-cap))
+                      (cistern--connected-tanks st x y))
+             ;; V4-05: a manifold anchor is unlimited headroom
+             (cistern--manifold-live-p st x y)))))
 
 (defun cistern--free-usable-toilets (st)
   (let ((out nil))
@@ -366,7 +428,10 @@ Both halves replace the collapsed legacy backed-p."
   (let ((severed nil))
     (maphash (lambda (k _v)
                (when (and (eq (cistern--toilet-state st (car k) (cdr k)) 'down)
-                          (null (cistern--connected-tanks st (car k) (cdr k))))
+                          (null (cistern--connected-tanks st (car k) (cdr k)))
+                          ;; V4-05: a manifold anchor is never severed
+                          (not (cistern--manifold-live-p st (car k)
+                                                         (cdr k))))
                  (setq severed t)))
              (cistern-st-toilets st))
     severed))
@@ -554,13 +619,25 @@ bug class where plumbing state pointed elsewhere cannot exist."
       (puthash tp (list :busy nil) (cistern-st-toilets st)))
     (let ((tanks (cistern--connected-tanks st (cistern--worker-x w)
                                             (cistern--worker-y w))))
-      (if (null tanks)
-          (progn
-            (cistern--add-hazard st x y)
-            (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
-            (let ((line (format "SEVERED LINE AT (%d,%d) — WASTE SPILLED" x y)))
-              (cistern--log-sev st 'error "%s" line)
-              (push (list 'leak line) (cistern-st-rewards-events st)))) ; leak (M4)
+      (cond
+       ((and (null tanks)
+             (cistern--manifold-live-p st (cistern--worker-x w)
+                                       (cistern--worker-y w)))
+        ;; V4-05: a manifold anchor drains the waste — relief
+        ;; without tank income and without a spill
+        (cistern--log-sev st 'info "%s"
+                          (format (cdr (assq 'relief-log cistern--copy))
+                                  x y))
+        (push (list 'relief bladder x y)
+              (cistern-st-rewards-events st)))
+       ((null tanks)
+        (progn
+          (cistern--add-hazard st x y)
+          (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
+          (let ((line (format "SEVERED LINE AT (%d,%d) — WASTE SPILLED" x y)))
+            (cistern--log-sev st 'error "%s" line)
+            (push (list 'leak line) (cistern-st-rewards-events st))))) ; leak (M4)
+       (t
         (let ((best (car tanks)))
           (dolist (tk tanks)
             (when (< (plist-get (gethash tk (cistern-st-tanks st)) :load)
@@ -576,7 +653,7 @@ bug class where plumbing state pointed elsewhere cannot exist."
                 (cistern-st-rewards-events st))
           (cistern--log-sev st 'info "%s"
                             (format (cdr (assq 'relief-log cistern--copy))
-                                    x y)))))))
+                                    x y))))))))
 
 (defun cistern--add-hazard (st x y)
   "Contaminate (X,Y) if it is floor.  Everything else — ore,
@@ -585,6 +662,16 @@ base can never be destroyed by unserved need."
   (when (and (cistern--in-bounds-p st x y)
              (eq (cistern--cell st x y) 'floor))
     (cistern--set-cell st x y 'hazard)
+    t))
+
+(defun cistern--add-flood (st x y)
+  "V4-05 (S3.2): flood (X,Y) if it is clean, unoccupied floor.
+Flood is water, not waste: it never counts toward the contam
+limit — it steals ticks, not health."
+  (when (and (cistern--in-bounds-p st x y)
+             (eq (cistern--cell st x y) 'floor)
+             (not (gethash (cons x y) (cistern--occupied-cells st nil))))
+    (cistern--set-cell st x y 'flood)
     t))
 
 (defun cistern--accident (st w)
@@ -597,6 +684,11 @@ base can never be destroyed by unserved need."
                        (not (gethash n (cistern--occupied-cells st w))))
               (throw 'placed t)))))
     (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
+    ;; V4-05 (S3.2): a breach may flood the wet floor around it —
+    ;; spread-pct roll per clean neighbor
+    (dolist (n (cistern--neighbors st x y))
+      (when (< (cistern--rand st 100) cistern-spread-pct)
+        (cistern--add-flood st (car n) (cdr n))))
     (dolist (n (cistern--neighbors st x y))
       (dolist (o (cistern-st-creators st))
         (when (and (not (eq o w))
@@ -668,25 +760,30 @@ worker); decay 2%% back to floor.  Contamination is pressure, not
 permanent scarring: stop bleeding and the marks fade."
   (let ((hs nil) (i 0))
     (while (< i (length (cistern-st-map st)))
-      (when (eq (aref (cistern-st-map st) i) 'hazard)
+      (when (memq (aref (cistern-st-map st) i) '(hazard flood))
         (push (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st))) hs))
       (cl-incf i))
     (setq hs (nreverse hs))
     (dolist (h hs)
       (let ((roll (cistern--rand st 100)))
-        (cond
-         ((< roll cistern-spread-pct)
-          (let* ((cands (cl-remove-if
-                         (lambda (n)
-                           (or (not (eq (cistern--cell st (car n) (cdr n))
-                                        'floor))
-                               (gethash n (cistern--occupied-cells st nil))))
-                         (cistern--neighbors st (car h) (cdr h)))))
-            (when cands
-              (let ((n (nth (cistern--rand st (length cands)) cands)))
-                (cistern--add-hazard st (car n) (cdr n))))))
-         ((< roll (+ cistern-spread-pct cistern-decay-pct))
-          (cistern--set-cell st (car h) (cdr h) 'floor)))))))
+        (if (eq (cistern--cell st (car h) (cdr h)) 'flood)
+            ;; V4-05: flood does not spread — it only dries, on the
+            ;; same decay-pct roll the hazard uses
+            (when (< roll cistern-decay-pct)
+              (cistern--set-cell st (car h) (cdr h) 'floor))
+          (cond
+           ((< roll cistern-spread-pct)
+            (let* ((cands (cl-remove-if
+                           (lambda (n)
+                             (or (not (eq (cistern--cell st (car n) (cdr n))
+                                          'floor))
+                                 (gethash n (cistern--occupied-cells st nil))))
+                           (cistern--neighbors st (car h) (cdr h)))))
+              (when cands
+                (let ((n (nth (cistern--rand st (length cands)) cands)))
+                  (cistern--add-hazard st (car n) (cdr n))))))
+           ((< roll (+ cistern-spread-pct cistern-decay-pct))
+            (cistern--set-cell st (car h) (cdr h) 'floor))))))))
 
 (defun cistern--phase-migration (st)
   (when (and (> (cistern-st-tick st) 0)
@@ -836,6 +933,8 @@ game layer (Phase 2)."
     (tutorial-1 . "MOVE THE CURSOR ONTO A WORKER")
     (tutorial-2 . "PURGE A FILLING TANK (x)")
     (tutorial-3 . "THE PURGE PAYS — ALLOY IN THE BANK")
+    ;; V4-05 (SURFACE S3.2): rubble clear log
+    (rubble-cleared . "RUBBLE CLEARED AT (%d,%d) — %d ALLOY")
     ;; V4-02 (SURFACE S1.2/S1.3): the log browser's table copy
     (log-header . "— press q to close —")
     (log-jump-none . "NO CELL ON THIS LINE")

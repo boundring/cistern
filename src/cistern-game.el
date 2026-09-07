@@ -68,6 +68,18 @@ phantom-plumbing invariant, load-bearing)."
   (let ((kind (and (cistern--in-bounds-p st x y)
                    (cistern--cell st x y))))
     (cond
+     ;; V4-05 (S3.2): rubble clears to floor for a lighter fee
+     ((eq kind 'rubble)
+      (cond
+       ((< (cistern-st-alloy st) cistern-cost-clear)
+        (cistern--log st "INSUFFICIENT ALLOY — %d REQUIRED"
+                      cistern-cost-clear))
+       (t
+        (setf (cistern-st-alloy st) (- (cistern-st-alloy st)
+                                       cistern-cost-clear))
+        (cistern--set-cell st x y 'floor)
+        (cistern--log st (cdr (assq 'rubble-cleared cistern--copy))
+                      x y cistern-cost-clear))))
      ((not (memq kind '(pipe toilet tank)))
       (cistern--log st "NOT YOURS TO DEMOLISH"))
      ((and (eq kind 'toilet)
@@ -180,12 +192,13 @@ breach fires deterministically from the pinned constants.")
    :seed 42                       ; same seed as the losing scenario
    :script
     `((verb . ,(lambda (st) (cistern--cmd-purge st 5 2)))    ; starter tank: clears the 30-load backup and funds the build
-      (verb . ,(lambda (st) (cistern--cmd-build st 'pipe 6 2)))  ; grow the starter network outward (each cell is a
-      (verb . ,(lambda (st) (cistern--cmd-build st 'toilet 7 2))) ;  floor neighbor of the reserved starter plumbing)
-      (verb . ,(lambda (st) (cistern--cmd-build st 'pipe 6 3)))
-      (verb . ,(lambda (st) (cistern--cmd-build st 'pipe 6 4)))
-      (verb . ,(lambda (st) (cistern--cmd-build st 'pipe 6 5)))
-      (verb . ,(lambda (st) (cistern--cmd-build st 'toilet 7 5))) ; seat on the seekers' return funnel
+      ;; V4-05 retune (procgen gained rubble/manifold, shifting the
+      ;; old corridor run): seat the need ON the starter cluster —
+      ;; each new toilet is a direct floor neighbor of the already-
+      ;; wired starter pipes, so no extra pipe alloy is spent
+      (verb . ,(lambda (st) (cistern--cmd-build st 'toilet 4 1)))
+      (verb . ,(lambda (st) (cistern--cmd-build st 'toilet 4 3)))
+      (verb . ,(lambda (st) (cistern--cmd-build st 'toilet 2 2)))
       (wait . 55))               ; same horizon budget as the losing scenario
    :expect '((contamination . (= 0))
              (over . nil)))
@@ -583,11 +596,13 @@ one render — same drain-once pattern as `cistern-st-rewards-events'
   st)
 
 (defun cistern--cmd-decon (st x y)
-  "Clean a hazard tile (cistern.el:527-538 verbatim semantics:
-hazard tiles ONLY — R8 keeps demolish distinct from decon)."
+  "Clean a hazard tile or dry a flood cell (cistern.el:527-538
+verbatim semantics: hazard/flood tiles ONLY — R8 keeps demolish
+distinct from decon; V4-05: drying flood reuses cistern-cost-decon
+and never touches the contam limit)."
   (cond
    ((not (and (cistern--in-bounds-p st x y)
-              (eq (cistern--cell st x y) 'hazard)))
+              (memq (cistern--cell st x y) '(hazard flood))))
     (cistern--log st "NO CONTAMINANT UNDER CURSOR"))
    ((< (cistern-st-alloy st) cistern-cost-decon)
     (cistern--log st "INSUFFICIENT ALLOY — %d REQUIRED" cistern-cost-decon))
