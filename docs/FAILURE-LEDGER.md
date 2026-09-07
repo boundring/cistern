@@ -2340,3 +2340,138 @@ One entry per dead/failed/retried run.
   ROUND-2 END SUMMARY.
 
 ---
+## L-067 (2026-09-07, run: impl-ux-r2-2 — R2-Q08 shipped interactions named)
+
+- Attempt: Red tests `cistern-test-ux2-q08-briefing-interactions` +
+  `cistern-test-ux2-q10-goals-explained` (red commit `1319928`; red
+  run: "L taught", 2/73). Green `4010021`.
+- CONTROLS gains `L full log`, `u cancel armed verb (ESC on GUI)`,
+  `C-u r slow auto-run (1 tps)` — briefing PROSE per the COPY-TABLE
+  "not in the table" rule (the R2-Q08 protect pins this).  Test-side
+  lesson: the asserts match the directive's copy verbatim —
+  column-aligned princ spacing ("L   full log") failed the probe;
+  the copy goes in exactly as curated.
+- Outcome: GREEN. Canonical suite: ALL 73 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q10 GOALS paragraph (same green).
+
+## L-068 (2026-09-07, run: impl-ux-r2-2 — R2-Q10 GOALS explained)
+
+- Attempt: (shared red: "GOALS explained").  THE LOOP gains
+  `GOALS n/m tracks the active goal card; complete it for score and
+  trophies.` — the strip's segment finally has a player-facing
+  explanation.  Card commit stays non-modal (copy only).
+- Outcome: GREEN. Canonical suite: ALL 73 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q09 same-tick discoverability.
+
+## L-069 (2026-09-07, run: impl-ux-r2-2 — R2-Q09 same-tick undo discoverable)
+
+- Attempt: Red test `cistern-test-ux2-q09-same-tick-inspector` (red
+  commit `ca7c607`; red run: "a same-tick cell offers the free
+  undo", 1/75). Green `8f7817f` (with R2-Q14).
+- The inspector appends ` — SAME-TICK: FREE UNDO` (table key) when
+  the cursor rests on a demolishable piece whose built-at tick ==
+  the current tick; after one tick the offer is gone (asserted).
+  The check is a DOMAIN query (`cistern--built-this-tick-p`) — the
+  first draft read the built-at hash in the view and the r5
+  projection backstop caught it immediately (D6 held).
+- HARVEST: two paren casualties in this green (the helper's defun
+  close, and the bearing's `parts)))))` tail dropped by an inexact
+  patch match) — caught by check-parens + the suite, fixed by
+  diffing against the last commit rather than re-counting by hand.
+- Outcome: GREEN. Canonical suite: ALL 75 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q14 compound bearings (same green).
+
+## L-070 (2026-09-07, run: impl-ux-r2-2 — R2-Q14 compound bearings)
+
+- Attempt: (shared red: "the diagonal reads as one compound").  A
+  multi-axis target renders as ONE compound (`tank ▣ 2 east +
+  4 north` — the axes join with `+`); single-axis lines
+  byte-identical (asserted: `toilet Ω 1 north, ` unchanged).
+- Outcome: GREEN. Canonical suite: ALL 75 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q11 tutorial repairs.
+
+## L-071 (2026-09-07, run: impl-ux-r2-2 — R2-Q11 tutorial repairs)
+
+- Attempt: Red tests `cistern-test-ux2-q11-tutorial-repairs` +
+  `cistern-test-ux2-q12-worker-noun` + `cistern-test-ux2-q13-log-
+  buffer-exit` + `cistern-test-ux2-q15-boot-vacates` (red commit
+  `0dbdec2`; red run: "step 1 advances the tick its predicate
+  holds", 4/79). Green `819ae66`.
+- (a) CARRIED: step predicates check BEFORE the wander phase
+  (`cistern--do-tick` advances the tutorial first) — the chased
+  worker cannot escape mid-tick; step 1 is deterministic on a
+  parked cursor.  NO reword: with (a) there is no lottery left, so
+  the step copy stays `MOVE THE CURSOR ONTO A WORKER` (the
+  directive's reword option was conditional on (a) failing).
+- (b) Per-step gate: the index is the count of currently-satisfied
+  steps, monotonically clamped (`idx = max(idx, count)`) — a
+  satisfied later step advances without earlier ones (purge-first
+  reaches 2 steps done); completion at count = n.
+- (c) The tutorial PROMPT is suppressed while over (the death frame
+  carries no prompt; the log tail may still carry the completion
+  line — history).  Test note: the probe matches the prompt pattern
+  `TUTORIAL n/n`, not the word TUTORIAL.
+- The r1 q27 drive updated: with the per-step gate the tutorial
+  completes only when the cursor step holds at a check tick — the
+  drive parks the cursor on a worker's tick-start cell (now
+  deterministic via (a); the round-1 60-tick luck bound is GONE).
+- Outcome: GREEN. Canonical suite: ALL 79 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q12 worker noun (same green).
+
+## L-072 (2026-09-07, run: impl-ux-r2-2 — R2-Q12 worker noun unification)
+
+- Attempt: (shared red: "the breach names WORKER").  Green with the
+  round-1 q27/q15 test updates.
+- `BREACH — WORKER %s OVERFLOWED AT (x,y)` (breach-fmt key) and
+  `WORKER RELIEVED AT (x,y)` (relief-log key) — both formats in the
+  table; the M7 intent text uses relief-log so the faced intent and
+  the log line cannot drift.  One noun everywhere: log, map, legend,
+  inspector (the glyphs already carried identity).  Q14's glyph-
+  match probes updated to WORKER and green.
+- Outcome: GREEN. Canonical suite: ALL 79 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q13 the L buffer exits.
+
+## L-073 (2026-09-07, run: impl-ux-r2-2 — R2-Q13 the L buffer exits like everything else)
+
+- Attempt: (shared red: "special-mode").  `cistern-log` now renders
+  the buffer in `special-mode` (q → quit-window for free), prepends
+  `— press q to close —` as the first line, and keeps the Q16
+  contract (read-only, oldest first, uncapped).  The r1 q16 assert
+  moved with the hint line (the oldest log line is line 2).
+- Outcome: GREEN. Canonical suite: ALL 79 TESTS PASSED, exit 0.
+- Change for next attempt: R2-Q15 boot flavor.
+
+## L-074 (2026-09-07, run: impl-ux-r2-2 — R2-Q15 boot flavor vacates the tail)
+
+- Attempt: (shared red: "boot flavor vacates the tail" — the round-1
+  collapse shrank the player era to one line and the boot line
+  filled a slot).  Green `819ae66`.
+- The boot line (the log's OLDEST entry) ranks below ANY player-era
+  line in the recency fill — with ≥3 newer events it never occupies
+  a tail slot, no matter how hard the player lines collapse.  With
+  an EMPTY player era the boot line still renders (fallback to the
+  newest entries; asserted).  Suppression stays silent.
+- Outcome: GREEN. Canonical suite: ALL 79 TESTS PASSED, exit 0
+  (64 round-1 + 15 round-2 entries).
+- Change for next attempt: ROUND-2 END — summary + docs marks.
+
+## L-075 (2026-09-07, run: impl-ux-r2 — ROUND-2 END SUMMARY)
+
+- All 15 directives SHIPPED (see docs/ux/TOP-30-R2.md status mark).
+  Canonical suite: ALL 79 TESTS PASSED, exit 0 (64 round-1 + 15
+  round-2 entries, tests/test-ux-r2.el).  Ledger range this round:
+  L-060..L-075 (16 entries).  Reds first for every directive except
+  none — all 15 had meaningful reds.
+- The one geometric change of the round (R2-Q02's block-height
+  constant) landed with its map-geometry probe green and every
+  round-1 render-geometry test (r1-click, r5-hook, r7) untouched.
+- Both director rulings applied: legend-at-frame-foot (L-060, and
+  the round-2 layout held), badge-as-status-light (L-061; teaching
+  copy lives in help row B + the briefing).
+- Wrap readiness: working tree clean (all round-2 commits landed),
+  suite green at 79/79 on the final commit, round 1 AND round 2
+  both closed, ledger continuous L-001..L-075.
+- Change for next attempt: none pending — polish-class set closed
+  at the 15 cap; anything further routes to the director.
+
+---
