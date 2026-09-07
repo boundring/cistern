@@ -2475,3 +2475,84 @@ One entry per dead/failed/retried run.
   at the 15 cap; anything further routes to the director.
 
 ---
+## L-076 (2026-09-07, run: align-fix — tile alignment: wall rows drift, columns shift)
+
+DEFECT: in the owner's environment the map's tile columns drift —
+some glyphs render wider than one cell, shifting every column after
+them.
+
+DIAGNOSIS (live measurement, owner's full init on :0; probe script
+/tmp/cistern-probe.el → /tmp/cistern-widths.txt).  Owner font:
+Iosevka (frame font -UKWN-Iosevka-...-13-...), cell = 7px, locale
+en_US.UTF-8.  Width table, glyph → px (deviation from 7px cell):
+
+| glyph | U+    | px | dev | renders via   |
+|-------|-------+----+-----+---------------|
+| 0/a/M/+ ASCII | — | 7 | 0 | Iosevka |
+| ·     | U+00B7 | 7 | 0 | Iosevka |
+| ▓     | U+2593 | 7 | 0 | Iosevka |
+| ▒     | U+2592 | 7 | 0 | Iosevka |
+| +     | U+002B | 7 | 0 | Iosevka |
+| ╌     | U+254C | 7 | 0 | Iosevka |
+| Ω     | U+03A9 | 7 | 0 | Iosevka |
+| ┌┐└┘┼│─ | U+250x-25xx | 7 | 0 | Iosevka |
+| α–θ   | U+03B1-03B8 | 7 | 0 | Iosevka |
+| ◆     | U+25C6 | 13 | +6 | Iosevka (wide fallback) |
+| ▣     | U+25A3 | 13 | +6 | Iosevka (wide fallback) |
+| — (copy lines) | U+2014 | 13 | +6 | Iosevka (wide fallback) |
+
+Root cause, two stacked mechanisms: (1) ◆/▣/— are East-Asian-
+AMBIGUOUS width and Iosevka renders them double-width; (2) all of
+U+2500-25FF is `symbol` script, and with the default
+`use-default-font-for-symbols` = t Emacs bypasses every fontset
+entry for symbols and uses the DEFAULT font — so a fontset pin
+alone silently did nothing (proved live: pin applied, font-at still
+Iosevka).  Everything else the game renders already measured 7px.
+
+FIX (commit pair 19c56ea red-first + 8412320):
+- `cistern--pin-glyph-fontset`: pins U+25A0-25FF AND U+2010-2015 on
+  the GAME FRAME's fontset to a mono font measured at exactly the
+  cell advance — measurement is `font-info` SPACE/AVERAGE/MAX widths
+  over the candidate list (Iosevka Fixed, Iosevka Term, DejaVu Sans
+  Mono, Hack, Fira Code, Adwaita Mono; all six cover both ranges per
+  fontconfig charset intersection), cached per cell width, no probe
+  frames created.  Owner env lands on **Iosevka Fixed-10** (same
+  glyph shapes as their Iosevka; measured sw=aw=mw=7).
+- `cistern-mode` sets `use-default-font-for-symbols` nil
+  BUFFER-LOCALLY (display honors the buffer-local value; measurement
+  temp buffers don't — the runner-side proof uses font-at) so the
+  pin engages only for the map.  No glyph swaps: tile-table flavor
+  preserved, legend/Q12 untouched.
+- `line-spacing 0` added to the mode (truncate-lines was already set).
+- Entry point: `cistern` and `cistern-new-game` now own the frame —
+  select the game window and `delete-other-windows` (L-076 owner
+  report: had to switch to the buffer manually).
+
+REGRESSION PROBE: `tests/test-gui-probe.el` → `cistern-test-gui-
+cell-width` (80th suite entry): on a graphic display, builds the
+game render (seed 42 + full suspect line), asserts via `font-at`
+that every unique glyph's resolved font advance equals the cell
+width; in pure batch it messages SKIPPED and stays registered, so
+the canonical suite stays green.  RED evidence pre-fix: the same
+measurement showed ◆/▣/— at 13px in the un-pinned game buffer.
+
+MECHANISM NOTES (for the next person): `string-pixel-width`
+measures in its own temp buffer on the selected frame — it cannot
+see buffer-local display vars or non-selected frames' fonts, which
+produced two false readings during diagnosis (face-remap :fontset
+variant measured a 2x font; buffer-local var seemed ignored).
+`font-at POS WINDOW` is the ground truth for what a buffer really
+renders.  This Emacs's `font-info` is the 14-element layout:
+SPACE-WIDTH is index 10 (was 8 pre-27).
+
+VERIFY: canonical suite ALL 80 TESTS PASSED (batch, probe
+registered+skipped); GUI probe PASSED on :0 (76 unique glyphs, 0
+deviations from 7px).  Fixed files installed to
+~/.emacs.d/lisp/ (.elc-free, five files), review instance relaunched
+(nohup emacs -f cistern, pid alive), render dump from the installed
+path + real entry point: map rows column-stable, ▣ ◆ — via Iosevka
+Fixed at 7px, all else Iosevka at 7px
+(/tmp/cistern-render-dump.txt).  Owner visual confirmation pending —
+the relaunch is on their screen now.
+
+---
