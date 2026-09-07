@@ -70,7 +70,8 @@ reserved (Q19 armed, Q29 auto-run); SEED lives in the ? briefing."
                t "SEED left the strip — it lives in the ? briefing now")
     (cl-assert (<= (length header) 95)
                t "strip truncated at width 95 (len %d)" (length header))
-    (cl-assert (equal (cistern-view--header-badges st) "")
+    ;; R2-Q02: idle = no badge row at all (nil, not an empty row)
+    (cl-assert (null (cistern-view--header-badges st))
                t "badge slot reserved and empty")
     (cistern-help)
     (let ((text (with-current-buffer "*cistern help*" (buffer-string))))
@@ -525,9 +526,10 @@ arm-then-click; an at-cursor keypress refuses CLEANLY instead of
 arm-then-fail noise."
   (let ((st (cistern--new-game 42)))
     (cistern--cmd-arm-verb st 'pipe)
-    (cl-assert (string-match-p "ARMED: PIPE — CLICK PLACES, ESC CANCELS"
-                               (cistern-test-ux--header st))
-               t "armed verb visible in the badge slot")
+    ;; R2-Q02: the badge is its own dim row below the strip
+    (cl-assert (string-match-p "ARMED: PIPE"
+                               (nth 1 (cistern-test-ux--render-lines st)))
+               t "armed verb visible in the badge row")
     (cistern--cmd-disarm st)
     (cl-assert (null (cistern-st-armed-verb st))
                t "disarm clears the verb via the use-case")
@@ -774,8 +776,10 @@ links) beside the 5tps default.  The handle stays out of state."
                                             'cistern-input--auto-run-callback))
                    t "default stays 5 ticks/second")
         ;; the badge rides Q01's reserved slot
-        (cl-assert (string-match-p "AUTO-RUN" (cistern-test-ux--header st))
-                   t "header shows AUTO-RUN while the chain is live")
+        ;; R2-Q02: the badge is its own dim row below the strip
+        (cl-assert (string-match-p "AUTO-RUN"
+                                   (nth 1 (cistern-test-ux--render-lines st)))
+                   t "badge row shows AUTO-RUN while the chain is live")
         (cistern-input-auto-run-toggle st)))))
 
 ;; --- Q30: free regret window ----------------------------------------------------------

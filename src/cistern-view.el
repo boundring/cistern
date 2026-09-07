@@ -16,6 +16,14 @@
 Buffer line header-lines+1 is map row 0 — `cistern-view--cell-at'
 and the render MUST agree on this count (L-014).")
 
+(defun cistern-view--header-block-height (st)
+  "R2-Q02: THE block-height constant — rows above the map that
+both the renderer and `cistern-view--cell-at' derive from.  Cold
+strip + two help rows = 3; one live badge row (armed and/or
+auto-run) makes 4.  Never two independent numbers."
+  (+ cistern-view--header-lines
+     (if (or (cistern-st-armed-verb st) (cistern-st-auto-run st)) 1 0)))
+
 ;; ---------------------------------------------------------------------------
 ;; Faces (ported from legacy :604-621; pipe gains connection faces).
 
@@ -192,7 +200,8 @@ so the strip returns already-faced."
                      (if gc (format "%d/%d" (car gc) (cdr gc)) "-/-")
                      (cistern-st-reputation st)
                      (if (cistern-st-over st)
-                         (concat "   !! " (cistern-st-over st))
+                         (concat "   " (cdr (assq 'condemn-append
+                                                  cistern--copy)))
                        ""))
              'face 'cistern-header))))
 
@@ -206,23 +215,24 @@ objectives; nil without a card."
             (length (plist-get card :goals))))))
 
 (defun cistern-view--header-badges (st)
-  "Reserved dim strip segment after REP (Q01): filled by Q19
-\(armed verb) and Q29 (auto-run).  Empty until then."
-  (concat (let ((verb (cistern-st-armed-verb st)))
-            (if verb
-                (format (cdr (assq 'badge-armed cistern--copy))
-                        (upcase (symbol-name verb)))
-              ""))
-          (if (cistern-st-auto-run st)
-              (cdr (assq 'badge-auto cistern--copy))
-            "")))
+  "R2-Q02: the ONE reserved badge row, directly below the strip —
+armed and auto-run coexist here.  Empty string when idle (no row)."
+  (let ((parts nil))
+    (when (cistern-st-armed-verb st)
+      (push (format (cdr (assq 'badge-armed cistern--copy))
+                    (upcase (symbol-name (cistern-st-armed-verb st))))
+            parts))
+    (when (cistern-st-auto-run st)
+      (push (cdr (assq 'badge-auto cistern--copy)) parts))
+    (when parts
+      (mapconcat #'identity (nreverse parts) " · "))))
 
 (defun cistern-view--help-line ()
   "R2-Q01: the help is TWO deliberate dim rows, each within the
 95-col contract — row A cursor + act verbs, row B arm/meta."
   (format (concat "[arrows/mouse] move [t]oilet %d [p]ipe %d [K]tank %d"
                   " [d]emolish %d [c]decon %d [x]purge [SPC]tick\n"
-                  "[t]/[p]/[K] %s [r]auto-run [n]ew [?]help [q]uit\n")
+                  "%s [r]auto-run [n]ew [?]help [q]uit\n")
           cistern-cost-toilet cistern-cost-pipe cistern-cost-tank
           cistern-cost-demolish cistern-cost-decon
           (cdr (assq 'help-arm cistern--copy))))
@@ -480,9 +490,13 @@ lines precede the map rows."
                                    (plist-get (cistern-st-summary st) :score))))))
     (concat
      ;; Q21: the header line arrives already-faced (CONTAM segment)
-     (propertize (cistern-view--header-line st) 'face 'cistern-header)
-     (propertize (cistern-view--header-badges st) 'face 'cistern-dim)
-     "\n"
+     (propertize (concat (cistern-view--header-line st) "\n")
+                 'face 'cistern-header)
+     ;; R2-Q02: the badges render on ONE reserved dim row directly
+     ;; below the strip; the block height is the one constant
+     (when (cistern-view--header-badges st)
+       (propertize (concat (cistern-view--header-badges st) "\n")
+                   'face 'cistern-dim))
      ;; R2-Q01: the help is two dim rows; the wrapped legend renders
      ;; below the map — the pre-map block stays header-lines tall
      (propertize (cistern-view--help-line) 'face 'cistern-dim)
@@ -512,7 +526,7 @@ lines precede the map rows."
 are ignored by the driver).  Used by the driver's mouse handler;
 batch-tested."
   (let ((x col)
-        (y (- line 1 cistern-view--header-lines)))
+        (y (- line 1 (cistern-view--header-block-height st))))
     (when (and (>= x 0) (< x (cistern-st-w st))
                (>= y 0) (< y (cistern-st-h st)))
       (cons x y))))
