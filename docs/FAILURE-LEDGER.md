@@ -1915,3 +1915,111 @@ One entry per dead/failed/retried run.
   inspector lines byte-identical).
 
 ---
+## L-046 (2026-09-07, run: impl-ux-r1-b3 — Q17 transient cursor-hint surface)
+
+- Attempt: Red tests `cistern-test-ux-q17-cursor-hint` +
+  `cistern-test-ux-q18-refusal-hints` as one dependency-chain red
+  (red commit `2521b6e`; red run: void-function cistern-st-hint,
+  2/52, exit 1). Greens `ac18656` (Q17), `1214908` (Q18).
+- Transport (director-pinned, honored): a state slot — `hint` on
+  `cistern-st` — posted by use-cases, read by the view (one row
+  under the inspector, dim face, inspector pattern), drained ONCE
+  by the driver's refresh after the insert
+  (`cistern--cmd-consume-hint`) — the rewards-events pattern, no
+  double consumption, no view mutation (the projection backstop
+  stayed green).  Nil hint ⇒ empty string ⇒ byte-identical baseline
+  render (no permanent layout shift).
+- Lesson: headless tests that drive driver commands must assert the
+  hint from the RENDERED frame (the refresh consumed it) — asserted
+  via with-temp-buffer buffer-string in Q19.
+- Outcome: GREEN. Canonical suite: ALL 53 TESTS PASSED, exit 0
+  (after Q18's green).
+- Change for next attempt: Q18 refusal copy rides the new surface.
+
+## L-047 (2026-09-07, run: impl-ux-r1-b3 — Q18 refusal copy names the next action)
+
+- Attempt: (shared red above). Green `1214908`.
+- The two pinned refusal sites post through Q17 with fix-naming
+  copy from the Q11 table: build-on-wall →
+  `NO FLOOR THERE — AIM FOR OPEN FLOOR`; insufficient-alloy →
+  `NEED %d ALLOY — PURGE (x) PAYS` (cost interpolated).  The LOG
+  keeps the original lines byte-identical (CANNOT BUILD THERE /
+  INSUFFICIENT ALLOY — %d REQUIRED) — history intact, the hint is
+  the where-the-eyes-are layer.  Worker-in-the-way and
+  out-of-sector refusals intentionally left hint-less (minimal
+  reading: the directive names two sites).
+- Outcome: GREEN. Canonical suite: ALL 52 TESTS PASSED, exit 0.
+- Change for next attempt: Q19 armed badge + cancel.
+
+## L-048 (2026-09-07, run: impl-ux-r1-b3 — Q19 armed verb visible, cancelable, taught)
+
+- Attempt: Red test `cistern-test-ux-q19-armed-badge` (red commit
+  `6bae400`; red run: "armed verb visible in the badge slot", 1/53).
+  Green `64987c8`.
+- Badge: Q01's reserved dim slot now fills when a verb is armed —
+  `  ARMED: PIPE — CLICK PLACES, ESC CANCELS` (copy table
+  badge-armed); unarmed strip unchanged (q01 still asserts the
+  empty slot).  WIDTH CONFLICT ledgered: the pinned badge copy
+  (~42 chars with the two-space lead) exceeds the 95-col budget on
+  an armed cold strip (85 + 42 = 127).  Resolution: Q01's budget
+  pins the STANDING strip; the armed strip is a transient state the
+  player just caused (eyes on the cursor, not the strip) — the
+  directive's example copy kept verbatim, the q01 test unchanged.
+  Compaction rejected; flag to the director if the budget must win.
+- ESC/u cancel: `cistern--cmd-disarm` (use-case-owned, mirroring
+  cmd-arm-verb per L-010) + adapter `cistern-input-disarm` + driver
+  `cistern-disarm`; bound to "u" AND <escape> — both verified
+  unbound before (no meta-prefix collision: <escape> is the GUI
+  escape-event key, "u" the terminal-friendly option).
+- Taught: help line gains `t/p/K arm — click to place` (copy table
+  help-arm) — the help line's first sanctioned change.
+- Clean refuse: `cistern--cmd-build` now returns t/nil (was: return
+  value unspecified — callers never used it); the driver's
+  arm-and-build arms ONLY when the at-cursor build lands — a wall
+  cursor posts the Q18 hint and leaves the verb unarmed.
+- Outcome: GREEN. Canonical suite: ALL 53 TESTS PASSED, exit 0.
+- Change for next attempt: Q20 inspector bearing (extension-only).
+
+## L-049 (2026-09-07, run: impl-ux-r1-b3 — Q20 inspector bearing, extension only)
+
+- Attempt: Red test `cistern-test-ux-q20-floor-bearing` (red commit
+  `963d925`; red run: "floor cursor names the nearest structures",
+  1/54).  Green `191d089`.
+- Floor cursor only: `FLOOR — toilet Ω 3 west, tank ▣ 2 north` —
+  nearest toilet AND nearest tank picked by manhattan distance in
+  the domain (`cistern--nearest-structure`, ties broken in
+  coordinate order for determinism); per-axis direction words over
+  the shared geometry; glyph + name from the existing tables; the
+  format skeleton (`FLOOR — %s`) rides the Q11 copy table.  All
+  non-floor inspector lines byte-identical (the wall line is pinned
+  exactly in the test) — the t-branch was split, not rewritten.
+- Note (ledgered): bearing text is generated data (glyphs/names/
+  compass words), not flavored copy — the skeleton lives in the
+  table, the words stay in the view; the docs pass may pull the
+  words in if it wants total coverage.
+- Outcome: GREEN. Canonical suite: ALL 54 TESTS PASSED, exit 0.
+- Change for next attempt: Q21 urgency coloring (last of batch 3).
+
+## L-050 (2026-09-07, run: impl-ux-r1-b3 — Q21 urgency colored)
+
+- Attempt: Red test `cistern-test-ux-q21-urgency-color` (red commit
+  `d0c3ac4`; red run: "contam >= 75% renders red bold", 1/55 — the
+  strip was uniformly cistern-header and the pressure line
+  unconditionally dim).  Green `ac1debe`.
+- Pressure line faces by state, mirroring the pressure-line cond
+  (`cistern-view--pressure-face`): over/severed/backed-up → red
+  bold (cistern-toilet-down), RISING → yellow (cistern-tank-high),
+  NOMINAL → dim.  Colors, not new words — the strings are
+  untouched.  CONTAM segment faces by fraction: yellow ≥ 50%, red
+  bold ≥ 75%; the header now arrives already-faced from
+  header-line (the render's wholesale propertize was dropped — it
+  would have clobbered the segment face).
+- Outcome: GREEN. Canonical suite: ALL 55 TESTS PASSED, exit 0
+  (34 baseline + 21 UX entries).
+- Change for next attempt: batch 4 (Q22–Q30) — Q22 snapshot before
+  Q23 death panel; Q24 needs Q03 (landed); Q25/Q26 guards; Q27
+  tutorial table; Q28 briefing proofread (%% escapes); Q29 auto-run
+  badge rides the Q01 slot; Q30 regret window with the Q07 guard
+  watching.
+
+---
