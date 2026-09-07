@@ -190,5 +190,70 @@ advertised 1-per-3; the inspector line's rate stays verbatim."
                                 (cistern-view--render st)))
                t "inspector purge rate verbatim")))
 
+;; --- Q08: pressure gradient anticipates ---------------------------------------
+
+(defun cistern-test-ux-q08-pressure-gradient ()
+  "The middle tier is proportional (>= 0.85 x sum-of-tank-cap)
+and shows the fill %; the raw-total branch is gone; at cap it is
+CRITICAL."
+  (let ((st (cistern--new-game 42)))
+    ;; 0.9 x cap on the one starter tank: RISING with the fill %,
+    ;; and the failure tier has NOT fired (pre-failure state)
+    (puthash (cons 5 2) (list :load 54) (cistern-st-tanks st))
+    (let ((line (cistern-view--pressure-line st)))
+      (cl-assert (string-match-p "PRESSURE RISING — TANK 90%" line)
+                 t "RISING at 0.9 cap with the fill %%")
+      (cl-assert (null (string-match-p "CRITICAL" line))
+                 t "0.9 cap is not critical")
+      (cl-assert (null (cistern-st-over st)) t "state is pre-failure"))
+    ;; the raw-total branch is deleted: 51+50=101 over two tanks
+    ;; (each below 85%) must NOT read RISING
+    (puthash (cons 5 2) (list :load 51) (cistern-st-tanks st))
+    (puthash (cons 8 5) (list :load 50) (cistern-st-tanks st))
+    (cl-assert (string-match-p "NOMINAL" (cistern-view--pressure-line st))
+               t "raw-total branch deleted (101 no longer rises)")
+    ;; at cap: CRITICAL
+    (puthash (cons 5 2) (list :load 60) (cistern-st-tanks st))
+    (puthash (cons 8 5) (list :load 0) (cistern-st-tanks st))
+    (cl-assert (string-match-p "CRITICAL" (cistern-view--pressure-line st))
+               t "at cap is critical")))
+
+;; --- Q11: PROTECT voice register / one copy table ------------------------------
+
+(defconst cistern-test-ux--src-dir
+  (expand-file-name "src" cistern-test-ux--root))
+
+(defun cistern-test-ux--src-string-count (s)
+  "How many times the literal S appears across src/*.el."
+  (let ((n 0))
+    (dolist (f (directory-files cistern-test-ux--src-dir t "\\.el\\'"))
+      (with-temp-buffer
+        (insert-file-contents f)
+        (setq n (+ n (how-many (regexp-quote s))))))
+    n))
+
+(defun cistern-test-ux-q11-copy-table ()
+  "The idle pressure line stays byte-identical; all new
+user-facing strings exist exactly once, inside the domain copy
+table `cistern--copy' (the old milestone table is consolidated
+away, not left beside it)."
+  (let ((st (cistern--new-game 42)))
+    (cl-assert (string= (cistern-view--pressure-line st)
+                        "LINES NOMINAL — THE STRUCTURE DOES NOT CARE")
+               t "idle pressure line byte-identical"))
+  (cl-assert (boundp 'cistern--copy) t "one domain copy table exists")
+  (cl-assert (null (boundp 'cistern--copy-milestones))
+             t "milestone strings consolidated into cistern--copy")
+  ;; every flavor string in the table appears exactly once in src/ —
+  ;; the table is the single source, no format-string drift
+  (dolist (entry (cdr (assq 'milestone cistern--copy)))
+    (cl-assert (= 1 (cistern-test-ux--src-string-count (cdr entry)))
+               t "milestone copy %S appears once, in the table" (cdr entry)))
+  (dolist (key '(pressure-rising pressure-severed pressure-severed-bare))
+    (let ((s (cdr (assq key cistern--copy))))
+      (cl-assert (stringp s) t "copy key %S present" key)
+      (cl-assert (= 1 (cistern-test-ux--src-string-count s))
+                 t "copy %S appears once, in the table" s))))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here

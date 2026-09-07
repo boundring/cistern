@@ -59,7 +59,9 @@
     cistern-test-ux-q04-goal-progress
     cistern-test-ux-q05-milestone-announce
     cistern-test-ux-q06-popup-protect
-    cistern-test-ux-q07-purge-economy))
+    cistern-test-ux-q07-purge-economy
+    cistern-test-ux-q08-pressure-gradient
+    cistern-test-ux-q11-copy-table))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
