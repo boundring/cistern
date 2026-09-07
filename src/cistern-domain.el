@@ -333,6 +333,35 @@ Both halves replace the collapsed legacy backed-p."
              (cistern-st-toilets st))
     severed))
 
+(defun cistern--nearest-tank (st x y)
+  "Coordinate of the tank nearest to (X,Y) by flood-fill distance
+over walkable plumbing space; nil when no tank exists (Q10: the
+flood-fill data already exists — this reads it)."
+  (let ((dist (cistern--flood st x y
+                              (lambda (px py)
+                                (memq (cistern--cell st px py)
+                                      '(floor pipe tank)))))
+        (best nil) (bd nil))
+    (maphash (lambda (k _v)
+               (let ((d (gethash k dist)))
+                 (when (and d (or (null bd) (< d bd)))
+                   (setq bd d best k))))
+             (cistern-st-tanks st))
+    best))
+
+(defun cistern--severed-remedy (st)
+  "For the first severed toilet (coordinate order — deterministic),
+the nearest tank coordinate to wire toward; nil otherwise (Q10)."
+  (let ((severed nil))
+    (maphash (lambda (k _v)
+               (when (and (eq (cistern--toilet-state st (car k) (cdr k)) 'down)
+                          (null (cistern--connected-tanks st (car k) (cdr k))))
+                 (push k severed)))
+             (cistern-st-toilets st))
+    (when severed
+      (setq severed (sort severed (lambda (a b) (< (car a) (car b)))))
+      (cistern--nearest-tank st (car (car severed)) (cdr (car severed))))))
+
 (defun cistern--walkable-p (st x y tx ty)
   "Is (X,Y) enterable by a worker walking to target (TX,TY)?
 Table-passable cells always.  A toilet only when it is the target:

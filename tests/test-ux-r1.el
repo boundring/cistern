@@ -300,6 +300,7 @@ advises REWIRE — never purge — and names the tank cell to wire
 to; the inspector agrees (LAY PIPE)."
   (let ((st (cistern--new-game 42)))
     (cistern--cmd-demolish st 4 2)            ; sever the starter line
+    (setf (cistern-st-cursor st) (cons 3 3))  ; cursor on the severed toilet
     (let* ((line (cistern-view--pressure-line st))
            (inspector (cistern-test-ux--plain (cistern-view--inspector st))))
       (cl-assert (string-match-p "LINES SEVERED — REWIRE (p)" line)

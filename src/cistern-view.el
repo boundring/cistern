@@ -259,6 +259,14 @@ Q11 from the domain table."
   (let* ((capsum (cistern--tank-capacity-total st))
          (total (cistern--tank-load-total st)))
     (cond ((cistern-st-over st) "SECTOR CONDEMNED — PRESS n TO RESTART")
+        ;; Q10: severed lines get rewired, never purged — and the
+        ;; line names the tank cell to wire toward (copy per Q11)
+        ((cistern--toilets-severed-p st)
+         (let ((tk (cistern--severed-remedy st)))
+           (if tk
+               (format (cdr (assq 'pressure-severed cistern--copy))
+                       (car tk) (cdr tk))
+             (cdr (assq 'pressure-severed-bare cistern--copy)))))
         ((cistern--toilets-backed-up-p st)
          "PRESSURE CRITICAL — TOILETS BACKED UP / PURGE THE TANKS")
         ((and (> capsum 0) (>= total (* 0.85 capsum)))
