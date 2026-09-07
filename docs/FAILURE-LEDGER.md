@@ -2641,3 +2641,23 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-080 (2026-09-07, run: impl-v4-w1 — V4-04 palette application triggers, S2.3)
+
+- Outcome: LANDED (red commit `git log 0d0a87b..HEAD~1`, green this
+  commit).
+- Red: cistern-test-v4-04-palette-apply failed "mode init did not
+  derive the palette" (no application path existed).
+- Green: cistern--palette-hex (frame bg → "#RRGGBB"), cistern--apply-palette
+  (frame-scoped set-face-attribute over the role table, cache = one
+  string compare), cistern--theme-refresh on enable-theme-functions
+  (hooked by mode init), drift guard rides refresh via the same
+  apply path.  GUI live probe registered + skipped in batch.
+- Debug note (for the next person): in -batch, `color-values'
+  returns ZEROS for hex strings — display-dependent.  Hex is parsed
+  directly; color-values only as named-color fallback.
+- VERIFY: canonical suite ALL 87 TESTS PASSED (batch; live probe
+  skipped).
+
+---
+

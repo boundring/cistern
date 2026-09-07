@@ -31,6 +31,9 @@ pure render.  Every state-mutating command ends here."
   ;; advances the field only (celebrations finish while frozen).
   ;; Call site pinned in L-029.
   (cistern--advance-particles cistern--st)
+  ;; V4-04 (S2.3) trigger 3: drift guard — one string compare; a
+  ;; custom-set-faces/load-theme bg change re-derives before render.
+  (cistern--apply-palette)
   (let ((inhibit-read-only t))
     (erase-buffer)
     (insert (cistern-view--render cistern--st))
@@ -70,7 +73,53 @@ pure render.  Every state-mutating command ends here."
   ;; fontset entirely and use the (wide-fallback) default font — the
   ;; pin below would never engage.  Buffer-local: only the map opts out.
   (setq-local use-default-font-for-symbols nil)
-  (cistern--pin-glyph-fontset (selected-frame)))
+  (cistern--pin-glyph-fontset (selected-frame))
+  ;; V4-04 (S2.3): trigger 1 — mode init applies the palette; the
+  ;; hook registration rides init so it lands exactly when the game
+  ;; goes live (add-hook is idempotent).
+  (cistern--apply-palette (selected-frame))
+  (add-hook 'enable-theme-functions #'cistern--theme-refresh))
+
+;; ---------------------------------------------------------------------------
+;; Theme-contrast application (V4-04, SURFACE S2.3).  The game frame
+;; is ours (cistern--own-frame, L-076), so face application is
+;; frame-scoped and never touches the user's other frames.
+
+(defun cistern--palette-hex (frame)
+  "FRAME's background as \"#RRGGBB\", or nil when unresolvable."
+  (let ((bg (frame-parameter frame 'background-color)))
+    (and (stringp bg)
+         ;; hex first: `color-values' is display-dependent (batch
+         ;; returns zeros) and themes often set named colors
+         (if (string-match "^#\\([0-9a-fA-F]\\{6\\}\\)$" bg)
+             (concat "#" (upcase (match-string 1 bg)))
+           (and (color-values bg)
+                (apply #'format "#%02X%02X%02X"
+                       (mapcar (lambda (v) (round (* 255.0 (/ v 65535.0))))
+                               (color-values bg))))))))
+
+(defun cistern--apply-palette (&optional frame)
+  "Derive the palette from FRAME's background and apply it
+frame-scoped (S2.3).  The cache is one string compare per call —
+the refresh drift guard rides this same path."
+  (setq frame (or frame (selected-frame)))
+  (let ((hex (cistern--palette-hex frame)))
+    (when hex
+      (unless (and cistern--palette-cache
+                   (equal (car cistern--palette-cache) hex))
+        (let ((pal (cistern--derive-palette hex)))
+          (dolist (e cistern-view--face-roles)
+            (set-face-attribute
+             (intern (format "cistern-%s" (car e))) frame
+             :foreground (cdr (assq (car e) pal))))
+          (setq cistern--palette-cache (cons hex pal)))))))
+
+(defun cistern--theme-refresh (&optional _theme)
+  "S2.3 trigger 2: a theme change while the game is live re-derives
+and re-applies on the game frame.  Hooked by `cistern-mode' init."
+  (let ((w (get-buffer-window "*cistern*")))
+    (when w
+      (cistern--apply-palette (window-frame w)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Glyph-width pin (L-076).  Some tile glyphs (ore U+25C6, tank U+25A3)
