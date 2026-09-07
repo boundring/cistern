@@ -643,5 +643,41 @@ teach-arrows coach exactly once through the Q17 slot."
                t "coach fired twice in a game"))
   (message "CISTERN-V4-07-OK"))
 
+(defconst cistern-test-v4-08--browser-keys
+  '("n/p walk" "C-s search" "RET jump" "g refresh" "q close"))
+
+(defun cistern-test-v4-08-briefing ()
+  "V4-08 (A4.4/A4.5): the briefing grows a POWER LAYER section
+carrying the S4 pairings and every §S1.3 browser key, the GLYPHS
+section is generated from the tile table (no hardcoded glyph
+list), and no line exceeds 95 cols."
+  (let ((help (cistern--help-text)))
+    (cl-assert help t "help text builder exists")
+    (cl-assert (string-match-p "POWER LAYER" help)
+               t "briefing lacks the POWER LAYER section")
+    (dolist (row cistern-test-v4-08--browser-keys)
+      (cl-assert (string-match-p row help)
+                 t "briefing lacks the browser key row %s" row))
+    (cl-assert (string-match-p "already know" help)
+               t "the power layer misses the you-already-know frame")
+    ;; A4.5: width contract
+    (dolist (line (split-string help "\n"))
+      (cl-assert (<= (length line) 95) t "help line over 95 cols")))
+  ;; GLYPHS: generated from the table — no tile glyph literal may
+  ;; appear in the help builder's source
+  (let ((src (format "%S" (symbol-function 'cistern--help-text))))
+    (dolist (entry cistern--tile-table)
+      (cl-assert (not (string-match-p
+                       (regexp-quote (cistern--tile-glyph (car entry))) src))
+                 t "hardcoded tile glyph %s in the help builder"
+                 (cistern--tile-glyph (car entry)))))
+  ;; and the generated section agrees with the table (all kinds named)
+  (let ((help (cistern--help-text)))
+    (dolist (entry cistern--tile-table)
+      (cl-assert (string-match-p
+                  (cdr (assq (car entry) cistern-view--kind-names)) help)
+                 t "help glyphs omit %s" (car entry))))
+  (message "CISTERN-V4-08-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here
