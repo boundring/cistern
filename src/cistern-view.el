@@ -317,17 +317,58 @@ Q11 from the domain table."
                   'face 'cistern-tutorial))))
 
 (defun cistern-view--log-tail (st)
-  "Last three log lines.  Q13: each entry is (LINE . SEVERITY),
-so the face persists with the text across ticks — the view no
-longer re-matches the current tick's intents."
-  (let ((out ""))
-    (dolist (e (last (reverse (cistern-st-log st)) 3) out)
+  "Three-line tail (Q15): consecutive identical lines collapse
+with a silent ×N count; majors (breach/condemnation) keep max
+severity weight inside the recent window; older flavor ages out
+like any line.  Q13: each entry is (LINE . SEVERITY), so faces
+persist with the text across ticks.  Suppression is silent."
+  (let* ((collapsed (cistern-view--collapse-log
+                     (reverse (cistern-st-log st))))  ; chronological
+        ;; ponytail: window 12 = the old log cap; a ranking constant,
+        ;; revisit only if tails feel stale
+        (window (last collapsed (min 12 (length collapsed))))
+        (picked (cistern-view--pick-tail window))
+        (out ""))
+    (dolist (e picked out)
       (setq out (concat out
-                        (propertize (car e) 'face
-                                    (or (cdr (assq (cdr e)
+                        (propertize (if (> (nth 2 e) 1)
+                                        (format "%s ×%d" (nth 0 e) (nth 2 e))
+                                      (nth 0 e))
+                                    'face
+                                    (or (cdr (assq (nth 1 e)
                                                    cistern-view--palette-faces))
                                         'cistern-dim))
                         "\n")))))
+
+(defun cistern-view--collapse-log (chron)
+  "Collapse consecutive identical lines (Q15): chronological
+input of (LINE . SEVERITY) entries → (LINE SEVERITY COUNT)
+triples.  Silent except the count."
+  (let ((out nil))
+    (dolist (e chron)
+      (let ((top (car out)))
+        (if (and top (string= (car top) (car e)))
+            (setf (nth 2 top) (1+ (nth 2 top)))
+          (push (list (car e) (cdr e) 1) out))))
+    (nreverse out)))
+
+(defun cistern-view--pick-tail (window)
+  "Choose ≤3 lines from the chronological WINDOW of triples:
+majors keep max severity weight (breach/condemnation always make
+the tail), remaining slots fill by recency; output order stays
+chronological."
+  (let* ((major-idx (last (cl-loop for e in window
+                                   for i from 0
+                                   when (eq (nth 1 e) 'error)
+                                   collect i)
+                          3))
+         (n (length window))
+         (rest-idx (last (cl-loop for i from (1- n) downto 0
+                                  unless (memq i major-idx)
+                                  collect i)
+                         (- 3 (length major-idx)))))
+    (mapcar (lambda (i) (nth i window))
+            (sort (append major-idx rest-idx) #'<))))
 
 (defun cistern-view--render (st)
   "Pure projection of ST into a propertized string.  No buffer
