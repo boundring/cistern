@@ -703,11 +703,16 @@ prompt renders as a persistent line, not log lines."
     (cl-assert (string-match-p "TUTORIAL 1/3"
                                (cistern-test-ux--plain (cistern-view--render st)))
                t "step 1 still the prompt by tick 3")
-    ;; drive step 1: move the cursor onto a worker
-    (let ((w (car (cistern-st-creators st))))
+    ;; drive step 1: park the cursor on a worker's spawn cell — the
+    ;; wanderer passes under it within the bound (deterministic seed)
+    (let ((w0 (car (cistern-st-creators st))))
       (setf (cistern-st-cursor st)
-            (cons (cistern--worker-x w) (cistern--worker-y w))))
-    (cistern--do-tick st)
+            (cons (cistern--worker-x w0) (cistern--worker-y w0)))
+      (dotimes (_ 60)
+        (unless (string-match-p "TUTORIAL 2/3"
+                                (cistern-test-ux--plain
+                                 (cistern-view--render st)))
+          (cistern--do-tick st))))
     (cl-assert (string-match-p "TUTORIAL 2/3"
                                (cistern-test-ux--plain (cistern-view--render st)))
                t "cursor-on-worker advances to step 2")

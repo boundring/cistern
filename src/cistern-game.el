@@ -97,7 +97,21 @@ predicate takes ST and a non-nil result advances.  Scenario content
 is Phase 4a; the table ships empty so advance is a no-op.  The
 optional TABLE arg is the test-injection point (the shipped game
 never passes one)."
-  (or table '()))
+  (or table
+      ;; Q27: the shipped 3-step table — real predicates over state,
+      ;; inspector-grade prompts from the Q11 copy table
+      (list (cons (cdr (assq 'tutorial-1 cistern--copy))
+                  (lambda (st)
+                    (cl-find-if (lambda (w)
+                                  (and (= (cistern--worker-x w)
+                                          (car (cistern-st-cursor st)))
+                                       (= (cistern--worker-y w)
+                                          (cdr (cistern-st-cursor st)))))
+                                (cistern-st-creators st))))
+            (cons (cdr (assq 'tutorial-2 cistern--copy))
+                  (lambda (st) (> (cistern-st-purges st) 0)))
+            (cons (cdr (assq 'tutorial-3 cistern--copy))
+                  (lambda (st) (> (cistern-st-alloy st) 20))))))
 
 (defun cistern--tutorial-advance (st &optional table)
   "Advance the tutorial index one gated step per tick (legacy

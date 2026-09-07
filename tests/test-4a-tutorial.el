@@ -83,9 +83,12 @@ state-driven so steps resolve instantly when already satisfied.")
 
   ;; shipped state: the table is empty — ticks run with zero tutorial
   ;; side effects (Phase 2 invariant, regression-pinned)
+  ;; Q27 supersedes the empty-table pin: the shipped table now has
+  ;; 3 steps; the mechanism's no-side-effect invariant still holds —
+  ;; a tick whose step predicate does not hold logs nothing
   (let ((st (cistern--new-game 42)))
-    (cl-assert (null (cistern--tutorial-steps))
-               "shipped tutorial table is empty")
+    (cl-assert (= (length (cistern--tutorial-steps)) 3)
+               "shipped tutorial table ships 3 steps (Q27)")
     (let ((tick0 (cistern-st-tick st)) (log0 (cistern-st-log st)))
       (cistern--do-tick st)
       (cl-assert (= (cistern-st-tick st) (1+ tick0))

@@ -800,7 +800,10 @@ game layer (Phase 2)."
     (death-panel . "%s / TICKS %d · RELIEVES %d · SCORE %d / PRESS n TO RESTART")
     (goal-met-served . "GOAL MET — %d SERVED")
     (goal-met-bursts . "GOAL MET — %d BURSTS HELD")
-    (goal-met-ceiling . "GOAL MET — CONTAM UNDER %d"))
+    (goal-met-ceiling . "GOAL MET — CONTAM UNDER %d")
+    (tutorial-1 . "MOVE THE CURSOR ONTO A WORKER")
+    (tutorial-2 . "PURGE A FILLING TANK (x)")
+    (tutorial-3 . "THE PURGE PAYS — ALLOY IN THE BANK"))
   "Q11 copy table, keyed by surface (Q05/Q08/Q10 milestones and
 pressure lines so far).")
 

@@ -214,13 +214,13 @@ buffer.  The main screen keeps its 3-line tail."
     (princ "  ▓ wall    · floor    ◆ ore vein    ─ pipe    Ω toilet\n")
     (princ "  ▣ tank    ▒ contamination    + gate    α..θ workers\n\n")
     (princ "THE LOOP\n")
-    (princ "  Workers mine ◆ for alloy.  Their bladders fill.  At 60%%\n")
+    (princ "  Workers mine ◆ for alloy.  Their bladders fill.  At 60%\n")
     (princ "  they walk to a Ω and seat themselves — entering the toilet\n")
     (princ "  tile IS sitting down.  A Ω works only when piped to a ▣ with\n")
     (princ "  headroom.  Each use sends 10 units down the line.\n\n")
     (princ "  A full ▣ backs up every Ω it feeds (red Ω).  Purge with x on\n")
     (princ "  the ▣: free, and it PAYS 1 alloy per 3 units of waste.\n\n")
-    (princ "  At 100%% a worker breaches: the tile turns ▒, contamination\n")
+    (princ "  At 100% a worker breaches: the tile turns ▒, contamination\n")
     (princ "  rises, neighbors fall sick.  ▒ spreads to adjacent floor.\n")
     (princ (format "  Decon with c.  At %d the sector is condemned.\n\n"
                    cistern-contam-limit))
@@ -235,6 +235,7 @@ buffer.  The main screen keeps its 3-line tail."
                    cistern-cost-tank cistern-cost-decon))
     (princ (format "  x   purge tank (pays)     d   demolish (%d)\n"
                    cistern-cost-demolish))
+    (princ (format "  %s\n" (cdr (assq 'help-arm cistern--copy))))
     (princ "  r   auto-run (5 ticks/s)\n")
     (princ "  T   skip tutorial         n   new game\n")
     (princ "  ?   this briefing         q   quit\n")))
