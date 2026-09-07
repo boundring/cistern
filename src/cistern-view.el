@@ -169,18 +169,32 @@ variants only — base glyphs never leave the table."
   "Q01 strip contract: fixed segment order TICK ALLOY POP
 CONTAM SCORE GOALS REP.  SEED and the version moved to the ?
 briefing (width budget at 95 cols); one dim badge slot (Q19
-armed, Q29 auto-run) is reserved after REP."
-  (let ((gc (cistern-view--goal-counts st)))
-    (format "CISTERN — SECTOR-7  TICK %d  ALLOY %d  POP %d/%d  CONTAM %d/%d  SCORE %d  GOALS %s  REP %d%s"
-            (cistern-st-tick st)
-            (cistern-st-alloy st)
-            (length (cistern-st-creators st)) cistern-pop-cap
-            (cistern-st-contam st) cistern-contam-limit
-            (or (cistern-st-score st) 0)
-            (if gc (format "%d/%d" (car gc) (cdr gc)) "-/-")
-            (cistern-st-reputation st)
-            (if (cistern-st-over st) (concat "   !! " (cistern-st-over st))
-              ""))))
+armed, Q29 auto-run) is reserved after REP.  Q21: the CONTAM
+segment faces by fraction — yellow >= 50%%, red bold >= 75%% —
+so the strip returns already-faced."
+  (let* ((gc (cistern-view--goal-counts st))
+         (pct (/ (* 100.0 (cistern-st-contam st)) cistern-contam-limit))
+         (contam-face (cond ((>= pct 75) 'cistern-toilet-down)
+                            ((>= pct 50) 'cistern-tank-high)
+                            (t 'cistern-header))))
+    (concat (propertize
+             (format "CISTERN — SECTOR-7  TICK %d  ALLOY %d  POP %d/%d"
+                     (cistern-st-tick st)
+                     (cistern-st-alloy st)
+                     (length (cistern-st-creators st)) cistern-pop-cap)
+             'face 'cistern-header)
+            (propertize (format "  CONTAM %d/%d"
+                                (cistern-st-contam st) cistern-contam-limit)
+                        'face contam-face)
+            (propertize
+             (format "  SCORE %d  GOALS %s  REP %d%s"
+                     (or (cistern-st-score st) 0)
+                     (if gc (format "%d/%d" (car gc) (cdr gc)) "-/-")
+                     (cistern-st-reputation st)
+                     (if (cistern-st-over st)
+                         (concat "   !! " (cistern-st-over st))
+                       ""))
+             'face 'cistern-header))))
 
 (defun cistern-view--goal-counts (st)
   "Active-card progress (Q04): (MET . TOTAL) from the card's
@@ -268,6 +282,20 @@ can never be listed twice."
                           (t "working"))))))
     (concat "CURSOR (" (number-to-string x) "," (number-to-string y)
             "): " base (if who (concat "  —  " who) ""))))
+
+(defun cistern-view--pressure-face (st)
+  "Q21: colors, not new words — CRITICAL (and SEVERED, the other
+act-now state) red bold, RISING yellow, NOMINAL dim.  Mirrors the
+pressure-line state cond."
+  (cond ((or (cistern-st-over st)
+             (cistern--toilets-severed-p st)
+             (cistern--toilets-backed-up-p st))
+         'cistern-toilet-down)
+        ((and (> (cistern--tank-capacity-total st) 0)
+              (>= (cistern--tank-load-total st)
+                  (* 0.85 (cistern--tank-capacity-total st))))
+         'cistern-tank-high)
+        (t 'cistern-dim)))
 
 (defun cistern-view--floor-bearing (st x y)
   "Q20: nearest toilet and tank bearings for the floor cursor at
@@ -423,7 +451,8 @@ lines precede the map rows."
          ;; design (ceremony copy/centering) is Phase 4 — DEFERRED.
          (banner (cdr celebration)))
     (concat
-     (propertize (cistern-view--header-line st) 'face 'cistern-header)
+     ;; Q21: the header line arrives already-faced (CONTAM segment)
+     (cistern-view--header-line st)
      (propertize (cistern-view--header-badges st) 'face 'cistern-dim)
      "\n"
      (propertize (cistern-view--help-line) 'face 'cistern-dim)
@@ -437,7 +466,7 @@ lines precede the map rows."
      (let ((h (cistern-st-hint st)))
        (if h (propertize (concat h "\n") 'face 'cistern-dim) ""))
      (propertize (concat (cistern-view--pressure-line st) "\n")
-                 'face 'cistern-dim)
+                 'face (cistern-view--pressure-face st))
      (cistern-view--tutorial-line st)
      (cistern-view--log-tail st))))
 
