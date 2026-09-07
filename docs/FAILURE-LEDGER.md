@@ -1647,3 +1647,110 @@ One entry per dead/failed/retried run.
   seed (`cistern-st-seed st`) during the post-playtest presentation
   pass, since a player cannot reproduce a run from the LCG state
   currently displayed.
+
+## L-035 (2026-09-07, run: impl-ux-r1 — Q01+Q02 header strip contract, score/rep rendered)
+
+- Attempt: Red tests `tests/test-ux-r1.el :: cistern-test-ux-q01-header-strip`
+  + `cistern-test-ux-q02-score-rep` (red commit `c812f3f`; red run:
+  "strip segment SCORE  missing" / "cold strip shows SCORE 0",
+  2/36, exit 1). Green `96cb46d`.
+- Strip contract landed: fixed segment order `TICK ALLOY POP CONTAM
+  SCORE GOALS REP`, values read from state (`cistern-st-score`,
+  `cistern-st-reputation`, and Q04's `cistern-view--goal-counts` for
+  `GOALS n/m` off the active card — `-/-` only while card-less).  One
+  dim badge segment reserved after REP (`cistern-view--header-badges`,
+  empty until Q19/Q29); render concatenates header + badges + "\n".
+- Width decision (least-active, ledgered): the old title
+  "CISTERN — SECTOR-7 — v3.0.0-dev" + SEED + the three new segments
+  measures 99–104 cols — over the 95 budget at cold start.  Minimal
+  reading that keeps every pinned segment: title compacted to
+  "CISTERN — SECTOR-7"; version AND seed moved into the `?' briefing
+  first line ("CISTERN v%s — sanitation protocol for Sector 7 — map
+  seed %d").  This also resolves L-034's carried change: the briefing
+  now prints the REAL seed (`cistern-st-seed`), not the LCG state the
+  old header "SEED" segment displayed.
+- Fixture lesson (test-side): the driven-relief helper must use
+  `let*' — `let' evaluates the spot loop's initializer before `w' is
+  bound (void-variable w); and Elisp "" is truthy, so the reserved
+  slot asserts `equal ... ""`, not `null`.
+- Outcome: GREEN. Canonical suite: ALL 36 TESTS PASSED, exit 0.
+- Change for next attempt: Q03 starter card (already planned next in
+  build order); watch replay-identity tests — the card now rides
+  every new game's state.
+
+## L-036 (2026-09-07, run: impl-ux-r1 — Q03 starter goal card + card-aliasing bug)
+
+- Attempt: Red test `cistern-test-ux-q03-starter-card` (red commit
+  `4d8972e`; red run: "starter goal card dealt at tick one", 1/37,
+  exit 1). Green `b53f2f4`.
+- Layer decision (least-active, ledgered): the directive pins the
+  call to cistern-game.el, but `cistern--new-game' lives in the
+  domain (innermost layer) — a game-layer issuance would either run
+  after construction (not "one call") or invert the domain→game
+  require edge.  Minimal reading: `cistern--cmd-set-goal-card` +
+  `cistern--goal-kinds` relocated to cistern-domain.el UNCHANGED
+  (same symbols, zero caller migration), and new-game issues
+  `cistern--starter-card` (tier 2, serve 3, ceiling 5) with one call.
+- REAL BUG CAUGHT BY THE SUITE (the lesson of this run): green broke
+  `cistern-test-4a-deterministic` — replay identity 2a8a5617 vs
+  c635170c.  Root cause: `cistern--cmd-set-goal-card` shallow-copied
+  the card, so every state aliased the SHARED literal goal plists;
+  the M3 evaluator's `plist-put ... :satisfied` then mutated those
+  literals, leaking goal state across games and making
+  `prin1-to-string` hashes mutation-history-dependent.  Fix
+  (root-cause, not symptom): the setter deep-copies goals
+  (`mapcar #'copy-sequence`), so each state owns its card.  The
+  existing 4a-deterministic entry is the standing regression test.
+- Outcome: GREEN. Canonical suite: ALL 37 TESTS PASSED, exit 0.
+- Change for next attempt: Q04's driven same-tick assertion (its red
+  was subsumed — the GOALS mechanics landed with the Q01 strip);
+  then Q05 milestone announcements.
+
+## L-037 (2026-09-07, run: impl-ux-r1 — Q05 milestone announcements + Q04 driven progress)
+
+- Attempt: Red test `cistern-test-ux-q05-milestone-announce` (red
+  commit `ff054e6`; red run: "milestone line in the log tail", 1/39,
+  exit 1 — the ANTAG-12 silence reproduced headlessly). Green
+  `00df336`.
+- Unlock branch now announces at the tick of the act, commit-first
+  (the unlock itself still commits to `cistern-st-unlocks` before
+  any presentation): the formatted line enters the log via
+  `cistern--log`, rides the log-tail as a faced `:layer 'log`
+  intent (success face — milestone is good news in the M7 grammar),
+  and rides the banner row as `:layer 'banner` — log line and banner
+  present in the SAME frame.  The raw `(unlock :id ...)` intent is
+  kept unchanged so 4b-m8's intent-shape asserts stay truthful.
+- Copy routing (Q11 PROTECT): milestone display names live in
+  `cistern--copy-milestones` in the domain — the one string table the
+  docs pass reviews; format `MILESTONE — BIG CISTERN ONLINE`.
+- Q04 note: `cistern-test-ux-q04-goal-progress` (driven first
+  objective → `GOALS 1/1` in the same tick's strip) landed in the
+  red commit already green — its plausible-bug surface (strip not
+  reading the card) was first exposed by the Q01 red; retained as
+  the same-tick freshness guard.
+- Outcome: GREEN. Canonical suite: ALL 39 TESTS PASSED, exit 0.
+- Change for next attempt: Q06/Q07 executable PROTECT guards, then
+  batch 2 (Q08 pressure gradient before the Q09 domain split).
+
+## L-038 (2026-09-07, run: impl-ux-r1 — Q06+Q07 executable PROTECT guards)
+
+- Attempt: guard tests `cistern-test-ux-q06-popup-protect` +
+  `cistern-test-ux-q07-purge-economy` (commit `f36acc0`).  No red:
+  both constraints are already true of the mechanism (M5 popups,
+  purge ledger) — these entries pin them so Q25 (particle placement)
+  and Q30 (free regret window) cannot regress them silently.
+- Q06 pins: a `+N` popup exists AT the relief cell in the overlay of
+  the tick that produced the relief (SCREEN-13), and a cursor parked
+  on that cell still occludes it (D5 z-order cursor > worker >
+  popup > cell unchanged).
+- Q07 pins: purge at a known 45-load tank changes alloy by exactly
+  15 (1 per 3, no rounding drift), and the inspector line keeps
+  "pays 1 alloy per 3" verbatim — the rate any future economy change
+  (incl. Q30) must keep true.
+- Outcome: GREEN. Canonical suite: ALL 41 TESTS PASSED, exit 0
+  (34 baseline + 7 UX entries).
+- Change for next attempt: batch 2 — Q08 gradient first (director-
+  pinned Q08 → Q09 → Q10), all new copy through
+  `cistern--copy-*` domain tables per Q11.
+
+---
