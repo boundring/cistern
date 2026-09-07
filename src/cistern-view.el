@@ -252,12 +252,20 @@ objectives; nil without a card."
             "): " base (if who (concat "  —  " who) ""))))
 
 (defun cistern-view--pressure-line (st)
-  (cond ((cistern-st-over st) "SECTOR CONDEMNED — PRESS n TO RESTART")
-        ((cistern--toilets-backed-p st)
+  "Q08: the middle tier anticipates — RISING fires at 0.85 x the
+total tank capacity and names the fill %; the raw-total branch is
+deleted (101 units over many tanks is not pressure).  Copy per
+Q11 from the domain table."
+  (let* ((capsum (cistern--tank-capacity-total st))
+         (total (cistern--tank-load-total st)))
+    (cond ((cistern-st-over st) "SECTOR CONDEMNED — PRESS n TO RESTART")
+        ((cistern--toilets-backed-up-p st)
          "PRESSURE CRITICAL — TOILETS BACKED UP / PURGE THE TANKS")
-        ((> (cistern--tank-load-total st) 100)
-         "PRESSURE RISING — LINES NEAR CAPACITY")
-        (t "LINES NOMINAL — THE STRUCTURE DOES NOT CARE")))
+        ((and (> capsum 0) (>= total (* 0.85 capsum)))
+         (format (cdr (assq 'pressure-rising cistern--copy))
+                 (round (/ (* 100.0 (cistern--tank-load-max st))
+                           cistern-tank-cap))))
+        (t "LINES NOMINAL — THE STRUCTURE DOES NOT CARE"))))
 
 (defun cistern-view--map-rows (st &optional overlay)
   (let ((out ""))

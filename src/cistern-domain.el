@@ -290,12 +290,43 @@ Returns hash (X . Y) -> distance.  The seed is included regardless."
              (cistern-st-tanks st))
     total))
 
+(defun cistern--tank-capacity-total (st)
+  "Total tank capacity across all placed tanks (Q08)."
+  (* (hash-table-count (cistern-st-tanks st)) cistern-tank-cap))
+
+(defun cistern--tank-load-max (st)
+  "Highest single-tank load (Q08: the pressure source the RISING
+% names)."
+  (let ((maxload 0))
+    (maphash (lambda (_k v)
+               (setq maxload (max maxload (plist-get v :load))))
+             (cistern-st-tanks st))
+    maxload))
+
 (defun cistern--toilets-backed-p (st)
   "True when any placed toilet is out of service while not in use
 (legacy :716-722 semantics verbatim)."
   (let ((backed nil))
     (maphash (lambda (k _v)
                (when (eq (cistern--toilet-state st (car k) (cdr k)) 'down)
+                 (setq backed t)))
+             (cistern-st-toilets st))
+    backed))
+
+(defun cistern--toilets-backed-up-p (st)
+  "Q09 split, backed-up half: a placed toilet is out of service
+with a live path whose tanks are OVER CAPACITY (full to the cap).
+The near-full but not-full band stays with Q08's RISING — the
+line anticipates instead of lying."
+  (let ((backed nil))
+    (maphash (lambda (k _v)
+               (when (and (eq (cistern--toilet-state st (car k) (cdr k)) 'down)
+                          (cl-some (lambda (tk)
+                                     (>= (plist-get (gethash tk
+                                                          (cistern-st-tanks st))
+                                                    :load)
+                                         cistern-tank-cap))
+                                   (cistern--connected-tanks st (car k) (cdr k))))
                  (setq backed t)))
              (cistern-st-toilets st))
     backed))
@@ -657,16 +688,22 @@ game layer (Phase 2)."
   "The starter goal card (Q03): serve 3, ceiling 5, tier 2
 \(standard) — dealt to every new game from tick one.")
 
-;; Q11 PROTECT copy table: ALL new user-facing strings land in domain
-;; copy tables (one place for the docs pass to review).  Blame!
-;; register — terse, institutional, deadpan.
-(defconst cistern--copy-milestones
-  '((big-cistern . "BIG CISTERN ONLINE")
-    (fast-flush . "FAST FLUSH ONLINE")
-    (self-clean . "SELF-CLEAN ONLINE")
-    (air-freshener . "AIR FRESHENER ONLINE")
-    (golden-pipe . "GOLDEN PIPE ONLINE"))
-  "Milestone display names (Q05/Q11), keyed by unlock id.")
+;; Q11 PROTECT copy table: ALL new user-facing strings land here —
+;; one table, one place for the docs pass to review.  Blame!
+;; register — terse, institutional, deadpan.  The idle pressure line
+;; is pre-existing view copy and stays byte-identical in
+;; cistern-view.el.
+(defconst cistern--copy
+  '((milestone . ((big-cistern . "BIG CISTERN ONLINE")
+                  (fast-flush . "FAST FLUSH ONLINE")
+                  (self-clean . "SELF-CLEAN ONLINE")
+                  (air-freshener . "AIR FRESHENER ONLINE")
+                  (golden-pipe . "GOLDEN PIPE ONLINE")))
+    (pressure-rising . "PRESSURE RISING — TANK %d%%")
+    (pressure-severed . "LINES SEVERED — REWIRE (p) — TANK AT (%d,%d)")
+    (pressure-severed-bare . "LINES SEVERED — REWIRE (p)"))
+  "Q11 copy table, keyed by surface (Q05/Q08/Q10 milestones and
+pressure lines so far).")
 
 (defun cistern--cmd-set-goal-card (st card)
   "Set ST's active goal card (M3).  Validates the §5 shape — max 3

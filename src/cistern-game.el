@@ -354,17 +354,7 @@ state for the view to read (L-027); the view never calls this."
         (when (and (>= (cistern-st-relieves st) threshold)
                    (not (memq unlock (cistern-st-unlocks st))))
           (push unlock (cistern-st-unlocks st))
-          ;; Q05: the unlock announces at the tick of the act — the
-          ;; line enters the log (history) and rides the log-tail face
-          ;; plus the banner row of the SAME frame.  Commit-first:
-          ;; the unlock itself committed above, zero ticks.
-          (let ((line (format "MILESTONE — %s"
-                              (cdr (assq unlock
-                                         cistern--copy-milestones)))))
-            (cistern--log st "%s" line)
-            (push (list :layer 'log :text line :face 'success) intents)
-            (push (list :layer 'banner :text line) intents))
-          (push (list 'unlock :id unlock) intents)
+          (setq intents (cistern--announce-unlock st unlock intents))
           (when (eq unlock 'golden-pipe)
             (setq celebrate t)))))
     (setf (cistern-st-rewards-events st) nil)
@@ -381,6 +371,19 @@ state for the view to read (L-027); the view never calls this."
           (final (nreverse intents)))
       (setf (cistern-st-rewards-outcome st) (cons outcome final))
       (list st outcome final))))
+
+(defun cistern--announce-unlock (st unlock intents)
+  "Q05: announce UNLOCK at the tick of the act — the line enters
+the log (history) and rides the log-tail face plus the banner row
+of the SAME frame.  Commit-first: the unlock itself is committed
+by the caller before this runs.  Returns the extended INTENTS."
+  (let ((line (format "MILESTONE — %s"
+                      (cdr (assq unlock
+                                 (cdr (assq 'milestone cistern--copy)))))))
+    (cistern--log st "%s" line)
+    (push (list :layer 'log :text line :face 'success) intents)
+    (push (list :layer 'banner :text line) intents)
+    (push (list 'unlock :id unlock) intents)))
 
 (defun cistern--particle-draw (st)
   "Advance ST's particle child stream by one raw step, returning

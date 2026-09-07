@@ -223,14 +223,20 @@ CRITICAL."
 (defconst cistern-test-ux--src-dir
   (expand-file-name "src" cistern-test-ux--root))
 
-(defun cistern-test-ux--src-string-count (s)
-  "How many times the literal S appears across src/*.el."
-  (let ((n 0))
-    (dolist (f (directory-files cistern-test-ux--src-dir t "\\.el\\'"))
-      (with-temp-buffer
-        (insert-file-contents f)
-        (setq n (+ n (how-many (regexp-quote s))))))
-    n))
+(defun cistern-test-ux--string-count-in (s file)
+  "How many times the literal S appears in FILE."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (how-many (regexp-quote s))))
+
+(defun cistern-test-ux--copy-strings (table)
+  "All user-facing strings in the copy TABLE (nested alists)."
+  (let ((out nil))
+    (dolist (e table)
+      (if (stringp (cdr e))
+          (push (cdr e) out)
+        (setq out (append (cistern-test-ux--copy-strings (cdr e)) out))))
+    (nreverse out)))
 
 (defun cistern-test-ux-q11-copy-table ()
   "The idle pressure line stays byte-identical; all new
@@ -244,16 +250,19 @@ away, not left beside it)."
   (cl-assert (boundp 'cistern--copy) t "one domain copy table exists")
   (cl-assert (null (boundp 'cistern--copy-milestones))
              t "milestone strings consolidated into cistern--copy")
-  ;; every flavor string in the table appears exactly once in src/ —
-  ;; the table is the single source, no format-string drift
-  (dolist (entry (cdr (assq 'milestone cistern--copy)))
-    (cl-assert (= 1 (cistern-test-ux--src-string-count (cdr entry)))
-               t "milestone copy %S appears once, in the table" (cdr entry)))
-  (dolist (key '(pressure-rising pressure-severed pressure-severed-bare))
-    (let ((s (cdr (assq key cistern--copy))))
-      (cl-assert (stringp s) t "copy key %S present" key)
-      (cl-assert (= 1 (cistern-test-ux--src-string-count s))
-                 t "copy %S appears once, in the table" s))))
+  ;; every flavor string in the table lives in cistern-domain.el and
+  ;; in NO other src file — the table is the single source, no
+  ;; format-string drift (substring overlaps inside the table's own
+  ;; file are fine; the long strings contain the short ones)
+  (let ((domain (expand-file-name "cistern-domain.el"
+                                  cistern-test-ux--src-dir)))
+    (dolist (s (cistern-test-ux--copy-strings cistern--copy))
+      (cl-assert (> (cistern-test-ux--string-count-in s domain) 0)
+                 t "copy %S present in the domain table" s)
+      (dolist (f (directory-files cistern-test-ux--src-dir t "\\.el\\'"))
+        (unless (string= f domain)
+          (cl-assert (= 0 (cistern-test-ux--string-count-in s f))
+                     t "copy %S drifted outside the domain table" s))))))
 
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
