@@ -391,6 +391,27 @@ the nearest tank coordinate to wire toward; nil otherwise (Q10)."
       (setq severed (sort severed (lambda (a b) (< (car a) (car b)))))
       (cistern--nearest-tank st (car (car severed)) (cdr (car severed))))))
 
+(defun cistern--nearest-structure (st kind x y)
+  "Nearest placed structure of KIND (toilet/tank) to (X,Y) by
+manhattan distance; ties broken in coordinate order (deterministic).
+Q20: the inspector's bearing reads the shared geometry here."
+  (let ((cands nil))
+    (maphash (lambda (k _v)
+               (push (list (+ (abs (- (car k) x)) (abs (- (cdr k) y)))
+                           (car k) (cdr k))
+                     cands))
+             (if (eq kind 'toilet)
+                 (cistern-st-toilets st) (cistern-st-tanks st)))
+    (let ((sorted (sort cands
+                        (lambda (a b)
+                          (or (< (car a) (car b))
+                              (and (= (car a) (car b))
+                                   (or (< (cadr a) (cadr b))
+                                       (and (= (cadr a) (cadr b))
+                                            (< (caddr a) (caddr b))))))))))
+      (when sorted
+        (cons (nth 1 (car sorted)) (nth 2 (car sorted)))))))
+
 (defun cistern--walkable-p (st x y tx ty)
   "Is (X,Y) enterable by a worker walking to target (TX,TY)?
 Table-passable cells always.  A toilet only when it is the target:
@@ -765,7 +786,8 @@ game layer (Phase 2)."
     (refusal-no-floor . "NO FLOOR THERE — AIM FOR OPEN FLOOR")
     (refusal-alloy . "NEED %d ALLOY — PURGE (x) PAYS")
     (badge-armed . "  ARMED: %s — CLICK PLACES, ESC CANCELS")
-    (help-arm . "t/p/K arm — click to place"))
+    (help-arm . "t/p/K arm — click to place")
+    (bearing-floor . "FLOOR — %s"))
   "Q11 copy table, keyed by surface (Q05/Q08/Q10 milestones and
 pressure lines so far).")
 

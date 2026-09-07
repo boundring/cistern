@@ -246,6 +246,14 @@ can never be listed twice."
             (format "TANK — LOAD %d/%d — PURGE WITH x (pays 1 alloy per %d)"
                     (or (cistern--tank-load st x y) 0)
                     cistern-tank-cap cistern-purge-rate))
+           ((eq kind 'floor)
+            ;; Q20 (extension only): the floor cursor gets its
+            ;; bearings — nearest toilet and tank, manhattan from the
+            ;; shared geometry.  All non-floor lines untouched.
+            (let ((bearing (cistern-view--floor-bearing st x y)))
+              (if bearing
+                  (format (cdr (assq 'bearing-floor cistern--copy)) bearing)
+                (cdr (assq kind cistern-view--kind-descriptions)))))
            (t (cdr (assq kind cistern-view--kind-descriptions)))))
          (who
           (when w
@@ -260,6 +268,31 @@ can never be listed twice."
                           (t "working"))))))
     (concat "CURSOR (" (number-to-string x) "," (number-to-string y)
             "): " base (if who (concat "  —  " who) ""))))
+
+(defun cistern-view--floor-bearing (st x y)
+  "Q20: nearest toilet and tank bearings for the floor cursor at
+\(X,Y) — per-axis direction words over the manhattan pick; nil
+when nothing is placed yet."
+  (let ((parts nil))
+    (dolist (kind '(toilet tank))
+      (let ((pos (cistern--nearest-structure st kind x y)))
+        (when pos
+          (let* ((dx (- (car pos) x))
+                 (dy (- (cdr pos) y))
+                 (words nil))
+            (when (/= dx 0)
+              (push (format "%d %s" (abs dx) (if (> dx 0) "east" "west"))
+                    words))
+            (when (/= dy 0)
+              (push (format "%d %s" (abs dy) (if (> dy 0) "south" "north"))
+                    words))
+            (push (format "%s %s %s"
+                          (cdr (assq kind cistern-view--kind-names))
+                          (cistern--tile-glyph kind)
+                          (mapconcat #'identity (nreverse words) ", "))
+                  parts)))))
+    (when parts
+      (mapconcat #'identity (nreverse parts) ", "))))
 
 (defun cistern-view--pressure-line (st)
   "Q08: the middle tier anticipates — RISING fires at 0.85 x the
