@@ -1014,5 +1014,44 @@ dominant stat; stream hygiene holds."
                t "CL.II kept the unsuited penalty"))
   (message "CISTERN-V4-12-OK"))
 
+(defun cistern-test-v4-13-envelope-guard ()
+  "V4-13 (A12/A14): the solvable-envelope inequality
+window(w) = (120 − seek_eff)/2 − use_ticks_eff_max ≥ 22 holds for
+EVERY reachable stat block (proven from the clamps, not sampled),
+the bladder increment and burst stay pinned, and 300-tick runs are
+deterministic including rpg-pos, XP and clearance."
+  ;; A12: full sweep over every stat block the roller can emit
+  (let ((worst 100))
+    (dotimes (f 16)
+      (dotimes (g 16)
+        (dotimes (n 16)
+          (dotimes (a 16)
+            (let* ((w (cistern--worker-make
+                       :stats (list (+ 3 f) (+ 3 g) (+ 3 n) (+ 3 a))))
+                   (seek (cistern--rpg-seek-eff (cistern--rpg-stat-mod w 2)))
+                   (ut (cistern--rpg-use-ticks w 'archive-stall))
+                   (win (- (/ (- 120 seek) 2.0) ut)))
+              (cl-assert (and (>= seek 50) (<= seek 68))
+                         t "seek_eff clamp broken")
+              (cl-assert (and (>= ut 1) (<= ut 4))
+                         t "use_ticks_eff clamp broken")
+              (cl-assert (>= win 22)
+                         t "window %.1f below 22 for stats %S"
+                         win (cistern--worker-stats w))
+              (setq worst (min worst win)))))))
+    (cl-assert (= worst 22) t "guard not tight: worst %S" worst))
+  ;; the pinned constants the envelope proof rests on
+  (cl-assert (= cistern-bladder-rate 2) t "bladder rate moved")
+  (cl-assert (= cistern-bladder-burst 120) t "burst moved")
+  ;; A14: 300-tick determinism, hash covers rpg-pos/XP/clearance
+  (let ((h1 (progn (setq cistern--st (cistern--new-game 20260830))
+                   (dotimes (_ 300) (cistern--do-tick cistern--st))
+                   (secure-hash 'sha1 (prin1-to-string cistern--st)))))
+    (setq cistern--st (cistern--new-game 20260830))
+    (dotimes (_ 300) (cistern--do-tick cistern--st))
+    (cl-assert (equal h1 (secure-hash 'sha1 (prin1-to-string cistern--st)))
+               t "300-tick runs diverged")))
+  (message "CISTERN-V4-13-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here

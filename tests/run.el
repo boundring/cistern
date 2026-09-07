@@ -117,7 +117,8 @@
     cistern-test-v4-09-qol
     cistern-test-v4-10-stat-blocks
     cistern-test-v4-11-toilet-catalog
-    cistern-test-v4-12-rpg-machinery))
+    cistern-test-v4-12-rpg-machinery
+    cistern-test-v4-13-envelope-guard))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
