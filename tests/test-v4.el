@@ -485,5 +485,43 @@ tank at all and is never severed; procgen is deterministic with
     (cl-assert (string-match-p "╬ manifold" legend) t "legend misses manifold"))
   (message "CISTERN-V4-05-OK"))
 
+(defun cistern-test-v4-06-kind-faces ()
+  "V4-06 (A3.6 + A3.1): the five new kinds get S2-rol faces —
+derived colors through the same palette path as every other face
+— and the inspector names state + fix verb for each, with the
+strings living in `cistern--copy'."
+  (let ((st (cistern--new-game 42)))
+    (set-frame-parameter (selected-frame) 'background-color "#101010")
+    (setq cistern--palette-cache nil)
+    (cistern--apply-palette (selected-frame))
+    (dolist (role '(rubble flood manifold cache event))
+      (let ((face (intern (format "cistern-%s" role)))
+            (color (cdr (assq role (cistern--derive-palette "#101010")))))
+        (cl-assert (boundp face) t "face for %s missing" role)
+        (cl-assert (equal (face-attribute face :foreground
+                                          (selected-frame) 'default)
+                          color)
+           t "face %s did not take its role color" role))))
+  ;; view kind-faces routes the three new tile kinds to their faces
+  (dolist (kind '(rubble flood manifold cache event))
+    (cl-assert (cdr (assq kind cistern-view--kind-faces))
+               t "kind %s has no face mapping" kind))
+  ;; inspector lines: state + fix verb, strings from the copy table
+  (dolist (spec '((rubble "RUBBLE" "d")
+                  (flood "FLOOD" "c")
+                  (manifold "MANIFOLD" "TANK")))
+    (let* ((kind (car spec))
+           (line (progn (cistern--set-cell st 8 8 kind)
+                        (setf (cistern-st-cursor st) (cons 8 8))
+                        (cistern-view--inspector st))))
+      (cl-assert (string-match-p (nth 1 spec) line)
+                 t "inspector does not name %s state" kind)
+      (cl-assert (string-match-p (nth 2 spec) line)
+                 t "inspector %s line names no fix verb" kind)
+      (let ((copy-key (intern (format "desc-%s" kind))))
+        (cl-assert (cdr (assq copy-key cistern--copy))
+                   t "%s line is not copy-table copy" kind))))
+  (message "CISTERN-V4-06-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here

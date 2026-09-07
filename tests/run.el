@@ -110,7 +110,8 @@
     cistern-test-v4-04-palette-apply
     cistern-test-v4-04-palette-live
     cistern-test-v4-05-tile-kinds
-    cistern-test-v4-05-manifold-flood-loop))
+    cistern-test-v4-05-manifold-flood-loop
+    cistern-test-v4-06-kind-faces))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
