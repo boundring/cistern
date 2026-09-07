@@ -786,6 +786,15 @@ permanent scarring: stop bleeding and the marks fade."
             (cistern--set-cell st (car h) (cdr h) 'floor))))))))
 
 (defun cistern--phase-migration (st)
+  ;; V4-09 (S5.5): the arrival announces itself three ticks out —
+  ;; exactly once per cycle, and only when an arrival will actually
+  ;; happen (pop cap not reached)
+  (when (and (> (cistern-st-tick st) 0)
+             (< (length (cistern-st-creators st)) cistern-pop-cap)
+             (= 3 (- cistern-migrant-every
+                     (% (cistern-st-tick st) cistern-migrant-every))))
+    (cistern--log-sev st 'info "%s"
+                      (format (cdr (assq 'migrant-in-fmt cistern--copy)) 3)))
   (when (and (> (cistern-st-tick st) 0)
              (= 0 (% (cistern-st-tick st) cistern-migrant-every))
              (< (length (cistern-st-creators st)) cistern-pop-cap))
@@ -942,6 +951,9 @@ game layer (Phase 2)."
     (desc-manifold . "MANIFOLD — FREE PIPE ANCHOR: WIRES WITHOUT A TANK")
     (desc-cache . "CACHE — WALK IT TO BANK THE ALLOY")
     (desc-event . "EVENT INCOMING — THE COUNTDOWN IS STANDING")
+    ;; V4-09 (SURFACE S5.3/S5.5)
+    (death-log-hint . "L — FULL HISTORY")
+    (migrant-in-fmt . "MIGRANT IN %d TICKS")
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
     (capacity-none . "NO WIRED TOILET ON THE GRID — LAY PIPE (p)")
     (teach-arrows . "C-n/C-p/C-f/C-b MOVE TOO")

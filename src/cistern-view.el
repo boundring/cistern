@@ -649,11 +649,17 @@ lines precede the map rows."
          (banner (concat (cdr celebration)
                          (when (and (cistern-st-over st)
                                     (cistern-st-summary st))
-                           (format (cdr (assq 'death-panel cistern--copy))
-                                   (plist-get (cistern-st-summary st) :cause)
-                                   (plist-get (cistern-st-summary st) :ticks)
-                                   (plist-get (cistern-st-summary st) :relieves)
-                                   (plist-get (cistern-st-summary st) :score))))))
+                           (concat
+                            (format (cdr (assq 'death-panel cistern--copy))
+                                    (plist-get (cistern-st-summary st) :cause)
+                                    (plist-get (cistern-st-summary st) :ticks)
+                                    (plist-get (cistern-st-summary st) :relieves)
+                                    (plist-get (cistern-st-summary st) :score))
+                            ;; V4-09 (S5.3): the whole run stays reviewable
+                            "\n"
+                            (propertize (cdr (assq 'death-log-hint
+                                                   cistern--copy))
+                                        'face 'cistern-dim))))))
     (concat
      ;; Q21: the header line arrives already-faced (CONTAM segment)
      (propertize (concat (cistern-view--header-line st) "\n")

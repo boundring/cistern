@@ -2772,3 +2772,50 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-085 (2026-09-07, run: impl-v4-w1 — V4-09 QoL (S5.1/S5.3/S5.5) + WAVE-1 END SUMMARY)
+
+- Outcome: LANDED (red commit `git log 367e9cf..HEAD~1`, green this
+  commit). WAVE 1 CLOSED: 9/9 directives.
+- Red: cistern--last-armed repeat landed in V4-07, but the test's
+  death-panel / countdown asserts failed (no FULL HISTORY line, no
+  MIGRANT IN copy) — plus a mis-parenthesized block that escaped
+  the defun and executed at load (second occurrence of this class
+  this wave; watch multi-let test bodies).
+- Green: copy keys death-log-hint ("L — FULL HISTORY") and
+  migrant-in-fmt ("MIGRANT IN %d TICKS"); cistern--phase-migration
+  logs the countdown exactly once per cycle at T−3, only when an
+  arrival will actually happen (pop cap not reached); the death
+  banner appends the dim full-history line so the uncapped log
+  stays reviewable from the condemned frame.  `.` semantics
+  complete from V4-07: repeats only the last SUCCESSFUL arm, no-op
+  with no prior arm, ESC/u clears the fuel, illegal-cell re-arm
+  refuses through the standard Q18 path without charging alloy.
+- Draft fix inside green: the banner edit nested when-body forms
+  against a concat binding — closed the let* early (read-syntax
+  error) and would have dropped the panel text; restructured with
+  an explicit inner concat.
+- VERIFY: canonical suite ALL 93 TESTS PASSED (batch).
+
+### WAVE-1 END SUMMARY (impl-v4-w1, replacement run)
+
+- Directives: 9/9 LANDED (V4-01 verified from the dead prior run;
+  V4-02..V4-09 red-first here).
+- Suite: 81 → 93 batch tests, all passing (two GUI probes
+  registered + skipped without display).
+- Ledger: L-077..L-085 (reconciliation, per-directive entries,
+  wave summary).  Commits: red/green pairs per directive —
+  5a657b5, 745411d/da05803, 0d51d0d/0d0a87b, ad6ab2e/eae1cee,
+  3ee4320/da6dd35, */142dab2, */b4fce67, */367e9cf, V4-09 pair.
+- Wave-2 handoff (what narrative core consumes from wave 1):
+  the S1 browser is the story/dialogue delivery surface —
+  cistern-view--log-line projects (LINE SEVERITY TICK) with palette
+  faces; severity intents ride cistern-view--palette-faces; the
+  five new tile kinds (rubble/flood/manifold/cache/event) are
+  table-sourced with faces derived from S2 roles — the story
+  event-tile (`!`/`?` transient cells, S5.5) build directly on the
+  cache/event faces + copy keys already shipped; palette
+  application is frame-scoped and theme-hooked for any new faces
+  (rule, not list: new face = new role, zero literals).
+
+---
