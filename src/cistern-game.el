@@ -354,6 +354,16 @@ state for the view to read (L-027); the view never calls this."
         (when (and (>= (cistern-st-relieves st) threshold)
                    (not (memq unlock (cistern-st-unlocks st))))
           (push unlock (cistern-st-unlocks st))
+          ;; Q05: the unlock announces at the tick of the act — the
+          ;; line enters the log (history) and rides the log-tail face
+          ;; plus the banner row of the SAME frame.  Commit-first:
+          ;; the unlock itself committed above, zero ticks.
+          (let ((line (format "MILESTONE — %s"
+                              (cdr (assq unlock
+                                         cistern--copy-milestones)))))
+            (cistern--log st "%s" line)
+            (push (list :layer 'log :text line :face 'success) intents)
+            (push (list :layer 'banner :text line) intents))
           (push (list 'unlock :id unlock) intents)
           (when (eq unlock 'golden-pipe)
             (setq celebrate t)))))

@@ -657,6 +657,17 @@ game layer (Phase 2)."
   "The starter goal card (Q03): serve 3, ceiling 5, tier 2
 \(standard) — dealt to every new game from tick one.")
 
+;; Q11 PROTECT copy table: ALL new user-facing strings land in domain
+;; copy tables (one place for the docs pass to review).  Blame!
+;; register — terse, institutional, deadpan.
+(defconst cistern--copy-milestones
+  '((big-cistern . "BIG CISTERN ONLINE")
+    (fast-flush . "FAST FLUSH ONLINE")
+    (self-clean . "SELF-CLEAN ONLINE")
+    (air-freshener . "AIR FRESHENER ONLINE")
+    (golden-pipe . "GOLDEN PIPE ONLINE"))
+  "Milestone display names (Q05/Q11), keyed by unlock id.")
+
 (defun cistern--cmd-set-goal-card (st card)
   "Set ST's active goal card (M3).  Validates the §5 shape — max 3
 goals, known kinds — and stamps :map-id from the game seed (the
