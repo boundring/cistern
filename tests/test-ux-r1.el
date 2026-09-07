@@ -616,5 +616,93 @@ by state (CRITICAL red bold, RISING yellow, NOMINAL dim)."
     (cl-assert pos t "pressure row found")
     (get-text-property pos 'face render)))
 
+;; --- Q22: run-summary snapshot ----------------------------------------------------
+
+(defun cistern-test-ux-q22-run-summary ()
+  "At condemnation the state exposes one summary — ticks
+survived, relieves, score, trophies, cause — matching the run."
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-relieves st) 12)
+    (setf (cistern-st-score st) 250)
+    (setf (cistern-st-trophies st) '(42))
+    (dotimes (_ 291) (cistern--do-tick st))
+    (setf (cistern-st-contam st) cistern-contam-limit)
+    (cistern--phase-check st)
+    (let ((s (cistern-st-summary st)))
+      (cl-assert s t "condemnation captures the summary")
+      (cl-assert (= (plist-get s :ticks) (cistern-st-tick st))
+                 t "ticks survived recorded")
+      (cl-assert (= (plist-get s :relieves) 12) t "relieves recorded")
+      (cl-assert (= (plist-get s :score) 250) t "score recorded")
+      (cl-assert (equal (plist-get s :trophies) '(42))
+                 t "trophies recorded")
+      (cl-assert (equal (plist-get s :cause)
+                        "SECTOR CONDEMNED — CONTAMINATION LIMIT")
+                 t "cause recorded"))))
+
+;; --- Q23: death summary panel -------------------------------------------------------
+
+(defun cistern-test-ux-q23-death-panel ()
+  "On condemned the render carries the summary as a banner-layer
+panel — cause, ticks, relieves, score, restart — and the log
+shows a SINGLE restart line, not one per post-over keypress."
+  (let ((st (cistern--new-game 42)))
+    (setq cistern--st st)
+    (setf (cistern-st-relieves st) 12)
+    (setf (cistern-st-score st) 250)
+    (setf (cistern-st-contam st) cistern-contam-limit)
+    (with-temp-buffer
+      (cistern--refresh))
+    (cistern--phase-check st)
+    (let ((render (cistern-test-ux--plain (cistern-view--render st))))
+      (cl-assert (string-match-p
+                  (concat "SECTOR CONDEMNED — CONTAMINATION LIMIT"
+                          " / TICKS [0-9]+ · RELIEVES 12 · SCORE 250"
+                          " / PRESS n TO RESTART")
+                  render)
+                 t "one frame carries the death panel")))
+  ;; post-over keypresses: one restart line, not four
+  (let ((st (cistern--new-game 42)))
+    (setq cistern--st st)
+    (setf (cistern-st-contam st) cistern-contam-limit)
+    (with-temp-buffer
+      (dotimes (_ 4) (cistern-tick))
+      (let ((restarts (cl-count-if
+                       (lambda (e) (string-match-p "PRESS n FOR NEW GAME"
+                                                   (car e)))
+                       (cistern-st-log st))))
+        (cl-assert (= restarts 1)
+                   t "log shows a single restart line (got %d)" restarts)))))
+
+;; --- Q24: ceremony narrates the goals -------------------------------------------------
+
+(defun cistern-test-ux-q24-goal-narration ()
+  "Before the MAP COMPLETED banner, each satisfied goal logs
+GOAL MET — the narration precedes the banner in the log."
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 2 :goals ((:kind relieves-served :target 1)
+                          (:kind contamination-ceiling :target 5))))
+    (cistern-test-ux--drive-relief st)
+    (let* ((intents (cdr (cistern-st-rewards-outcome st)))
+           (met-idx (cl-position-if
+                     (lambda (i) (and (eq (plist-get i :layer) 'log)
+                                      (string-match-p "GOAL MET"
+                                                      (plist-get i :text))))
+                     intents))
+           (banner-idx (cl-position-if
+                        (lambda (i) (and (eq (plist-get i :layer) 'banner)
+                                         (equal (plist-get i :text)
+                                                "MAP COMPLETED")))
+                        intents)))
+      (cl-assert met-idx t "a GOAL MET line narrated")
+      (cl-assert banner-idx t "the completion banner present")
+      (cl-assert (< met-idx banner-idx)
+                 t "GOAL MET precedes the banner")
+      (cl-assert (cl-find-if (lambda (e) (string-match-p "GOAL MET — 1 SERVED"
+                                                        (car e)))
+                             (cistern-st-log st))
+                 t "the served goal narrates its count"))))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here

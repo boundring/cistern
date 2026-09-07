@@ -73,7 +73,10 @@
     cistern-test-ux-q18-refusal-hints
     cistern-test-ux-q19-armed-badge
     cistern-test-ux-q20-floor-bearing
-    cistern-test-ux-q21-urgency-color))
+    cistern-test-ux-q21-urgency-color
+    cistern-test-ux-q22-run-summary
+    cistern-test-ux-q23-death-panel
+    cistern-test-ux-q24-goal-narration))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
