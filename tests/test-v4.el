@@ -206,5 +206,84 @@ format width (breach line at tick 99999)."
         (forward-line 1))))
   (message "CISTERN-V4-02-OK"))
 
+;; --- V4-03: palette derivation pure function (S2.1/S2.2) ----------------------
+
+(defun cistern-test--chan (s)
+  "WCAG 2.x linearization of one hex channel pair S."
+  (let ((c (/ (string-to-number s 16) 255.0)))
+    (if (<= c 0.04045) (/ c 12.92) (expt (/ (+ c 0.055) 1.055) 2.4))))
+
+(defun cistern-test--wcag-lum (hex)
+  (let ((r (cistern-test--chan (substring hex 1 3)))
+        (g (cistern-test--chan (substring hex 3 5)))
+        (b (cistern-test--chan (substring hex 5 7))))
+    (+ (* 0.2126 r) (* 0.7152 g) (* 0.0722 b))))
+
+(defun cistern-test--ratio (fg bg)
+  (let ((lf (cistern-test--wcag-lum fg))
+        (lb (cistern-test--wcag-lum bg)))
+    (/ (+ (max lf lb) 0.05) (+ (min lf lb) 0.05))))
+
+(defun cistern-test-v4-03-derive-palette ()
+  "V4-03 (A2.1/A2.2): every role of `cistern--derive-palette'
+meets its class ratio (4.5 recessive/standard, 7.0
+emphatic/alert) on dark/light/mid/black/white/red backgrounds —
+hard floor 4.5 everywhere; the class target whenever ANY color
+could achieve it (grey extremes, both sides) — polarity switch and
+sat clamp both covered."
+  (dolist (bg '("#101010" "#F5F5F5" "#808080" "#000000" "#FFFFFF" "#FF0000"))
+    (let ((pal (cistern--derive-palette bg)))
+      (dolist (e cistern-view--face-roles)
+        (let* ((role (car e))
+               (class (nth 2 (cdr e)))
+               (target (if (memq class '(emphatic alert)) 7.0 4.5))
+               (color (cdr (assq role pal))))
+          (cl-assert color t "role %s missing from palette" role)
+          (let ((ratio (cistern-test--ratio color bg)))
+            (cl-assert (>= ratio 4.5)
+                       t "role %s at %.2f below 4.5 on %s" role ratio bg)
+            ;; the class target only binds when a grey could reach it
+            (let ((reach (max (cistern-test--ratio "#FFFFFF" bg)
+                              (cistern-test--ratio "#000000" bg))))
+              (when (>= reach target)
+                (cl-assert (>= ratio target)
+                           t "role %s at %.2f below %.1f on %s"
+                           role ratio target bg))))))))
+  (message "CISTERN-V4-03-OK"))
+
+(defun cistern-test-v4-03-palette-purity ()
+  "V4-03 (A2.3/A2.6 + A2.4): the derivation function calls no
+frame/buffer/color-resolver, the palette cache is not an input
+(stale cache cannot persist across a session), and no defface in
+the view carries a literal :foreground (cistern-cursor excepted)."
+  ;; A2.3: no runtime resolver inside the pure function
+  (let ((src (format "%S" (symbol-function 'cistern--derive-palette))))
+    (cl-assert (not (string-match-p "frame-parameter\\|color-name-to-rgb"
+                                    src))
+               t "derive-palette resolves runtime state"))
+  ;; A2.6: the cache is not an input — a stale value changes nothing
+  (let ((cistern--palette-cache
+         '("#101010" . ((wall . "#00FF00") (dim . "#0000FF")))))
+    (let ((pal (cistern--derive-palette "#F5F5F5")))
+      (cl-assert (not (equal (cdr (assq 'wall pal)) "#00FF00"))
+                 t "derive read a stale cache")))
+  ;; A2.4: deffaces take colors from roles, never literals
+  (with-temp-buffer
+    (insert-file-contents
+     (expand-file-name "src/cistern-view.el" cistern-test-r7--root))
+    (let ((src (buffer-string)) (pos 0) faces)
+      (while (string-match "(defface \\(cistern-[a-z-]+\\)" src pos)
+        (push (match-string 1 src) faces)
+        (setq pos (match-end 0)))
+      (dolist (f faces)
+        (let ((decl (progn (string-match
+                            (concat "(defface " (regexp-quote f)
+                                    " '((t \\([^)]*\\)))") src)
+                           (match-string 1 src))))
+          (unless (string= f "cistern-cursor")
+            (cl-assert (not (string-match-p ":foreground" decl))
+                       t "face %s carries a literal :foreground" f))))))
+  (message "CISTERN-V4-03-PURITY-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here
