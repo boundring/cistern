@@ -301,15 +301,18 @@ state for the view to read (L-027); the view never calls this."
     ;; works throughout, skipping forfeits nothing)
     (when ceremony-p
       (let ((room (- cistern--field-cap (length (cistern-st-particles st)))))
-        (dotimes (_ room)
+        ;; Q25: sparkles spawn ONLY over plain floor — pipes, walls,
+        ;; toilets and tanks stay visible under the ceremony — and the
+        ;; glyph set drops the floor dot and bare digits
+        (while (> room 0)
           (let* ((x (+ 1 (mod (cistern--particle-draw st) (- cistern-w 2))))
-                 (y (+ 1 (mod (cistern--particle-draw st) (- cistern-h 2))))
-                 (g (mod (cistern--particle-draw st) 6))
-                 (glyph (cond ((= g 0) "*") ((= g 1) "!") ((= g 2) "·")
-                              ((= g 3) "§")
-                              (t (number-to-string (mod (cistern--particle-draw st) 10))))))
-            (cistern--field-spawn st (cons x y) (cons 0 0) 6
-                                  glyph 'info 'sparkle)))))
+                 (y (+ 1 (mod (cistern--particle-draw st) (- cistern-h 2)))))
+            (when (eq (cistern--cell st x y) 'floor)
+              (let* ((g (mod (cistern--particle-draw st) 3))
+                     (glyph (cond ((= g 0) "*") ((= g 1) "!") (t "§"))))
+                (cistern--field-spawn st (cons x y) (cons 0 0) 6
+                                      glyph 'info 'sparkle)
+                (setq room (1- room))))))))
     ;; M4 reputation: deltas per §2 M4 verbatim (+1 relief, −5 burst,
     ;; −2 leak), clamped 0–100.
     (let* ((reliefs (cistern--count-events events 'relief))
