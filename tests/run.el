@@ -76,7 +76,9 @@
     cistern-test-ux-q21-urgency-color
     cistern-test-ux-q22-run-summary
     cistern-test-ux-q23-death-panel
-    cistern-test-ux-q24-goal-narration))
+    cistern-test-ux-q24-goal-narration
+    cistern-test-ux-q25-particle-placement
+    cistern-test-ux-q26-non-modal-guard))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

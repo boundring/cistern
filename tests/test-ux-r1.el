@@ -639,6 +639,55 @@ survived, relieves, score, trophies, cause — matching the run."
                         "SECTOR CONDEMNED — CONTAMINATION LIMIT")
                  t "cause recorded"))))
 
+;; --- Q25: particle placement contract ----------------------------------------------
+
+(defun cistern-test-ux-q25-particle-placement ()
+  "Ceremony sparkles spawn ONLY over plain floor, and the glyph
+set no longer collides with the floor dot or digits; pipes, walls,
+toilets and tanks stay visible under the ceremony (LEG-06)."
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 2 :goals ((:kind relieves-served :target 1))))
+    (cistern-test-ux--drive-relief st)      ; completes the card: ceremony
+    (let ((sparkles (cl-remove-if-not
+                     (lambda (p) (eq (plist-get p :layer) 'sparkle))
+                     (cistern-st-particles st))))
+      (cl-assert sparkles t "ceremony spawned sparkles")
+      (dolist (p sparkles)
+        (let* ((pos (plist-get p :pos))
+               (glyph (plist-get p :glyph)))
+          (cl-assert (eq (cistern--cell st (car pos) (cdr pos)) 'floor)
+                     t "sparkle over plain floor at %S" pos)
+          (cl-assert (null (member glyph '("·" "0" "1" "2" "3" "4"
+                                           "5" "6" "7" "8" "9")))
+                     t "no sparkle glyph collides with floor or digits"))))))
+
+;; --- Q26: PROTECT non-modal architecture guard ---------------------------------------
+
+(defun cistern-test-ux-q26-non-modal-guard ()
+  "PROTECT executable: during the death panel input stays live,
+and a keypress (n) starts the new game without forfeiting the
+banked summary — committed at trigger time, nothing pending."
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-contam st) cistern-contam-limit)
+    (cistern--phase-check st)
+    (cl-assert (cistern-st-summary st) t "summary banked at trigger")
+    ;; input live during the death panel
+    (cistern--cmd-cursor st 'right)
+    (cl-assert (equal (cistern-st-cursor st) (cons 4 6))
+               t "input live during the death panel")
+    ;; the keypress: n starts the new game
+    (setq cistern--st st)
+    (with-temp-buffer
+      (cistern-new-game))
+    (cl-assert (= (cistern-st-tick cistern--st) 0)
+               t "the keypress started the new game")
+    (cl-assert (cistern-st-goal-card cistern--st)
+               t "the new game is fully dealt")
+    ;; nothing forfeited: the banked summary survives in the old state
+    (cl-assert (plist-get (cistern-st-summary st) :ticks)
+               t "the banked summary is intact")))
+
 ;; --- Q23: death summary panel -------------------------------------------------------
 
 (defun cistern-test-ux-q23-death-panel ()
