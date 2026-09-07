@@ -264,5 +264,33 @@ away, not left beside it)."
           (cl-assert (= 0 (cistern-test-ux--string-count-in s f))
                      t "copy %S drifted outside the domain table" s))))))
 
+;; --- Q09: severed vs backed-up domain split -----------------------------------
+
+(defun cistern-test-ux-q09-domain-split ()
+  "A severed toilet (no path) and a backed-up toilet (path, tanks
+full) expose DIFFERENT flags; the collapsed legacy predicate is
+gone."
+  (cl-assert (fboundp 'cistern--toilets-severed-p)
+             t "severed half of the split exists")
+  (cl-assert (fboundp 'cistern--toilets-backed-up-p)
+             t "backed-up half of the split exists")
+  (cl-assert (null (fboundp 'cistern--toilets-backed-p))
+             t "collapsed legacy predicate retired")
+  ;; severed with empty tanks: severed, not backed-up
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-demolish st 4 2)            ; sever the starter line
+    (puthash (cons 5 2) (list :load 0) (cistern-st-tanks st))
+    (cl-assert (cistern--toilets-severed-p st)
+               t "no-path toilet reads severed")
+    (cl-assert (null (cistern--toilets-backed-up-p st))
+               t "severed-with-empty-tanks is not backed-up"))
+  ;; path with a full tank: backed-up, not severed
+  (let ((st (cistern--new-game 42)))
+    (puthash (cons 5 2) (list :load 60) (cistern-st-tanks st))
+    (cl-assert (cistern--toilets-backed-up-p st)
+               t "full-tank path reads backed-up")
+    (cl-assert (null (cistern--toilets-severed-p st))
+               t "backed-up is not severed")))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
