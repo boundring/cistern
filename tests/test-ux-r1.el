@@ -320,5 +320,33 @@ to; the inspector agrees (LAY PIPE)."
                           "PRESSURE CRITICAL — TOILETS BACKED UP / PURGE THE TANKS")
                  t "backed-up keeps its purge advice verbatim"))))
 
+;; --- Q12: dead pipe glyph + legend from the table ------------------------------
+
+(defun cistern-test-ux-q12-dead-pipe-glyph ()
+  "An unconnected pipe renders the tile table's distinct dead
+glyph — never the floor dot — and the legend is GENERATED from
+the same tile table, so no glyph is listed twice."
+  (let* ((st (cistern--new-game 42))
+         (spot (cistern-test-game--floor-run st 1))
+         (x (car spot)) (y (cadr spot)))
+    (cistern--cmd-build st 'pipe x y)         ; isolated: unconnected
+    (let ((glyph (car (cistern-view--cell-glyph st x y))))
+      (cl-assert (string= glyph "╌")
+                 t "dead pipe carries the table's dead glyph")
+      (cl-assert (not (string= glyph (cistern--tile-glyph 'floor)))
+                 t "dead pipe is not the floor dot"))
+    (let* ((legend (cistern-test-ux--plain (cistern-view--legend-line)))
+           (entries (split-string
+                     (replace-regexp-in-string "\\`GLYPHS:\\s-*" "" legend)
+                     "\\s-\\{2\\}" t))
+           (glyphs (mapcar (lambda (e) (substring e 0 1)) entries)))
+      (cl-assert (= 1 (how-many "╌" legend))
+                 t "legend lists the dead pipe exactly once")
+      (cl-assert (= (length glyphs) (length (cl-delete-duplicates
+                                            glyphs :test #'string=)))
+                 t "no glyph listed twice in the legend")
+      (cl-assert (member "╌" glyphs)
+                 t "legend matches the map's actual glyphs"))))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here

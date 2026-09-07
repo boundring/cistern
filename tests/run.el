@@ -63,7 +63,8 @@
     cistern-test-ux-q08-pressure-gradient
     cistern-test-ux-q11-copy-table
     cistern-test-ux-q09-domain-split
-    cistern-test-ux-q10-severed-rewire))
+    cistern-test-ux-q10-severed-rewire
+    cistern-test-ux-q12-dead-pipe-glyph))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
