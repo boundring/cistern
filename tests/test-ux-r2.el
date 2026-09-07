@@ -106,5 +106,43 @@ first cell is unchanged."
                                       (cistern-view--header-line st))))
                t "the long cause lives on the death panel, not the strip")))
 
+;; --- R2-Q03: one copy table, one verb -------------------------------------------
+
+(defun cistern-test-ux2--string-count (s file)
+  "Occurrences of S in FILE via split-count (how-many chokes on
+multibyte literals)."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (1- (length (split-string (buffer-string) s)))))
+
+(defun cistern-test-ux2-q03-copy-sweep ()
+  "RESTART everywhere (zero NEW GAME), the TUTORIAL strings live
+only in `cistern--copy', and the idle pressure line stays
+byte-identical."
+  (let ((st (cistern--new-game 42)))
+    (setq cistern--st st)
+    (setf (cistern-st-contam st) cistern-contam-limit)
+    (with-temp-buffer
+      (dotimes (_ 3) (cistern-tick)))
+    (dolist (e (cistern-st-log st))
+      (when (string-match-p "PRESS n" (car e))
+        (cl-assert (string-match-p "PRESS n TO RESTART" (car e))
+                   t "every PRESS n occurrence says RESTART")
+        (cl-assert (null (string-match-p "NEW GAME" (car e)))
+                   t "no NEW GAME wording left")))
+    (cl-assert (string= (cistern-view--pressure-line st)
+                        "LINES NOMINAL — THE STRUCTURE DOES NOT CARE")
+               t "idle pressure line byte-identical"))
+  (dolist (key '(restart-log tutorial-complete tutorial-step
+                 tutorial-skipped tutorial-line-fmt))
+    (let ((s (cdr (assq key cistern--copy))))
+      (cl-assert (stringp s) t "copy key %S present" key)
+      (dolist (f (directory-files (expand-file-name "src"
+                                                    cistern-test-ux2--root)
+                                  t "\\.el\\'"))
+        (unless (string-match-p "cistern-domain" f)
+          (cl-assert (= 0 (cistern-test-ux2--string-count s f))
+                     t "copy %S drifted outside the table" s))))))
+
 (provide 'test-ux-r2)
 ;;; test-ux-r2.el ends here
