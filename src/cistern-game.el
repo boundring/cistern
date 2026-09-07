@@ -6,7 +6,7 @@
 ;; inward: this file requires cistern-domain and nothing else.
 
 (require 'cl-lib)
-(require 'cistern-domain)
+(require 'cistern-domain (and load-file-name (expand-file-name "cistern-domain.el" (file-name-directory load-file-name))))
 
 (defconst cistern-cost-demolish 3
   "Alloy cost of the demolish verb (R8).  Implementation-seed

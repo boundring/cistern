@@ -9,9 +9,9 @@
 ;;; Code:
 
 (require 'cl-lib)
-(require 'cistern-game)
-(require 'cistern-input)
-(require 'cistern-view)
+(require 'cistern-game (and load-file-name (expand-file-name "cistern-game.el" (file-name-directory load-file-name))))
+(require 'cistern-input (and load-file-name (expand-file-name "cistern-input.el" (file-name-directory load-file-name))))
+(require 'cistern-view (and load-file-name (expand-file-name "cistern-view.el" (file-name-directory load-file-name))))
 
 ;; The one module global (spec §3.3, legacy cistern.el:785 pattern).
 ;; The D2 timer-handle exception (`cistern--auto-run-timer') lives in

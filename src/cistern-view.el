@@ -8,8 +8,8 @@
 ;; enum→face tables.  The pipe's connection-DEPENDENT shape is the
 ;; view's R7 job (the tile table is one-glyph-per-kind, plan 01 §1.3).
 
-(require 'cistern-domain)
-(require 'cistern-game)
+(require 'cistern-domain (and load-file-name (expand-file-name "cistern-domain.el" (file-name-directory load-file-name))))
+(require 'cistern-game (and load-file-name (expand-file-name "cistern-game.el" (file-name-directory load-file-name))))
 
 (defconst cistern-view--header-lines 3
   "Rendered lines above the map rows: status, help, glyph legend.

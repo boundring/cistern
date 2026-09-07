@@ -6,7 +6,7 @@
 ;; buffers, never render, and never name domain hash layouts.
 
 (require 'cl-lib)
-(require 'cistern-game)
+(require 'cistern-game (and load-file-name (expand-file-name "cistern-game.el" (file-name-directory load-file-name))))
 
 (defun cistern-input-cursor-move (st dir)
   "Move ST's cursor one cell in DIR (north/south/west/east) by
