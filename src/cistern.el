@@ -239,6 +239,9 @@ buffer.  The main screen keeps its 3-line tail."
                    cistern-contam-limit))
     (princ (format "  Every %d ticks a migrant arrives.  Population means load.\n\n"
                    cistern-migrant-every))
+    ;; R2-Q10: the strip's GOALS segment, explained
+    (princ "  GOALS n/m tracks the active goal card; complete it for\n")
+    (princ "  score and trophies.\n\n")
     (princ "CONTROLS\n")
     (princ "  SPC / RET   advance one tick\n")
     (princ "  arrows / mouse   move cursor\n")
@@ -249,6 +252,10 @@ buffer.  The main screen keeps its 3-line tail."
     (princ (format "  x   purge tank (pays)     d   demolish (%d)\n"
                    cistern-cost-demolish))
     (princ (format "  %s\n" (cdr (assq 'help-arm cistern--copy))))
+    ;; R2-Q08: the shipped interactions, named where the player reads
+    ;; (briefing prose — per the COPY-TABLE rule this is not table copy)
+    (princ "  L full log             u cancel armed verb (ESC on GUI)\n")
+    (princ "  C-u r slow auto-run (1 tps)\n")
     (princ "  r   auto-run (5 ticks/s)\n")
     (princ "  T   skip tutorial         n   new game\n")
     (princ "  ?   this briefing         q   quit\n")))
