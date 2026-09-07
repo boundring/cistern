@@ -100,7 +100,9 @@
     cistern-test-ux2-q13-log-buffer-exit
     cistern-test-ux2-q15-boot-vacates
   ;; L-076 glyph-width probe (GUI; batch registers + skips)
-    cistern-test-gui-cell-width))
+    cistern-test-gui-cell-width
+  ;; v4 wave 1 — surface foundations (docs/v4/V4-SPEC.md §4)
+    cistern-test-v4-01-tick-stamps))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
