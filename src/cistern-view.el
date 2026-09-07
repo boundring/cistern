@@ -353,8 +353,11 @@ without a card."
 armed and auto-run coexist here.  Empty string when idle (no row)."
   (let ((parts nil))
     (when (cistern-st-armed-verb st)
+      ;; V4-11: an armed toilet names the selected fixture type
       (push (format (cdr (assq 'badge-armed cistern--copy))
-                    (upcase (symbol-name (cistern-st-armed-verb st))))
+                    (if (eq (cistern-st-armed-verb st) 'toilet)
+                        (upcase (symbol-name (cistern-st-toilet-type st)))
+                      (upcase (symbol-name (cistern-st-armed-verb st)))))
             parts))
     (when (cistern-st-auto-run st)
       (push (cdr (assq 'badge-auto cistern--copy)) parts))

@@ -54,7 +54,10 @@ pure render.  Every state-mutating command ends here."
     (define-key m "d" #'cistern-demolish)
     (define-key m "c" #'cistern-decon)
     (define-key m "x" #'cistern-purge)
-    (define-key m "T" #'cistern-skip-tutorial)
+    ;; V4-11 (RPG §2): T cycles the armed fixture type — the
+    ;; tutorial skip moves to the power layer (C-t)
+    (define-key m "T" #'cistern-cycle-toilet-type)
+    (define-key m (kbd "C-t") #'cistern-skip-tutorial)
     (define-key m "r" #'cistern-auto-run-toggle)
     (define-key m "u" #'cistern-disarm)
     (define-key m (kbd "<escape>") #'cistern-disarm)
@@ -325,6 +328,13 @@ drop the others, so `cistern' reliably lands the user on the map."
 (defun cistern-cursor-capacity ()
   (interactive)
   (cistern-input-cursor-capacity cistern--st)
+  (cistern--refresh))
+
+(defun cistern-cycle-toilet-type ()
+  "V4-11 (RPG §2): `T` cycles the armed fixture type in catalog
+order; the badge names the selection."
+  (interactive)
+  (cistern--cmd-cycle-toilet-type cistern--st)
   (cistern--refresh))
 
 (defun cistern-repeat-arm ()

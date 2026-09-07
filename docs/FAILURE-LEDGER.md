@@ -2844,3 +2844,32 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-087 (2026-09-07, run: impl-v4-w2a — V4-11 toilet catalog, RPG §2)
+
+- Outcome: LANDED (red commit `git log 89872d6..HEAD~1`, green this
+  commit).
+- Red: missing catalog/type cycle/badge naming.
+- Green: cistern--toilet-catalog (5 types, sole source for
+  cost/ticks/load/suits/placement); state slot toilet-type (armed
+  selection, `T` cycles via cistern--cmd-cycle-toilet-type, catalog
+  order, wraps); cistern--toilet-place-verdict (no-adjacent-toilet
+  for fall-shaft, wall-adjacent for high-cistern/archive-stall,
+  verdict text in the catalog, rendered through the copy-table
+  refusal-place line, R7 style, refuse-before-charge); cmd-build
+  prices the armed type from the catalog and stamps :type in the
+  toilets hash; starter toilet = long-drop; badge names the
+  selected type when a toilet is armed (badge-type-fmt deleted per
+  §3.6 — badge-armed reused); tutorial skip moved to C-t (spec
+  repurposed T).
+- Draft fixes inside green: the state slot landed OUTSIDE the
+  cl-defstruct close (top-level call — second struct-boundary
+  slip this wave; the built-at slot's trailing paren is the trap);
+  the V4-11 test defun closed one let early (the same
+  multi-let-load-execution class as L-085 — cl-assert bodies ran
+  at load time and PASSED, masking the break); log-entry reads use
+  (car (car ...)) since V4-01's 3-tuples.
+- VERIFY: canonical suite ALL 95 TESTS PASSED (batch).
+
+---
+

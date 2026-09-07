@@ -114,8 +114,11 @@ by the view, not here).")
   (summary nil)              ; Q22: run-summary snapshot, banked at condemnation
   (auto-run nil)             ; Q29: badge mirror — the timer HANDLE never
                              ; enters state (D2); this is its on/off echo
-  (built-at nil))            ; Q30: hash (X . Y) -> tick-of-build, for the
+  (built-at nil)             ; Q30: hash (X . Y) -> tick-of-build, for the
                              ; same-tick regret window
+  ;; V4-11 (RPG §2): the armed fixture type — `T` cycles it in
+  ;; catalog order
+  (toilet-type 'long-drop))
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -193,6 +196,59 @@ clamp(3 − mod, 2, 6); sick workers take twice as many (§1)."
 (defun clamp (lo v hi)
   "V4-10 helper: clamp V into [LO, HI]."
   (min hi (max lo v)))
+
+;; ---------------------------------------------------------------------------
+;; V4-11 (RPG §2): the fixture catalog — sole source for cost, ticks,
+;; suits and placement of every toilet type.  Differentiators are
+;; numbers, suits, placement, cost; no special-case behavior.
+
+(defconst cistern--toilet-catalog
+  '((long-drop      :glyph "t" :cost 10 :ticks 2 :load 10
+      :primary GRIT :secondary FLOW :placement any)
+    (fall-shaft     :glyph "u" :cost 8  :ticks 2 :load 8
+      :primary FLOW :secondary GRIT :placement no-adjacent-toilet
+      :place-fail "SHAFT CLEARANCE")
+    (high-cistern   :glyph "¶" :cost 14 :ticks 1 :load 10
+      :primary ARCHIVE :secondary NERVE :placement wall-adjacent
+      :place-fail "NEEDS A WALL")
+    (archive-stall  :glyph "¤" :cost 12 :ticks 3 :load 12
+      :primary NERVE :secondary ARCHIVE :placement wall-adjacent
+      :place-fail "NEEDS A WALL")
+    (hermetic-booth :glyph "Ω" :cost 20 :ticks 2 :load 10
+      :primary NERVE :secondary GRIT :placement any))
+  "One entry per fixture type, keyed by type id (RPG §2).")
+
+(defun cistern--toilet-type-entry (type)
+  (cdr (assq type cistern--toilet-catalog)))
+
+(defun cistern--toilet-type-next (type)
+  "The catalog entry after TYPE, wrapping."
+  (let ((ids (mapcar #'car cistern--toilet-catalog))
+        (pos (cl-position type (mapcar #'car cistern--toilet-catalog))))
+    (nth (% (1+ pos) (length ids)) ids)))
+
+(defun cistern--toilet-place-verdict (st x y type)
+  "t when TYPE may be placed at (X,Y), else the verdict text
+(rendered through the copy-table refusal line, R7 style)."
+  (let ((rule (plist-get (cistern--toilet-type-entry type) :placement)))
+    (cond
+     ((eq rule 'any) t)
+     ((eq rule 'no-adjacent-toilet)
+      (if (cl-some (lambda (n) (eq (cistern--cell st (car n) (cdr n)) 'toilet))
+                   (cistern--neighbors st x y))
+          (plist-get (cistern--toilet-type-entry type) :place-fail)
+        t))
+     ((eq rule 'wall-adjacent)
+      (if (cl-some (lambda (n) (eq (cistern--cell st (car n) (cdr n)) 'wall))
+                   (cistern--neighbors st x y))
+          t
+        (plist-get (cistern--toilet-type-entry type) :place-fail))))))
+
+(defun cistern--cmd-cycle-toilet-type (st)
+  "V4-11: `T` — advance the armed fixture type in catalog order."
+  (setf (cistern-st-toilet-type st)
+        (cistern--toilet-type-next (cistern-st-toilet-type st)))
+  st)
 
 (defun cistern--stream-next (pos)
   "One raw child-stream step from POS: the domain LCG recurrence.
@@ -344,7 +400,8 @@ plumbing hashes, and LCG residue."
   (cistern--set-cell st 4 2 'pipe)
   (cistern--set-cell st 3 2 'pipe)
   (cistern--set-cell st 3 3 'toilet)
-  (puthash (cons 3 3) (list :busy nil) (cistern-st-toilets st))
+  (puthash (cons 3 3) (list :busy nil :type 'long-drop)
+            (cistern-st-toilets st))
   (puthash (cons 5 2) (list :load 30) (cistern-st-tanks st)))
 
 ;; ---------------------------------------------------------------------------
@@ -991,6 +1048,8 @@ game layer (Phase 2)."
     (pressure-severed-bare . "LINES SEVERED — REWIRE (p)")
     (refusal-no-floor . "NO FLOOR THERE — AIM FOR OPEN FLOOR")
     (refusal-alloy . "NEED %d ALLOY — PURGE (x) PAYS")
+    ;; V4-11 (RPG §2): the fixture placement refusal (R7 verdict style)
+    (refusal-place . "FIXTURE REJECTED THERE — %s")
     (pipe-dead . "PIPE — DEAD: NOT CONNECTED — REWIRE (p)")
     (badge-armed . "ARMED: %s")
     (badge-auto . "AUTO-RUN")

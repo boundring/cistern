@@ -17,10 +17,12 @@ refund is consumed in 4b (M1).")
 (defun cistern--cmd-build (st kind x y)
   "Place KIND (toilet/pipe/tank) at (X,Y).  Ported verbatim from
 cistern.el:498-525, rendered calls stripped."
-  (let ((cost (pcase kind
-                ('toilet cistern-cost-toilet)
-                ('pipe cistern-cost-pipe)
-                ('tank cistern-cost-tank))))
+  (let* ((type (and (eq kind 'toilet) (cistern-st-toilet-type st)))
+         ;; V4-11: the catalog prices the armed fixture type
+         (cost (pcase kind
+                 ('toilet (plist-get (cistern--toilet-type-entry type) :cost))
+                 ('pipe cistern-cost-pipe)
+                 ('tank cistern-cost-tank))))
     ;; returns t on placement, nil on refusal (Q19: the driver's
     ;; arm-and-build arms only when the at-cursor build lands)
     (cond
@@ -30,6 +32,12 @@ cistern.el:498-525, rendered calls stripped."
       (cistern--log st "CANNOT BUILD THERE")
       (setf (cistern-st-hint st)                       ; Q18: the hint
             (cdr (assq 'refusal-no-floor cistern--copy))) ; names the fix
+      nil)
+     ;; V4-11: catalog placement verdict — refuse before charging
+     ((and (eq kind 'toilet)
+           (not (eq t (cistern--toilet-place-verdict st x y type))))
+      (cistern--log st (cdr (assq 'refusal-place cistern--copy))
+                    (cistern--toilet-place-verdict st x y type))
       nil)
      ((gethash (cons x y) (cistern--occupied-cells st nil))
       (cistern--log st "WORKER IN THE WAY") nil)
@@ -44,7 +52,8 @@ cistern.el:498-525, rendered calls stripped."
       (puthash (cons x y) (cistern-st-tick st) (cistern-st-built-at st))
       (pcase kind
         ('toilet
-         (puthash (cons x y) (list :busy nil) (cistern-st-toilets st))
+         (puthash (cons x y) (list :busy nil :type type)
+                  (cistern-st-toilets st))
          (setf (cistern-st-built-toilet st)
                (1+ (cistern-st-built-toilet st))))
         ('tank

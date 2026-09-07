@@ -530,7 +530,9 @@ strings living in `cistern--copy'."
     ("t" . cistern-build-toilet) ("p" . cistern-build-pipe)
     ("K" . cistern-build-tank) ("d" . cistern-demolish)
     ("c" . cistern-decon) ("x" . cistern-purge)
-    ("T" . cistern-skip-tutorial) ("r" . cistern-auto-run-toggle)
+    ;; V4-11: T cycles the armed fixture type (spec §2); the
+    ;; tutorial skip moved to C-t
+    ("T" . cistern-cycle-toilet-type) ("r" . cistern-auto-run-toggle)
     ("u" . cistern-disarm) ("<escape>" . cistern-disarm)
     ("L" . cistern-log) ("n" . cistern-new-game)
     ("?" . cistern-help) ("q" . quit-window)))
@@ -836,7 +838,7 @@ names it."
       (cl-assert (not (cistern--cmd-build st 'toilet 8 6))
                  t "high-cistern built on free floor")
       (cl-assert (string-match-p "FIXTURE REJECTED"
-                                 (car (cistern-st-log st)))
+                                 (car (car (cistern-st-log st))))
                  t "placement refusal is not the copy-table line")
       (cl-assert (= (cistern-st-alloy st) alloy)
                  t "refused placement charged alloy"))
@@ -867,7 +869,7 @@ names it."
                t "cycle skipped fall-shaft")
     (dotimes (_ 4) (cistern--cmd-cycle-toilet-type st))
     (cl-assert (eq (cistern-st-toilet-type st) 'long-drop)
-               t "cycle does not wrap")))
+               t "cycle does not wrap"))
   ;; the badge names the selected type when a toilet is armed
   (let ((st (cistern--new-game 42)))
     (setf (cistern-st-toilet-type st) 'fall-shaft)
