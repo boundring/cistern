@@ -801,6 +801,7 @@ game layer (Phase 2)."
     (pressure-severed-bare . "LINES SEVERED — REWIRE (p)")
     (refusal-no-floor . "NO FLOOR THERE — AIM FOR OPEN FLOOR")
     (refusal-alloy . "NEED %d ALLOY — PURGE (x) PAYS")
+    (pipe-dead . "PIPE — DEAD: NOT CONNECTED — REWIRE (p)")
     (badge-armed . "ARMED: %s")
     (badge-auto . "AUTO-RUN")
     (condemn-append . "!! CONDEMNED")

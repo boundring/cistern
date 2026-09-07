@@ -286,6 +286,10 @@ can never be listed twice."
             (format "TANK — LOAD %d/%d — PURGE WITH x (pays 1 alloy per %d)"
                     (or (cistern--tank-load st x y) 0)
                     cistern-tank-cap cistern-purge-rate))
+           ;; R2-Q07: the DEAD pipe names its state and the fix — the
+           ;; connected pipe keeps its round-1 line byte-identical
+           ((and (eq kind 'pipe) (null (cistern--connected-tanks st x y)))
+            (cdr (assq 'pipe-dead cistern--copy)))
            ((eq kind 'floor)
             ;; Q20 (extension only): the floor cursor gets its
             ;; bearings — nearest toilet and tank, manhattan from the
