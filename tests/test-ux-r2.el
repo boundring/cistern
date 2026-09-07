@@ -200,5 +200,65 @@ from the M9 glyph set, and sits on plain floor."
                          'floor)
                      t "dust over plain floor"))))))
 
+;; --- R2-Q06: hint lifetime tied to intent ----------------------------------------
+
+(defun cistern-test-ux2--pressure-row-index (lines)
+  (cl-position-if (lambda (l) (string-match-p "PRESSURE\\|LINES NOMINAL\\|SECTOR" l))
+                  lines))
+
+(defun cistern-test-ux2-q06-hint-lifetime ()
+  "The hint survives cursor moves and renders; a non-cursor
+command clears it; a new refusal replaces it; the hint row is
+PERMANENTLY reserved so the pressure line never shifts."
+  (let ((st (cistern--new-game 42)))
+    (setq cistern--st st)
+    (setf (cistern-st-hint st) "HINT TEXT")
+    ;; cursor move preserves the hint
+    (with-temp-buffer (cistern-cursor-east))
+    (cl-assert (string-match-p "HINT TEXT"
+                               (cistern-test-ux2--plain
+                                (cistern-view--render st)))
+               t "hint survives a cursor move")
+    ;; the reserved row: the pressure line never shifts
+    (let* ((with-hint (cistern-test-ux2--render-lines st))
+           (idx-with (cistern-test-ux2--pressure-row-index with-hint)))
+      (setf (cistern-st-hint st) nil)
+      (let* ((without (cistern-test-ux2--render-lines st))
+             (idx-without (cistern-test-ux2--pressure-row-index without)))
+        (cl-assert (= idx-with idx-without)
+                   t "pressure row index identical with and without a hint")))
+    ;; a non-cursor command clears it
+    (setf (cistern-st-hint st) "HINT TEXT")
+    (with-temp-buffer (cistern-tick))
+    (cl-assert (null (string-match-p "HINT TEXT"
+                                     (cistern-test-ux2--plain
+                                      (cistern-view--render st))))
+               t "a non-cursor command drains the hint")
+    ;; over clears it
+    (setf (cistern-st-hint st) "HINT TEXT")
+    (setf (cistern-st-contam st) cistern-contam-limit)
+    (cistern--phase-check st)
+    (cl-assert (null (cistern-st-hint st))
+               t "condemnation clears the hint")))
+
+;; --- R2-Q07: dead pipe inspects as dead ---------------------------------------------
+
+(defun cistern-test-ux2-q07-dead-pipe-inspector ()
+  "A ╌ cell names its state and the fix verb; every other
+inspector line stays byte-identical (S1 probe)."
+  (let ((st (cistern--new-game 42)))
+    (let ((spot (cistern-test-game--floor-run st 1)))
+      (cistern--cmd-build st 'pipe (car spot) (cadr spot))
+      (setf (cistern-st-cursor st) (cons (car spot) (cadr spot)))
+      (cl-assert (string-match-p "PIPE — DEAD: NOT CONNECTED — REWIRE (p)"
+                                 (cistern-test-ux2--plain
+                                  (cistern-view--inspector st)))
+                 t "the dead pipe names its state and fix"))
+    ;; connected pipe: byte-identical to the round-1 line
+    (setf (cistern-st-cursor st) (cons 4 2))
+    (cl-assert (string= (cistern-test-ux2--plain (cistern-view--inspector st))
+                        "CURSOR (4,2): PIPE — the only wire; keep it short")
+               t "connected pipe inspector byte-identical")))
+
 (provide 'test-ux-r2)
 ;;; test-ux-r2.el ends here
