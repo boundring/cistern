@@ -64,7 +64,97 @@ pure render.  Every state-mutating command ends here."
 (define-derived-mode cistern-mode special-mode "CISTERN"
   "Major mode for the CISTERN sanitation management sim."
   (setq-local truncate-lines t)
-  (setq-local cursor-type nil))
+  (setq-local line-spacing 0)          ; L-076: no vertical drift
+  (setq-local cursor-type nil)
+  ;; L-076: with this t (the default), U+25A0-25FF glyphs bypass the
+  ;; fontset entirely and use the (wide-fallback) default font — the
+  ;; pin below would never engage.  Buffer-local: only the map opts out.
+  (setq-local use-default-font-for-symbols nil)
+  (cistern--pin-glyph-fontset (selected-frame)))
+
+;; ---------------------------------------------------------------------------
+;; Glyph-width pin (L-076).  Some tile glyphs (ore U+25C6, tank U+25A3)
+;; are East-Asian-ambiguous: with the owner's Iosevka default font they
+;; fall back to a double-width font and every column after them drifts.
+;; Fix: pin the geometric-shapes range (U+25A0-25FF) to a mono font
+;; MEASURED at the current cell width — frame-local to the game frame
+;; via `set-fontset-font', never the user's global font or default
+;; fontset.  (A face-remap :fontset variant was tried first and
+;; measured a 2x font — L-076 notes; frame fontset pin is the
+;; mechanism that measured true.)  Measured candidates (L-076
+;; diagnosis table, owner env cell=7px): Iosevka Fixed-10, Iosevka
+;; Term-10, DejaVu Sans Mono-8/9, Hack-8/9, Fira Code-8/9, Adwaita
+;; Mono-8/9 — the runtime sweep re-measures, so any environment lands
+;; on a fit or the pin is skipped (behavior unchanged, no luck).
+
+(defconst cistern--pin-font-families
+  '("Iosevka Fixed" "Iosevka Term" "DejaVu Sans Mono" "Hack"
+    "Fira Code" "Adwaita Mono")
+  "Ordered mono fallback candidates; first MEASURED fit wins.
+All six cover the pin range (U+25A0-25FF) and the dash range
+(U+2010-2015) per fontconfig charset intersection (L-076); sizes
+are resolved per frame by `font-info', so any environment with one
+of these families lands on a measured fit.")
+
+(defvar cistern--pin-font-cache nil
+  "Alist (CELL-WIDTH . FONT-NAME) of measured pins, keyed by cell width.")
+
+(defvar cistern--glyph-fontset nil
+  "Font name applied by the last `cistern--pin-glyph-fontset' (L-076).")
+
+(defun cistern--pin-font-fit-p (name cellw frame)
+  "NAME resolves on FRAME to a mono font measuring CELLW per cell.
+font-info's SPACE-WIDTH, AVERAGE-WIDTH and MAX-WIDTH all equal the
+cell advance — a monospace hit at the exact cell width.  No frame
+is created; `font-info' resolves the name directly (L-076)."
+  (condition-case nil
+      (let ((info (font-info name frame)))
+        (and (vectorp info)
+             (eql (aref info 10) cellw)   ; SPACE-WIDTH
+             (eql (aref info 11) cellw)   ; AVERAGE-WIDTH
+             (eql (aref info 7) cellw)))  ; MAX-WIDTH (mono sanity)
+    (error nil)))
+
+(defun cistern--pin-choose-font (cellw &optional frame)
+  "First candidate font measuring CELLW per cell on FRAME.
+Result cached per CELL-WIDTH; nil when no candidate fits."
+  (or (cdr (assq cellw cistern--pin-font-cache))
+      (let ((frame (or frame (selected-frame))) found)
+        (catch 'fit
+          (dolist (fam cistern--pin-font-families)
+            (dolist (n '(6 7 8 9 10 11 12 13 14 15 16))
+              (let ((name (format "%s-%d" fam n)))
+                (when (cistern--pin-font-fit-p name cellw frame)
+                  (setq found name)
+                  (throw 'fit name))))))
+        (when found
+          (push (cons cellw found) cistern--pin-font-cache))
+        found)))
+
+(defun cistern--pin-glyph-fontset (&optional frame)
+  "Pin U+25A0-25FF to a measured uniform font on FRAME's fontset.
+Only the geometric-shapes range is redirected; ASCII and every
+glyph the user's default font already measures at cell width keep
+rendering in that font.  FRAME defaults to the selected frame (the
+game frame — `cistern' selects it before the mode runs).  Skips
+silently when no candidate measures a fit (terminal, or unusual
+fonts) — behavior then is exactly as before."
+  (when (display-graphic-p)
+    (let* ((frame (or frame (selected-frame)))
+           (cellw (with-selected-frame frame (default-font-width)))
+           (font (cistern--pin-choose-font cellw)))
+      (when font
+        ;; a font NAME string is a valid FONT-SPEC for set-fontset-font
+        (set-fontset-font nil '(#x25A0 . #x25FF) font frame)
+        ;; em/en dashes in copy lines are East-Asian-ambiguous too
+        (set-fontset-font nil '(#x2010 . #x2015) font frame)
+        (setq cistern--glyph-fontset font)))))
+
+(defun cistern--own-frame ()
+  "L-076: the sector owns the frame — select the game window and
+drop the others, so `cistern' reliably lands the user on the map."
+  (select-window (or (get-buffer-window "*cistern*" t) (selected-window)))
+  (ignore-errors (delete-other-windows)))
 
 ;;;###autoload
 (defun cistern ()
@@ -76,6 +166,7 @@ pure render.  Every state-mutating command ends here."
   (unless cistern--st
     (setq cistern--st (cistern--new-game)))
   (cistern--refresh)
+  (cistern--own-frame)
   cistern--st)
 
 (defun cistern-new-game ()
@@ -83,7 +174,8 @@ pure render.  Every state-mutating command ends here."
   (when cistern--st (cistern--cmd-consume-hint cistern--st)) ; R2-Q06
   (setq cistern--st (cistern--new-game
                      (cistern--rand cistern--st 2147483647)))
-  (cistern--refresh))
+  (cistern--refresh)
+  (cistern--own-frame))
 
 (defun cistern-skip-tutorial ()
   (interactive)
