@@ -1,0 +1,24 @@
+CISTERN — SECTOR-7 — v3.0.0-dev  TICK 1   ALLOY 16   POP 4/8   CONTAM 0/20   SEED 1341335126
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  · pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓···········▓····················▓
+▓··┌─▣······▓····················▓
+▓··Ω········▓····················▓
+▓···········▓··················◆·▓
+▓···········▓····················▓
+▓············α··δ··············◆·▓
++···········▓··β·················▓
+▓···········+····················▓
+▓···········γ·▓+▓▓▓▓▓▓▓▓▓········▓
+▓···········▓····················▓
+▓···········▓····················▓
+▓···········▓····················▓
+▓···········▓····················▓
+▓···········▓····················▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+CURSOR (1,1): FLOOR
+LINES NOMINAL — THE STRUCTURE DOES NOT CARE
+SECTOR-7 ONLINE — KEEP THE WATER MOVING
+PIPE PLACED AT (1,1) — 2 ALLOY
+DEMOLISHED PIPE AT (1,1) — 3 ALLOY — 1 REFUND

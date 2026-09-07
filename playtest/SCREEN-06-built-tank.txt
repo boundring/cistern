@@ -1,0 +1,23 @@
+CISTERN — SECTOR-7 — v3.0.0-dev  TICK 0   ALLOY 5   POP 4/8   CONTAM 0/20   SEED 879663491
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  · pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▣····························▓··▓
+▓··┌─▣························▓··▓
+▓··Ω··························▓··▓
+▓·····························▓··▓
+▓·····························▓··▓
+▓···········α·▓δ▓▓▓▓+▓▓▓▓·····+··▓
++·◆···········β···············▓··▓
+▓·····························▓··▓
+▓··········γ··················▓··▓
+▓·····························▓··▓
+▓·····················◆·······▓··▓
+▓·····························▓··▓
+▓·····◆·······················+··▓
+▓·····························▓··▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+CURSOR (1,1): TANK — LOAD 0/60 — PURGE WITH x (pays 1 alloy per 3)
+LINES NOMINAL — THE STRUCTURE DOES NOT CARE
+SECTOR-7 ONLINE — KEEP THE WATER MOVING
+TANK PLACED AT (1,1) — 15 ALLOY

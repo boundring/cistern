@@ -1,0 +1,34 @@
+CISTERN v3.0.0-dev — sanitation protocol for Sector 7
+
+THE CONCEPT
+  Route need to capacity.  Convert waste to income.
+  Contamination is the clock.
+
+GLYPHS
+  ▓ wall    · floor    ◆ ore vein    ─ pipe    Ω toilet
+  ▣ tank    ▒ contamination    + gate    α..θ workers
+
+THE LOOP
+  Workers mine ◆ for alloy.  Their bladders fill.  At 60%%
+  they walk to a Ω and seat themselves — entering the toilet
+  tile IS sitting down.  A Ω works only when piped to a ▣ with
+  headroom.  Each use sends 10 units down the line.
+
+  A full ▣ backs up every Ω it feeds (red Ω).  Purge with x on
+  the ▣: free, and it PAYS 1 alloy per 3 units of waste.
+
+  At 100%% a worker breaches: the tile turns ▒, contamination
+  rises, neighbors fall sick.  ▒ spreads to adjacent floor.
+  Decon with c.  At 20 the sector is condemned.
+
+  Every 40 ticks a migrant arrives.  Population means load.
+
+CONTROLS
+  SPC / RET   advance one tick
+  arrows / mouse   move cursor
+  t   build toilet (10)     p   lay pipe (2)
+  K   build tank (15)       c   decontaminate (3)
+  x   purge tank (pays)     d   demolish (3)
+  r   auto-run (5 ticks/s)
+  T   skip tutorial         n   new game
+  ?   this briefing         q   quit

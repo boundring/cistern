@@ -1606,3 +1606,44 @@ One entry per dead/failed/retried run.
      is REWARDS-DESIGN §3 S2, unimplemented). State carries the
      unlocks; only the surface is missing. Owning phase:
      post-playtest tuning, when S2 lands.
+
+---
+
+## L-034 (2026-09-06, run: smoke-prototype — live driver smoke test)
+
+- Attempt: scripted interactive session through the REAL surface the
+  32 headless entries never touch — `cistern' entry, buffer, mode,
+  interactive commands, synthesized mouse events (playtest/smoke.el,
+  batch Emacs; 10 exercises, SCREEN dumps in playtest/).
+- Findings fixed (red test commit 54208e3, greens c1eddcc, f0124f4):
+  1. The documented run line `emacs -Q -l src/cistern.el` died with
+     file-missing: `load` never adds the loaded file's directory to
+     load-path, so the sibling `require`s could not resolve.  Fixed
+     by passing the explicit filename to each sibling require —
+     a bare top-level `when` bootstrap was tried first and REJECTED
+     by the L-026 source-integrity gate (non-defining top-level
+     head), which is exactly what that gate is for.
+  2. `cistern-help' (the `?' command) CRASHED with "Invalid
+     function: 20": two `princ` calls passed the substitution value
+     as princ's optional print-character function.  Any interactive
+     press of `?' errored.  Also fixed in the same command: the
+     controls block hardcoded stale prices (toilet 12 vs constant 10,
+     decon 4 vs 3, demolish 3 now rendered from the constant).
+- Verified NOT defects (pinned readings, confirmed against legacy
+  source and spec): keyboard t/p/K builds advance no tick (R6 pins
+  SPC/RET/click-with-verb only; legacy build commands never ticked);
+  isolated pipe renders `·` (legacy cistern--pipe-glyph returns `·`
+  with no plumbing neighbors); starter tank spawns with load 30
+  (domain fixture); goal card completes at 2 relieves for a target
+  of 3 (cistern--goal-target tier-1 scaling −25%); the header's
+  "SEED %d" prints (cistern-st-rng st), the live LCG state, not
+  (cistern-st-seed st) — VERBATIM legacy port (legacy :732), so
+  cosmetically misleading but the pinned reading.
+- Outcome: canonical suite `emacs -Q --batch -l tests/run.el -f
+  cistern-run-all-tests`: ALL 34 TESTS PASSED, exit 0 (32 + 2 new
+  smoke regressions).  Full session log: playtest/SMOKE-REPORT.md.
+- Change for next attempt: carry the L-032/L-033 presentation items
+  unchanged; add one smoke input — the header should print the real
+  seed (`cistern-st-seed st`) during the post-playtest presentation
+  pass, since a player cannot reproduce a run from the LCG state
+  currently displayed.

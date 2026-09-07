@@ -1,0 +1,25 @@
+CISTERN — SECTOR-7 — v3.0.0-dev  TICK 82   ALLOY 28   POP 6/8   CONTAM 3/20   SEED 494259494
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  · pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓·····!···§·!·!···········§·!·!··▓
+▓··+20─▣·*···*▓····················▓
+▓··ε········▓···8···············§▓
+▓········5··▓········*·····1···7·▓
+▓···········▓···!·······4·!·····4▓
+▓···▒························δαβ·▓
++··ζ▒··▒··0·▓···········!·····4γ·▓
+▓*·*···▒···1+··1···*·············▓
+▓···§·····!·+·▓+§▓▓▓6▓▓▓▓·····§·!▓
+▓······*···9▓7···*·····*···9·····▓
+▓···········6·§···0·········2····▓
+▓*··········▓············9·······▓
+▓·······§···!·······!············▓
+▓···········▓····················▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+MAP COMPLETED
+CURSOR (5,2): TANK — LOAD 20/60 — PURGE WITH x (pays 1 alloy per 3)
+LINES NOMINAL — THE STRUCTURE DOES NOT CARE
+CREATOR RELIEVED AT (3,3)
+MIGRANT ENTERED SECTOR — POPULATION 6
+CREATOR RELIEVED AT (3,3)
