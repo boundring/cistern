@@ -57,7 +57,9 @@
     cistern-test-ux-q02-score-rep
     cistern-test-ux-q03-starter-card
     cistern-test-ux-q04-goal-progress
-    cistern-test-ux-q05-milestone-announce))
+    cistern-test-ux-q05-milestone-announce
+    cistern-test-ux-q06-popup-protect
+    cistern-test-ux-q07-purge-economy))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

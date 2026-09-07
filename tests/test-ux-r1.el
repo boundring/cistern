@@ -152,5 +152,43 @@ ANTAG-12 silence is gone."
                                  (cistern-test-ux--plain banner))
                  t "milestone on the banner row"))))
 
+;; --- Q06: PROTECT popup channel -----------------------------------------------
+
+(defun cistern-test-ux-q06-popup-protect ()
+  "The relief popup stays the act-time channel: `+N` spawns at the
+toilet cell at the tick of relief (SCREEN-13), cursor still wins
+the cell (z-order cursor > worker > popup > cell)."
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (list (list 'relief 70 12 6)))
+    (let* ((overlay (car (cistern-view--celebration-overlay st)))
+           (hit (assoc (cons 12 6) overlay)))
+      (cl-assert hit t "popup present at the relief cell, tick of relief")
+      (cl-assert (string-match-p "\\`\\+[0-9]+\\'" (car (cdr hit)))
+                 t "popup glyph is +N over the pay")
+      ;; z-order unchanged: the cursor at the same cell occludes the popup
+      (setf (cistern-st-cursor st) (cons 12 6))
+      (let* ((row (nth (+ cistern-view--header-lines 6)
+                       (cistern-test-ux--render-lines st)))
+             (glyph (substring-no-properties row 12 (1+ 12))))
+        (cl-assert (not (string-match-p "\\`\\+" glyph))
+                   t "cursor occludes the popup at D5 precedence")))))
+
+;; --- Q07: PROTECT purge economy guard ------------------------------------------
+
+(defun cistern-test-ux-q07-purge-economy ()
+  "Purge at a known tank load changes alloy by exactly the
+advertised 1-per-3; the inspector line's rate stays verbatim."
+  (let ((st (cistern--new-game 42)))
+    (puthash (cons 5 2) (list :load 45) (cistern-st-tanks st))
+    (let ((a0 (cistern-st-alloy st)))
+      (cistern--cmd-purge st 5 2)
+      (cl-assert (= (cistern-st-alloy st) (+ a0 15))
+                 t "45 load pays exactly 15 alloy (1 per 3)"))
+    (setf (cistern-st-cursor st) (cons 5 2))
+    (cl-assert (string-match-p "pays 1 alloy per 3"
+                               (cistern-test-ux--plain
+                                (cistern-view--render st)))
+               t "inspector purge rate verbatim")))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
