@@ -550,5 +550,29 @@ arm-then-fail noise."
       (cl-assert (null (cistern-st-armed-verb st))
                  t "a refused at-cursor build does not arm"))))
 
+;; --- Q20: inspector bearing on plain floor ---------------------------------------
+
+(defun cistern-test-ux-q20-floor-bearing ()
+  "A plain-floor cursor names the nearest toilet and tank with
+grid distances and directions; every existing per-tile inspector
+line stays byte-identical (extension only)."
+  ;; extension: plain floor gains the bearing
+  (let* ((st (cistern--new-game 42))
+         (spot (cistern-test-game--floor-run st 1)))
+    (setf (cistern-st-cursor st) (cons (car spot) (cadr spot)))
+    (let ((insp (cistern-test-ux--plain (cistern-view--inspector st))))
+      (cl-assert (string-match-p
+                  "FLOOR — toilet Ω [0-9]+ \\(west\\|east\\|north\\|south\\).*tank ▣ [0-9]+"
+                  insp)
+                 t "floor cursor names the nearest structures")
+      (cl-assert (not (string-match-p "FLOOR\\s-*$" insp))
+                 t "the bare FLOOR line gained its bearing")))
+  ;; zero regression: non-floor lines byte-identical
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-cursor st) (cons 0 0))   ; wall
+    (cl-assert (string= (cistern-test-ux--plain (cistern-view--inspector st))
+                        "CURSOR (0,0): MEGASTRUCTURE WALL")
+               t "wall inspector byte-identical")))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here

@@ -71,7 +71,8 @@
     cistern-test-ux-q15-log-ranking
     cistern-test-ux-q17-cursor-hint
     cistern-test-ux-q18-refusal-hints
-    cistern-test-ux-q19-armed-badge))
+    cistern-test-ux-q19-armed-badge
+    cistern-test-ux-q20-floor-bearing))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
