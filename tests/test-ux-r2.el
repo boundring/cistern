@@ -260,5 +260,32 @@ inspector line stays byte-identical (S1 probe)."
                         "CURSOR (4,2): PIPE — the only wire; keep it short")
                t "connected pipe inspector byte-identical")))
 
+;; --- R2-Q08: shipped interactions named on a player-facing surface ---------------
+
+(defun cistern-test-ux2-q08-briefing-interactions ()
+  "The briefing's CONTROLS names the shipped interactions: the L
+full log, the u everywhere-cancel (ESC as the GUI nicety), and
+C-u r slow auto-run."
+  (cistern-help)
+  (let ((text (with-current-buffer "*cistern help*" (buffer-string))))
+    (cl-assert (string-match-p "L full log" text) t "L taught")
+    (cl-assert (string-match-p "u cancel armed verb" text)
+               t "u taught as the everywhere-cancel")
+    (cl-assert (string-match-p "ESC on GUI" text) t "ESC labeled GUI-only")
+    (cl-assert (string-match-p "C-u r slow auto-run (1 tps)" text)
+               t "slow auto-run taught")))
+
+;; --- R2-Q10: the strip's GOALS segment is explained ------------------------------
+
+(defun cistern-test-ux2-q10-goals-explained ()
+  "THE LOOP section names GOALS n/m and the active goal card."
+  (cistern-help)
+  (let ((text (with-current-buffer "*cistern help*" (buffer-string))))
+    (cl-assert (string-match-p "GOALS n/m tracks the active goal card"
+                               text)
+               t "GOALS explained")
+    (cl-assert (string-match-p "score and trophies" text)
+               t "the completion reward named")))
+
 (provide 'test-ux-r2)
 ;;; test-ux-r2.el ends here

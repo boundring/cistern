@@ -90,7 +90,9 @@
     cistern-test-ux2-q04-goals-claimed
     cistern-test-ux2-q05-dust-contract
     cistern-test-ux2-q06-hint-lifetime
-    cistern-test-ux2-q07-dead-pipe-inspector))
+    cistern-test-ux2-q07-dead-pipe-inspector
+    cistern-test-ux2-q08-briefing-interactions
+    cistern-test-ux2-q10-goals-explained))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
