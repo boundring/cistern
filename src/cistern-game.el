@@ -156,7 +156,8 @@ teaching moment).")
   (pcase key
     (`contamination (funcall (car val) (cistern-st-contam st) (cadr val)))
     (`log-contains (cl-some (lambda (line)
-                              (string-match-p (downcase val) (downcase line)))
+                              (string-match-p (downcase val)
+                                              (downcase (car line))))
                             (cistern-st-log st)))
     (`over (eq (not (cistern-st-over st)) (not val)))
     (_ (error "UNKNOWN SCENARIO EXPECT KEY %S" key))))
@@ -380,7 +381,7 @@ by the caller before this runs.  Returns the extended INTENTS."
   (let ((line (format "MILESTONE — %s"
                       (cdr (assq unlock
                                  (cdr (assq 'milestone cistern--copy)))))))
-    (cistern--log st "%s" line)
+    (cistern--log-sev st 'success "%s" line)
     (push (list :layer 'log :text line :face 'success) intents)
     (push (list :layer 'banner :text line) intents)
     (push (list 'unlock :id unlock) intents)))

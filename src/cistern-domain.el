@@ -121,11 +121,15 @@ Pure — never touches cistern-st-rng."
   (mod (+ (* pos 1103515245) 12345) 2147483648))
 
 (defun cistern--log (st fmt &rest args)
-  (push (apply #'format fmt args) (cistern-st-log st))
-  (when (> (length (cistern-st-log st)) 12)
-    (setf (cistern-st-log st)
-          (nbutlast (cistern-st-log st)
-                    (- (length (cistern-st-log st)) 12)))))
+  "Append a plain line.  Q13: entries are (LINE . SEVERITY-ENUM),
+so color persists with the text; nil severity renders dim.  Q16:
+the log is UNCAPPED — tail clipping is the view's concern."
+  (push (cons (apply #'format fmt args) nil) (cistern-st-log st)))
+
+(defun cistern--log-sev (st sev fmt &rest args)
+  "Append a line carrying SEVERITY-ENUM (Q13): info = minor,
+error = major — the view maps the enum through its palette."
+  (push (cons (apply #'format fmt args) sev) (cistern-st-log st)))
 
 ;; ---------------------------------------------------------------------------
 ;; 3. Grid primitives.  Ported verbatim from cistern.el:104-119.
@@ -500,7 +504,7 @@ bug class where plumbing state pointed elsewhere cannot exist."
             (cistern--add-hazard st x y)
             (setf (cistern-st-contam st) (1+ (cistern-st-contam st)))
             (let ((line (format "SEVERED LINE AT (%d,%d) — WASTE SPILLED" x y)))
-              (cistern--log st "%s" line)
+              (cistern--log-sev st 'error "%s" line)
               (push (list 'leak line) (cistern-st-rewards-events st)))) ; leak (M4)
         (let ((best (car tanks)))
           (dolist (tk tanks)
@@ -515,7 +519,7 @@ bug class where plumbing state pointed elsewhere cannot exist."
                   (cistern-st-tanks st))
           (push (list 'relief bladder x y)
                 (cistern-st-rewards-events st))
-          (cistern--log st "CREATOR RELIEVED AT (%d,%d)" x y)))))) ; minor faced line (M7)
+          (cistern--log-sev st 'info "CREATOR RELIEVED AT (%d,%d)" x y))))))
 
 (defun cistern--add-hazard (st x y)
   "Contaminate (X,Y) if it is floor.  Everything else — ore,
@@ -546,7 +550,7 @@ base can never be destroyed by unserved need."
     ;; identity glyph is a view concern (L-012 finding 1 resolution)
     (let* ((idx (or (cl-position w (cistern-st-creators st) :test #'eq) 0))
            (line (format "BREACH — CREATOR #%d OVERFLOWED AT (%d,%d)" idx x y)))
-      (cistern--log st "%s" line)
+      (cistern--log-sev st 'error "%s" line)
       ;; breach (M4): payload carries the logged line for the M7
       ;; faced log intent
       (push (list 'burst line) (cistern-st-rewards-events st)))))
@@ -642,7 +646,7 @@ permanent scarring: stop bleeding and the marks fade."
   (when (and (not (cistern-st-over st))
              (>= (cistern-st-contam st) cistern-contam-limit))
     (setf (cistern-st-over st) "SECTOR CONDEMNED — CONTAMINATION LIMIT")
-    (cistern--log st (cistern-st-over st))))
+    (cistern--log-sev st 'error "%s" (cistern-st-over st))))
 
 ;; 6b. Particle field (REWARDS-DESIGN §4): domain-owned, seeded,
 ;; pure.  The field is a newest-first list of particle plists

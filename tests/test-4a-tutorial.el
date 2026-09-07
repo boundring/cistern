@@ -18,7 +18,7 @@
 state-driven so steps resolve instantly when already satisfied.")
 
 (defun cistern-test-4a-tut--log-has (st needle)
-  (cl-some (lambda (line) (string-match-p needle line))
+  (cl-some (lambda (entry) (string-match-p needle (car entry)))
            (cistern-st-log st)))
 
 (defun cistern-test-4a-tutorial ()

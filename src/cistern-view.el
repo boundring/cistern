@@ -323,22 +323,17 @@ Q11 from the domain table."
                   'face 'cistern-tutorial))))
 
 (defun cistern-view--log-tail (st)
-  "Last three log lines; lines announced by the per-tick rewards
-evaluation (M7) render with their severity face, others dim."
-  (let ((faced nil) (out ""))
-    (dolist (i (cdr (cistern-st-rewards-outcome st)))
-      (when (eq (plist-get i :layer) 'log)
-        (push i faced)))
-    (dolist (l (last (reverse (cistern-st-log st)) 3) out)
-      (let* ((hit (cl-find-if (lambda (i) (string= (plist-get i :text) l))
-                              faced))
-             (enum (and hit (plist-get hit :face)))
-             (face (or (and enum (cdr (assq enum cistern-view--palette-faces)))
-                       'cistern-dim)))
-        (setq out (concat out
-                          (propertize l 'face
-                                      face)
-                          "\n"))))))
+  "Last three log lines.  Q13: each entry is (LINE . SEVERITY),
+so the face persists with the text across ticks — the view no
+longer re-matches the current tick's intents."
+  (let ((out ""))
+    (dolist (e (last (reverse (cistern-st-log st)) 3) out)
+      (setq out (concat out
+                        (propertize (car e) 'face
+                                    (or (cdr (assq (cdr e)
+                                                   cistern-view--palette-faces))
+                                        'cistern-dim))
+                        "\n")))))
 
 (defun cistern-view--render (st)
   "Pure projection of ST into a propertized string.  No buffer

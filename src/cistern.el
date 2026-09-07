@@ -53,6 +53,7 @@ pure render.  Every state-mutating command ends here."
     (define-key m "x" #'cistern-purge)
     (define-key m "T" #'cistern-skip-tutorial)
     (define-key m "r" #'cistern-auto-run-toggle)
+    (define-key m "L" #'cistern-log)
     (define-key m "n" #'cistern-new-game)
     (define-key m "?" #'cistern-help)
     (define-key m "q" #'quit-window)
@@ -170,6 +171,20 @@ and the chain callback live in the input adapter; the handle is
   (interactive)
   (setq cistern-input--refresh #'cistern--refresh)
   (cistern-input-auto-run-toggle cistern--st))
+
+(defun cistern-log ()
+  "Q16: the full uncapped log, oldest first, in a read-only
+buffer.  The main screen keeps its 3-line tail."
+  (interactive)
+  (let ((buf (get-buffer-create "*cistern log*")))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (dolist (e (reverse (cistern-st-log cistern--st)))
+          (insert (car e) "\n"))
+        (goto-char (point-min)))
+      (setq buffer-read-only t))
+    (pop-to-buffer buf)))
 
 (defun cistern-help ()
   (interactive)

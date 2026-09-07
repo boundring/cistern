@@ -96,7 +96,7 @@ the render is a pure, propertized projection of state."
   (let* ((st (cistern--new-game 42))
          (w (car (cistern-st-creators st))))
     (cistern--accident st w)
-    (let ((line (car (cistern-st-log st))))
+    (let ((line (caar (cistern-st-log st))))
       (cl-assert (string-match-p "CREATOR #0 OVERFLOWED" line)
                  t "domain log carries the worker index")
       (cl-assert (not (string-match-p "α" line))
