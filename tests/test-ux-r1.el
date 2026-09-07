@@ -349,5 +349,52 @@ the same tile table, so no glyph is listed twice."
       (cl-assert (member "╌" glyphs)
                  t "legend matches the map's actual glyphs"))))
 
+;; --- Q13: severity stored on log entries ---------------------------------------
+
+(defun cistern-test-ux-q13-severity-persists ()
+  "A breach line renders red for every tick it stays in the tail
+\(3+), not just tick one — severity rides the ENTRY, not the
+current tick's intents."
+  (let ((st (cistern--new-game 42)))
+    (let ((w (nth 1 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 14)
+      (setf (cistern--worker-y w) 7)
+      (setf (cistern--worker-bladder w)
+            (- cistern-bladder-burst cistern-bladder-rate)))
+    (cistern--do-tick st)                    ; the breach
+    (cistern--do-tick st)                    ; the next eval replaces the intents
+    (cistern--do-tick st)                    ; and the one after that
+    (let* ((tail (cistern-view--log-tail st))
+           (rows (split-string tail "\n"))
+           (hit (cl-find-if (lambda (r) (string-match-p "BREACH" r)) rows)))
+      (cl-assert hit t "breach still in the tail after 3 ticks")
+      (cl-assert (eq (get-text-property 0 'face hit) 'cistern-toilet-down)
+                 t "breach renders red for every tail tick"))))
+
+;; --- Q16: full log retrievable ---------------------------------------------------
+
+(defun cistern-test-ux-q16-full-log ()
+  "The domain log is uncapped; `L' shows the oldest line in a
+read-only buffer; the main screen keeps the 3-line tail."
+  (let ((st (cistern--new-game 42)))
+    (dotimes (i 13) (cistern--log st "TICK NOISE %d" i))
+    (cl-assert (cl-find-if (lambda (e) (string-match-p "SECTOR-7 ONLINE" (car e)))
+                           (cistern-st-log st))
+               t "uncapped: the boot line survives in state")
+    (setq cistern--st st)
+    (cistern-log)
+    (let ((buf (get-buffer "*cistern log*")))
+      (cl-assert buf t "L opens the log buffer")
+      (with-current-buffer buf
+        (goto-char (point-min))
+        (cl-assert (string-match-p "SECTOR-7 ONLINE"
+                                   (buffer-substring
+                                    (point) (line-end-position)))
+                   t "the log buffer shows line 1, oldest first")
+        (cl-assert buffer-read-only t "the log buffer is read-only")))
+    (cl-assert (null (cl-find-if (lambda (r) (string-match-p "SECTOR-7 ONLINE" r))
+                                 (split-string (cistern-view--log-tail st) "\n")))
+               t "the main screen keeps the 3-line tail")))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
