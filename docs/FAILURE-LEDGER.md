@@ -2023,3 +2023,184 @@ One entry per dead/failed/retried run.
   watching.
 
 ---
+## L-051 (2026-09-07, run: impl-ux-r1-b4 — Q22 run-summary snapshot)
+
+- Attempt: Red tests `cistern-test-ux-q22-run-summary` +
+  `cistern-test-ux-q23-death-panel` + `cistern-test-ux-q24-goal-
+  narration` as one dependency-chain red (red commit `9faf7f7`;
+  red run: void-function cistern-st-summary, 3/58, exit 1).
+  Greens `584881b` (Q22+Q23+Q24).
+- Summary = a plist on `cistern-st` (`:ticks :relieves :score
+  :trophies :cause`), banked by `cistern--phase-check` AT TRIGGER
+  TIME — commit-first; the Q23 panel only ever reads it.  The
+  directive said "one struct"; the plist follows the state's
+  card/outcome convention (ledgered, least-active).
+- Test lesson: injecting counts then driving 291 ticks doesn't work
+  — the natural condemnation fires first and the driven counts are
+  overwritten.  The test now drives to condemnation and asserts the
+  summary MATCHES the run's counters.
+- Outcome: GREEN. Canonical suite: ALL 58 TESTS PASSED, exit 0.
+- Change for next attempt: Q23 panel consumes it.
+
+## L-052 (2026-09-07, run: impl-ux-r1-b4 — Q23 death summary panel + restart-line suppression)
+
+- Attempt: (shared red).  The banner layer on condemned renders the
+  panel from the banked summary: `SECTOR CONDEMNED — CONTAMINATION
+  LIMIT / TICKS n · RELIEVES n · SCORE n / PRESS n TO RESTART`
+  (format skeleton in the Q11 copy table) — one frame carries
+  cause, counts, restart.  Commit-first, any key skips, input live
+  (PROTECT #17): the panel is presentation over live state.
+- The FOUR duplicate post-over log lines: the driver's tick command
+  logged "SECTOR CONDEMNED — PRESS n FOR NEW GAME" on EVERY
+  post-over keypress.  Suppression: log only when the newest log
+  line is not already that line — one restart line, silently (no
+  new copy; the pressure line already says it).
+- Mid-green incident: the Q24 block pushed rewards-eval past the
+  L-026 10k form-span again — `cistern--narrate-goals` extracted
+  (same decomposition as announce-unlock, L-039).  Also caught:
+  pick-tail's recency fill took the OLDEST of the descending index
+  stream (`last` of a descending list) and then an unbounded
+  `cl-subseq` on short windows — both fixed; the L-017-era
+  transient and M7 asserts flushed them out immediately.
+- Outcome: GREEN. Canonical suite: ALL 58 TESTS PASSED, exit 0.
+- Change for next attempt: Q25 particle placement contract.
+
+## L-053 (2026-09-07, run: impl-ux-r1-b4 — Q25 particle placement contract)
+
+- Attempt: Red test `cistern-test-ux-q25-particle-placement` (red
+  commit `5f562d7`; red run: "no sparkle glyph collides with floor
+  or digits", 1/60 — the M9 glyph set contained the floor dot "·"
+  AND bare digits).  Green `cbd0a67`.
+- Contract: ceremony sparkles spawn ONLY over plain floor cells —
+  the fill loop draws coordinates until it lands on floor (abundant
+  on the map; deterministic child stream, so replays stay
+  byte-identical) — and the glyph set is `* ! §` (the floor dot and
+  digits deleted).  LEG-06 holds: pipes, walls, toilets and tanks
+  stay visible under the ceremony.  Popups unaffected (M5 layer).
+- Outcome: GREEN. Canonical suite: ALL 60 TESTS PASSED, exit 0.
+- Change for next attempt: Q26 executable non-modal guard.
+
+## L-054 (2026-09-07, run: impl-ux-r1-b4 — Q26 non-modal guard executable)
+
+- Attempt: guard test `cistern-test-ux-q26-non-modal-guard` (lands
+  green with the Q25 commit — no red: the constraint was already
+  true of the mechanism; this entry pins it for Q23/Q24's new
+  ceremonies, per the directive "constraint made executable").
+  Extends the 4b-m9 (e) skip-semantics pattern onto the death
+  panel: during the panel a cursor move and a tick behave normally,
+  the n keypress starts the new game (fresh deal verified), and the
+  banked Q22 summary survives in the condemned state — nothing
+  forfeited, nothing pending (commit-first).
+- Outcome: GREEN. Canonical suite: ALL 60 TESTS PASSED, exit 0.
+- Change for next attempt: Q27 tutorial table ships.
+
+## L-055 (2026-09-07, run: impl-ux-r1-b4 — Q27 tutorial table ships)
+
+- Attempt: Red tests `cistern-test-ux-q27-tutorial-table` +
+  `cistern-test-ux-q28-briefing-proofread` (red commit `7ae7e15`;
+  red run: "step 1 prompt visible on a new game", 2/62).  Green
+  `bd9b579`.
+- `cistern--tutorial-steps` ships its default table: 3 steps over
+  real predicates — cursor onto a worker, purge a filling tank
+  (purges > 0), the purge pays (alloy > 20).  Prompts from the Q11
+  copy table, inspector-grade; the persistent prompt line is the
+  EXISTING tutorial-line render (no log lines).  One gated step per
+  tick (legacy advance semantics, unchanged).
+- Contract change landed on 4a-tutorial: the "shipped table is
+  empty" pin superseded — the table ships 3 steps; the
+  no-side-effect invariant now holds via the step-gate (a tick
+  whose predicate does not hold logs nothing).
+- Test lesson: step 1 cannot be driven by parking the cursor on a
+  worker's CURRENT cell (the wanderer moves during the same tick) —
+  the drive parks the cursor on the spawn cell and waits for the
+  wanderer to pass under it (deterministic seed, bounded).
+  ALSO harvested: `cistern-test-ux--drive-relief` had lost its seat
+  tick to an earlier fuzzy patch match — five tests failed at once;
+  the fixture is load-bearing for the whole UX suite.
+- Outcome: GREEN. Canonical suite: ALL 62 TESTS PASSED, exit 0.
+- Change for next attempt: Q28 briefing proofread (same green).
+
+## L-056 (2026-09-07, run: impl-ux-r1-b4 — Q28 briefing proofread)
+
+- Attempt: (shared red).  The two `princ` literals carried literal
+  `%%` (princ does not format — SCREEN-14's regression); now `60%`
+  and `100%` print true.  The CONTROLS block gains the
+  arm-then-click line (copy table help-arm, with Q19); the seed
+  mention landed with Q01's briefing move and is now pinned by the
+  test.  Asserts: 60% present, 100% present, NO `%%` anywhere,
+  click-to-place present, seed present.
+- Outcome: GREEN. Canonical suite: ALL 62 TESTS PASSED, exit 0.
+- Change for next attempt: Q29 auto-run surfaced + pacing.
+
+## L-057 (2026-09-07, run: impl-ux-r1-b4 — Q29 auto-run surfaced + pacing)
+
+- Attempt: Red tests `cistern-test-ux-q29-auto-run` +
+  `cistern-test-ux-q30-regret-window` (red commit `491bac6`; red
+  run: wrong-number-of-arguments on the 1-arg toggle, 2/64).
+  Green `29539fa`.
+- Badge: while the chain is live the Q01 slot shows `  AUTO-RUN`
+  (copy table).  The timer HANDLE stays out of state (D2 honored) —
+  the adapter mirrors an on/off FLAG into `cistern-st-auto-run`.
+  Pacing: prefix-arg slow mode schedules 1.0s chain links (1
+  tick/second) beside the 0.2s default; the interval lives in an
+  adapter defvar (`cistern-input--auto-run-interval`) — plumbing,
+  never game state — and the callback's reschedule reads it, so
+  slow mode stays slow across links.  Default 0.2 verified
+  unchanged (r6's cl-letf asserts untouched).  Help line already
+  mentions `r` (Q29 satisfied as-is).
+- Outcome: GREEN. Canonical suite: ALL 64 TESTS PASSED, exit 0.
+- Change for next attempt: Q30 free regret window (final directive).
+
+## L-058 (2026-09-07, run: impl-ux-r1-b4 — Q30 free regret window)
+
+- Attempt: (shared red: "place + immediate demolish: alloy
+  unchanged").  Green `29539fa`.
+- The window: `cistern-st-built-at` records the tick of placement
+  per cell (set in cmd-build, cleared on demolish); demolishing
+  while `built-at == current tick` refunds EVERYTHING — the
+  demolish fee AND the full build cost — so the place+demolish
+  cycle costs exactly nothing.  After any tick the M1 50% split
+  returns (L-024 rounding preserved).  Ledgered reading: "refunds
+  fully" = net zero over the cycle, which requires the fee back
+  too; the directive's own acceptance ("alloy unchanged") pins it.
+  Tick-1 affordability: the 20-alloy start always covers the
+  demolish fee after the most expensive build (asserted).
+- Contract updates: `cistern-test-demolish` A/B and `cistern-test-
+  4b-m1-demolish-refund` all placed+demolished SAME-TICK — they now
+  assert the regret window (net zero) and/or tick past the window
+  before asserting the M1 50% rules; the ticked 50% path is
+  additionally pinned by the new q30 ticked variant.
+- Outcome: GREEN. Canonical suite: ALL 64 TESTS PASSED, exit 0
+  (34 baseline + 30 UX entries).
+- Change for next attempt: ROUND-1 END — closing summary + docs
+  status marks.
+
+## L-059 (2026-09-07, run: impl-ux-r1 — ROUND-1 END SUMMARY)
+
+- All 30 directives SHIPPED (see docs/ux/TOP-30.md status marks).
+  Canonical suite: ALL 64 TESTS PASSED, exit 0 (34 baseline + 30
+  UX entries, tests/test-ux-r1.el, registered in tests/run.el).
+  Ledger range this round: L-035..L-059 (25 entries).  Every
+  directive: red commit first (except the three executable-PROTECT
+  guards Q06/Q07/Q26, ledgered as pins), minimal green, suite green
+  at every green boundary.
+- PROTECT status: inspector purge rate + idle pressure line
+  byte-identical (pinned by tests); popups at the act cell/tick
+  (Q06 guard); purge economy exact (Q07 guard); self-teaching loop
+  live (starter card + tutorial table); non-modal ceremony
+  (Q26 guard extends 4b-m9's skip semantics to the death panel);
+  Blame! register enforced by the Q11 copy table + drift test.
+- Real bugs the process caught: card-literal aliasing breaking
+  replay identity (L-036); view hash-layout access (r5 backstop,
+  L-039); two form-span overruns (L-026 gate, L-039/L-052); the
+  pressure line lying at the losing moment (Q09/Q10, the round's
+  core fix); ANTAG-06's dead pipe indistinguishable from floor
+  (Q12); M7 faces lost after one tick (Q13); ANTAG-12's silent
+  milestones (Q05); the M1 fee trapping tick-1 mistakes (Q30).
+- Change for next attempt (round 2 candidates, not directives):
+  RISING band skippability in one-tank games (L-039 pacing note);
+  armed-strip width if the 95 budget must win (L-048, director
+  accepted as taken); live playtest re-run of ANTAG/LEG captures
+  to refresh the docs' before/after evidence.
+
+---
