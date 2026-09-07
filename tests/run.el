@@ -98,7 +98,9 @@
     cistern-test-ux2-q11-tutorial-repairs
     cistern-test-ux2-q12-worker-noun
     cistern-test-ux2-q13-log-buffer-exit
-    cistern-test-ux2-q15-boot-vacates))
+    cistern-test-ux2-q15-boot-vacates
+  ;; L-076 glyph-width probe (GUI; batch registers + skips)
+    cistern-test-gui-cell-width))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
