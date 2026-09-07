@@ -497,11 +497,11 @@ strings living in `cistern--copy'."
     (dolist (role '(rubble flood manifold cache event))
       (let ((face (intern (format "cistern-%s" role)))
             (color (cdr (assq role (cistern--derive-palette "#101010")))))
-        (cl-assert (boundp face) t "face for %s missing" role)
+        (cl-assert (facep face) t "face for %s missing" role)
         (cl-assert (equal (face-attribute face :foreground
                                           (selected-frame) 'default)
                           color)
-           t "face %s did not take its role color" role))))
+           t "face %s did not take its role color" role)))
   ;; view kind-faces routes the three new tile kinds to their faces
   (dolist (kind '(rubble flood manifold cache event))
     (cl-assert (cdr (assq kind cistern-view--kind-faces))
@@ -521,7 +521,7 @@ strings living in `cistern--copy'."
       (let ((copy-key (intern (format "desc-%s" kind))))
         (cl-assert (cdr (assq copy-key cistern--copy))
                    t "%s line is not copy-table copy" kind))))
-  (message "CISTERN-V4-06-OK"))
+  (message "CISTERN-V4-06-OK")))
 
 (provide 'test-v4)
 ;;; test-v4.el ends here

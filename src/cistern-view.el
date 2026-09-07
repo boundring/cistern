@@ -54,6 +54,14 @@ auto-run) makes 4.  Never two independent numbers."
 (defface cistern-dim '((t)) "Dim UI text.")
 (defface cistern-tutorial '((t :weight bold)) "Tutorial line.")
 
+;; V4-06 (SURFACE S3.2/S2 bridge): faces for the five new kinds —
+;; colors come from roles below, never literals (rule, not list)
+(defface cistern-rubble '((t)) "Rubble — impassable debris.")
+(defface cistern-flood '((t :weight bold)) "Flood — wet floor.")
+(defface cistern-manifold '((t :weight bold)) "Manifold — free pipe anchor.")
+(defface cistern-cache '((t)) "Cache — walkable alloy bonus.")
+(defface cistern-event '((t)) "Event — incoming countdown marker.")
+
 ;; ---------------------------------------------------------------------------
 ;; Theme-contrast palette (V4-03, SURFACE S2.1/S2.2).  PURE MATH: the
 ;; derivation calls no frame/buffer/color-resolver (A2.3 probe) — the
@@ -79,7 +87,14 @@ auto-run) makes 4.  Never two independent numbers."
     (worker-sick . (70 0.6 standard))
     (header . (210 0.45 emphatic))
     (dim . (0 0.0 recessive))
-    (tutorial . (280 0.4 standard)))
+    (tutorial . (280 0.4 standard))
+    ;; V4-06: grey recessive rubble, cyan emphatic flood, orange
+    ;; emphatic manifold, yellow standard cache/event
+    (rubble . (0 0.0 recessive))
+    (flood . (190 0.6 emphatic))
+    (manifold . (30 0.8 emphatic))
+    (cache . (50 0.6 standard))
+    (event . (60 0.6 standard)))
   "Face/role → (HUE SAT CLASS); CLASS ∈ recessive/standard
 \(target 4.5:1) or emphatic/alert (7.0:1).")
 
@@ -158,7 +173,11 @@ greys)."
 
 (defconst cistern-view--kind-faces
   '((wall . cistern-wall) (floor . cistern-floor) (door . cistern-door)
-    (ore . cistern-ore) (hazard . cistern-hazard)))
+    (ore . cistern-ore) (hazard . cistern-hazard)
+    ;; V4-06 (S3.2): the five new kinds render through their roles
+    (rubble . cistern-rubble) (flood . cistern-flood)
+    (manifold . cistern-manifold) (cache . cistern-cache)
+    (event . cistern-event)))
 
 (defconst cistern-view--toilet-faces
   '((busy . cistern-toilet-busy) (usable . cistern-toilet)
@@ -412,7 +431,10 @@ can never be listed twice."
               (if bearing
                   (format (cdr (assq 'bearing-floor cistern--copy)) bearing)
                 (cdr (assq kind cistern-view--kind-descriptions)))))
-           (t (cdr (assq kind cistern-view--kind-descriptions)))))
+           (t (or (cdr (assq kind cistern-view--kind-descriptions))
+                  ;; V4-06: new kinds carry their line in the copy table
+                  (cdr (assq (intern (format "desc-%s" kind))
+                             cistern--copy))))))
          (who
           (when w
             (format "%s — bladder %d%% — %s"

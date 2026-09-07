@@ -2700,3 +2700,23 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-082 (2026-09-07, run: impl-v4-w1 — V4-06 new-kind faces + inspector lines, S3.2/S2 bridge)
+
+- Outcome: LANDED (red commit `git log da6dd35..HEAD~1`, green this
+  commit).
+- Red: "face for cistern-rubble missing" (no faces/roles existed).
+- Green: five deffaces (cistern-rubble/flood/manifold/cache/event,
+  no literal :foreground), five roles appended to the face-roles
+  table — the V4-04 apply loop derives+applies them with zero new
+  code — kind-faces entries, and desc-rubble/flood/manifold/cache/
+  event copy keys; the inspector's fallback branch resolves
+  desc-<kind> from the copy table for kinds not in
+  kind-descriptions.
+- Draft fixes inside green: defface does NOT bind the symbol as a
+  variable in this Emacs (facep, not boundp); the test's let scope
+  was closed one dolist early (void-variable st).
+- VERIFY: canonical suite ALL 90 TESTS PASSED (batch).
+
+---
+

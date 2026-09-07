@@ -935,6 +935,13 @@ game layer (Phase 2)."
     (tutorial-3 . "THE PURGE PAYS — ALLOY IN THE BANK")
     ;; V4-05 (SURFACE S3.2): rubble clear log
     (rubble-cleared . "RUBBLE CLEARED AT (%d,%d) — %d ALLOY")
+    ;; V4-06 (SURFACE S3.2/S1): inspector lines for the new kinds —
+    ;; state + fix verb, copy-table only (A3.6)
+    (desc-rubble . "RUBBLE — IMPASSABLE: D CLEARS TO FLOOR")
+    (desc-flood . "FLOOD — IMPASSABLE WHILE WET: C DRIES IT")
+    (desc-manifold . "MANIFOLD — FREE PIPE ANCHOR: WIRES WITHOUT A TANK")
+    (desc-cache . "CACHE — WALK IT TO BANK THE ALLOY")
+    (desc-event . "EVENT INCOMING — THE COUNTDOWN IS STANDING")
     ;; V4-02 (SURFACE S1.2/S1.3): the log browser's table copy
     (log-header . "— press q to close —")
     (log-jump-none . "NO CELL ON THIS LINE")
