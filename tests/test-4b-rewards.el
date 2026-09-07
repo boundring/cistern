@@ -83,9 +83,9 @@
 ;; ---------------------------------------------------------------------------
 ;; 4b Pair 2 — M1 demolish-with-refund (REWARDS-DESIGN §2 M1).
 
-(defconst cistern-test-4b-m1-dust-glyphs '("·" ".")
-  "M1 dust glyphs, REWARDS-DESIGN §4 trigger table (Demolish dust
-row).  Dust face: the doc row says \"gray face\" but the §4 face
+(defconst cistern-test-4b-m1-dust-glyphs '("*" "!" "§")
+  "M1 dust glyphs — R2-Q05: the Q25 particle contract applies, the
+glyph set is the M9 set.  Dust face: the doc row says \"gray face\" but the §4 face
 enum is closed (success/warning/error/info/bonus) — 'info is the
 neutral enum pending the L-024 ruling.")
 
@@ -103,6 +103,7 @@ neutral enum pending the L-024 ruling.")
            (x (nth 1 case)) (y (nth 2 case))
            (cost (nth 3 case)) (refund (nth 4 case))
            (st (cistern--new-game 42)))
+      (let ((prng-before (cistern-st-particle-rng st)))
       (cistern--cmd-build st kind x y)
       (cl-assert (eq (cistern--cell st x y) kind) "fixture placed")
       (cistern--do-tick st)                 ; Q30: past the regret window —
@@ -115,9 +116,10 @@ neutral enum pending the L-024 ruling.")
                    "fee 3 charged, 50% of build cost refunded (floor)"))
       ;; dust: M1 trigger row — 3-5 sparkle particles at the demolished
       ;; tile, glyphs from the row, amounts drawn from the CHILD stream
-      ;; (never the sim LCG); spawned INTO the field (M6 migration)
+      ;; (never the sim LCG); spawned INTO the field — R2-Q05: at the
+      ;; demolish itself (zero tick delay)
       (let* ((rng0 (cistern-st-rng st))
-             (prng0 (cistern-st-particle-rng st))
+             (prng0 prng-before)
              (ps (progn (cistern--rewards-eval st nil)
                         (cistern-st-particles st))))
         (cl-assert (and (>= (length ps) 3) (<= (length ps) 5))
@@ -141,7 +143,7 @@ neutral enum pending the L-024 ruling.")
         (cl-assert (not (= (cistern-st-particle-rng st) prng0))
                    "dust draws consume the child stream (position advances)")
         (cl-assert (null (cistern-st-rewards-events st))
-                   "emitted events drain on read"))))
+                   "emitted events drain on read")))))
   ;; refusal on empty tile: free, no event, no dust
   (let* ((st (cistern--new-game 42))
          (alloy0 (cistern-st-alloy st)))
@@ -511,14 +513,16 @@ exactly base."
   ;; draw order (count, then per particle: glyph, ttl, vel-x, vel-y)
   ;; BEFORE implementation, over the pinned stream (seed 42, id 1)
   ;; and trigger T = demolish-dust at tile (4,2).
-  '((0 . ((:pos (4 . 2) :vel (-1 . 0) :ttl 2 :glyph "." :face info :layer sparkle)
-          (:pos (4 . 2) :vel (1 . 1) :ttl 2 :glyph "." :face info :layer sparkle)
-          (:pos (4 . 2) :vel (1 . 0) :ttl 2 :glyph "." :face info :layer sparkle)
-          (:pos (4 . 2) :vel (0 . 0) :ttl 2 :glyph "." :face info :layer sparkle)))
-    (1 . ((:pos (3 . 2) :vel (-1 . 0) :ttl 1 :glyph "." :face info :layer sparkle)
-          (:pos (5 . 3) :vel (1 . 1) :ttl 1 :glyph "." :face info :layer sparkle)
-          (:pos (5 . 2) :vel (1 . 0) :ttl 1 :glyph "." :face info :layer sparkle)
-          (:pos (4 . 2) :vel (0 . 0) :ttl 1 :glyph "." :face info :layer sparkle)))
+  ;; R2-Q05: re-pinned — the glyph set is the M9 set (* ! §); draw
+  ;; order, ttl band and velocities unchanged.
+  '((0 . ((:pos (4 . 2) :vel (-1 . 0) :ttl 2 :glyph "§" :face info :layer sparkle)
+          (:pos (4 . 2) :vel (1 . 1) :ttl 2 :glyph "!" :face info :layer sparkle)
+          (:pos (4 . 2) :vel (1 . 0) :ttl 2 :glyph "*" :face info :layer sparkle)
+          (:pos (4 . 2) :vel (0 . 0) :ttl 2 :glyph "!" :face info :layer sparkle)))
+    (1 . ((:pos (3 . 2) :vel (-1 . 0) :ttl 1 :glyph "§" :face info :layer sparkle)
+          (:pos (5 . 3) :vel (1 . 1) :ttl 1 :glyph "!" :face info :layer sparkle)
+          (:pos (5 . 2) :vel (1 . 0) :ttl 1 :glyph "*" :face info :layer sparkle)
+          (:pos (4 . 2) :vel (0 . 0) :ttl 1 :glyph "!" :face info :layer sparkle)))
     (3 . nil)
     (6 . nil)))
 

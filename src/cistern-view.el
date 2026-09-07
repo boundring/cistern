@@ -207,10 +207,11 @@ so the strip returns already-faced."
 
 (defun cistern-view--goal-counts (st)
   "Active-card progress (Q04): (MET . TOTAL) from the card's
-objectives; nil without a card."
+objectives (R2-Q04: satisfied-at-least-once — claimed); nil
+without a card."
   (let ((card (cistern-st-goal-card st)))
     (when card
-      (cons (cl-count-if (lambda (g) (plist-get g :satisfied))
+      (cons (cl-count-if (lambda (g) (plist-get g :claimed))
                          (plist-get card :goals))
             (length (plist-get card :goals))))))
 

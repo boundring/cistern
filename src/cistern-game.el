@@ -96,7 +96,18 @@ phantom-plumbing invariant, load-bearing)."
         (remhash (cons x y) (cistern-st-tanks st))
         (remhash (cons x y) (cistern-st-built-at st))
         (cistern--set-cell st x y 'floor)
-        (push (list 'demolish x y) (cistern-st-rewards-events st))
+        ;; R2-Q05: the dust spawns AT THE DEMOLISH (zero tick delay),
+        ;; obeying the Q25 particle contract: glyphs only from the M9
+        ;; set, placement over the now-plain floor
+        (let ((count (+ 3 (mod (cistern--particle-draw st) 3))))
+          (dotimes (_ count)
+            (let* ((g (cistern--particle-draw st))
+                   (ttlp (+ 2 (mod (cistern--particle-draw st) 2)))
+                   (vx (- (mod (cistern--particle-draw st) 3) 1))
+                   (vy (- (mod (cistern--particle-draw st) 3) 1))
+                   (glyph (nth (mod g 3) '("*" "!" "§"))))
+              (cistern--field-spawn st (cons x y) (cons vx vy) ttlp
+                                    glyph 'info 'sparkle))))
         (cistern--log st "DEMOLISHED %s AT (%d,%d) — %d ALLOY — %d REFUND"
                       (upcase (symbol-name kind)) x y
                       cistern-cost-demolish refund))))))
@@ -257,24 +268,6 @@ state for the view to read (L-027); the view never calls this."
         (ceremony-p nil)
         ;; the tick's events: pending list + caller arguments, merged
         (events (append (cistern-st-rewards-events st) raw-events)))
-    (dolist (ev events)
-      ;; §5's event vocabulary is bare symbols (relief, burst, …);
-      ;; payload-carrying events (demolish) are lists.  Symbols pass.
-      (when (and (listp ev) (eq (car ev) 'demolish))
-        ;; §4 trigger table, Demolish dust row: 3–5 `sparkle`, ttl
-        ;; 2–3, glyphs `·` `.`, short vel — spawned INTO the field.
-        ;; Draw order pinned (L-029 fixture): count, then per
-        ;; particle: glyph, ttl, vel-x, vel-y.
-        (let* ((x (nth 1 ev)) (y (nth 2 ev))
-               (count (+ 3 (mod (cistern--particle-draw st) 3))))
-          (dotimes (_ count)
-            (let* ((g (cistern--particle-draw st))
-                   (ttlp (+ 2 (mod (cistern--particle-draw st) 2)))
-                   (vx (- (mod (cistern--particle-draw st) 3) 1))
-                   (vy (- (mod (cistern--particle-draw st) 3) 1))
-                   (glyph (if (= 0 (mod g 2)) "·" ".")))
-              (cistern--field-spawn st (cons x y) (cons vx vy) ttlp
-                                    glyph 'info 'sparkle))))))
     ;; M3 goal-card evaluator: re-checked on every call (rewards-eval
     ;; runs exactly once per tick, L-027 wiring).  Progress accrues
     ;; from relief and burst events; each goal's :satisfied is written back into
@@ -302,10 +295,24 @@ state for the view to read (L-027); the view never calls this."
                                               (`bursts-allowed bursts)
                                               (`contamination-ceiling
                                                (cistern-st-contam st)))))
-                                (plist-put g :satisfied
-                                           (if (eq kind 'relieves-served)
-                                               (>= value target)
-                                             (<= value target)))))
+                                (plist-put
+                                 (plist-put g :satisfied
+                                            (if (eq kind 'relieves-served)
+                                                (>= value target)
+                                              (<= value target)))
+                                 ;; R2-Q04: claimed-only readout — a
+                                 ;; goal, once satisfied, stays counted;
+                                 ;; the ceiling at contamination zero is
+                                 ;; not yet claimed (nothing achieved).
+                                 ;; :satisfied and the completion check
+                                 ;; below are untouched.
+                                 :claimed
+                                 (or (plist-get g :claimed)
+                                     (and (plist-get g :satisfied)
+                                          (not (and (eq kind
+                                                       'contamination-ceiling)
+                                                    (= (cistern-st-contam st)
+                                                       0))))))))
                             (plist-get card :goals))))
           (when (and (not (plist-get card :completed))
                      (cl-every (lambda (g) (plist-get g :satisfied))
