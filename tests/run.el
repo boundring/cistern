@@ -94,7 +94,11 @@
     cistern-test-ux2-q08-briefing-interactions
     cistern-test-ux2-q10-goals-explained
     cistern-test-ux2-q09-same-tick-inspector
-    cistern-test-ux2-q14-compound-bearings))
+    cistern-test-ux2-q14-compound-bearings
+    cistern-test-ux2-q11-tutorial-repairs
+    cistern-test-ux2-q12-worker-noun
+    cistern-test-ux2-q13-log-buffer-exit
+    cistern-test-ux2-q15-boot-vacates))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

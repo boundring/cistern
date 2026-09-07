@@ -323,5 +323,106 @@ lines are unchanged."
       (cl-assert (null (string-match-p "2 east, 2 north" insp))
                  t "no comma-joined axis pair remains"))))
 
+;; --- R2-Q11: tutorial step 1 is a player-controllable act -------------------------
+
+(defun cistern-test-ux2-q11-tutorial-repairs ()
+  "Step predicates check BEFORE the wander phase (a chased worker
+cannot escape mid-tick); the gate is per-step (purge-first reaches
+step 2 without step 1); the prompt is suppressed while over."
+  ;; (a) the tick-start cell advances that tick — deterministic
+  (let ((st (cistern--new-game 42)))
+    (let ((w (car (cistern-st-creators st))))
+      (setf (cistern-st-cursor st)
+            (cons (cistern--worker-x w) (cistern--worker-y w))))
+    (cistern--do-tick st)
+    (cl-assert (= 1 (cistern-st-tutorial st))
+               t "step 1 advances the tick its predicate holds")
+    ;; (c) suppressed while over
+    (setf (cistern-st-contam st) cistern-contam-limit)
+    (cistern--phase-check st)
+    (cl-assert (null (string-match-p "TUTORIAL"
+                                     (cistern-test-ux2--plain
+                                      (cistern-view--render st))))
+               t "death frame contains no TUTORIAL line"))
+  ;; (b) per-step gate: purge-first without step 1
+  (let ((st2 (cistern--new-game 42)))
+    (cistern--cmd-purge st2 5 2)
+    (cistern--do-tick st2)
+    (cl-assert (= 2 (cistern-st-tutorial st2))
+               t "purge-first reaches two steps without step 1")))
+
+;; --- R2-Q12: worker naming agrees across surfaces ----------------------------------
+
+(defun cistern-test-ux2-q12-worker-noun ()
+  "The breach and relief lines say WORKER (the glyph carries the
+identity); no CREATOR noun anywhere in the capture."
+  (let ((st (cistern--new-game 42)))
+    ;; a breach
+    (let ((w (nth 1 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 14)
+      (setf (cistern--worker-y w) 7)
+      (setf (cistern--worker-bladder w)
+            (- cistern-bladder-burst cistern-bladder-rate)))
+    (cistern--do-tick st)
+    (let ((breach (cl-find-if (lambda (e) (string-match-p "BREACH" (car e)))
+                              (cistern-st-log st))))
+      (cl-assert (string-match-p "BREACH — WORKER" (car breach))
+                 t "the breach names WORKER")
+      (cl-assert (null (string-match-p "CREATOR" (car breach)))
+                 t "no CREATOR noun"))
+    ;; the relief line too
+    (cistern-test-ux--drive-relief st)
+    (let ((relief (cl-find-if (lambda (e) (string-match-p "RELIEVED" (car e)))
+                              (cistern-st-log st))))
+      (cl-assert (string-match-p "WORKER RELIEVED" (car relief))
+                 t "the relief line says WORKER")
+      (cl-assert (null (string-match-p "CREATOR" (car relief)))
+                 t "no CREATOR noun")))) 
+
+;; --- R2-Q13: the L log buffer exits like everything else ----------------------------
+
+(defun cistern-test-ux2-q13-log-buffer-exit ()
+  "The log buffer is a special-mode buffer: q closes it, the
+press-q hint is its first line, and the log stays read-only,
+oldest first, uncapped."
+  (let ((st (cistern--new-game 42)))
+    (dotimes (i 14) (cistern--log st "TICK NOISE %d" i))
+    (setq cistern--st st)
+    (cistern-log)
+    (let ((buf (get-buffer "*cistern log*")))
+      (cl-assert buf t "the log buffer exists")
+      (with-current-buffer buf
+        (cl-assert (eq major-mode 'special-mode) t "special-mode")
+        (cl-assert buffer-read-only t "read-only")
+        (goto-char (point-min))
+        (cl-assert (string-match-p "press q to close"
+                                   (buffer-substring
+                                    (point) (line-end-position)))
+                   t "the press-q hint is the first line")
+        (search-forward "SECTOR-7 ONLINE")
+        (cl-assert t t "the oldest log line is present")
+        (cl-assert (eq (lookup-key special-mode-map "q") 'quit-window)
+                   t "q closes via special-mode")
+        (quit-window)
+        (cl-assert (null (get-buffer-window buf)) t "q closes the buffer")))))
+
+;; --- R2-Q15: boot flavor vacates the tail -------------------------------------------
+
+(defun cistern-test-ux2-q15-boot-vacates ()
+  "With three or more newer player-era events the boot line never
+occupies a tail slot — even when the player lines collapse; with
+an empty log the boot line still renders."
+  ;; collapse shrinks the player era: boot must still vacate
+  (let ((st (cistern--new-game 42)))
+    (dotimes (_ 12) (cistern--log-sev st 'info "WORKER RELIEVED AT (3,3)"))
+    (cistern--log-sev st 'error "BREACH — WORKER β OVERFLOWED AT (5,6)")
+    (cl-assert (null (cl-find-if (lambda (r) (string-match-p "ONLINE" r))
+                                 (split-string (cistern-view--log-tail st) "\n")))
+               t "boot flavor vacates the tail"))
+  ;; empty log: the boot line still renders
+  (let ((st (cistern--new-game 42)))
+    (cl-assert (string-match-p "ONLINE" (cistern-view--log-tail st))
+               t "with an empty log the boot line renders")))
+
 (provide 'test-ux-r2)
 ;;; test-ux-r2.el ends here
