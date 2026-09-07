@@ -96,7 +96,8 @@ pure render.  Every state-mutating command ends here."
   (if (cistern-st-over cistern--st)
       ;; Q23: ONE restart line, not one per post-over keypress — the
       ;; duplicate suppression is silent (log history keeps the first)
-      (let ((line "SECTOR CONDEMNED — PRESS n FOR NEW GAME"))
+      ;; R2-Q03: one verb — RESTART, as the panel and pressure line
+      (let ((line (cdr (assq 'restart-log cistern--copy))))
         (unless (equal (caar (cistern-st-log cistern--st)) line)
           (cistern--log cistern--st "%s" line)))
     (cistern--do-tick cistern--st))

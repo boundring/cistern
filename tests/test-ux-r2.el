@@ -130,9 +130,12 @@ byte-identical."
                    t "every PRESS n occurrence says RESTART")
         (cl-assert (null (string-match-p "NEW GAME" (car e)))
                    t "no NEW GAME wording left")))
+  ;; the idle line is checked on a LIVE game (the condemned state
+  ;; reads the panel line, not the idle line)
+  (let ((st (cistern--new-game 42)))
     (cl-assert (string= (cistern-view--pressure-line st)
                         "LINES NOMINAL — THE STRUCTURE DOES NOT CARE")
-               t "idle pressure line byte-identical"))
+               t "idle pressure line byte-identical")))
   (dolist (key '(restart-log tutorial-complete tutorial-step
                  tutorial-skipped tutorial-line-fmt))
     (let ((s (cdr (assq key cistern--copy))))

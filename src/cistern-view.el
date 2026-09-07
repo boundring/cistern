@@ -354,7 +354,8 @@ deleted (101 units over many tanks is not pressure).  Copy per
 Q11 from the domain table."
   (let* ((capsum (cistern--tank-capacity-total st))
          (total (cistern--tank-load-total st)))
-    (cond ((cistern-st-over st) "SECTOR CONDEMNED — PRESS n TO RESTART")
+    ;; R2-Q03: one verb, from the table — panel, log and line agree
+    (cond ((cistern-st-over st) (cdr (assq 'restart-log cistern--copy)))
         ;; Q10: severed lines get rewired, never purged — and the
         ;; line names the tank cell to wire toward (copy per Q11)
         ((cistern--toilets-severed-p st)
@@ -404,9 +405,11 @@ Q11 from the domain table."
   (let ((idx (cistern-st-tutorial st))
         (steps (cistern--tutorial-steps)))
     (when (and (numberp idx) (< idx (length steps)))
-      (propertize (format "TUTORIAL %d/%d: %s  (T skips)\n"
+      (propertize (concat (format (cdr (assq 'tutorial-line-fmt
+                                        cistern--copy))
                           (1+ idx) (length steps)
                           (car (nth idx steps)))
+                          "\n")
                   'face 'cistern-tutorial))))
 
 (defun cistern-view--log-tail (st)

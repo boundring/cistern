@@ -138,15 +138,16 @@ completion line."
       (if (>= (1+ idx) (length steps))
           (progn
             (setf (cistern-st-tutorial st) t)
-            (cistern--log st "TUTORIAL COMPLETE — THE SECTOR IS YOURS"))
-        (cistern--log st "TUTORIAL: OBJECTIVE COMPLETE")))))
+            (cistern--log st "%s" (cdr (assq 'tutorial-complete
+                                             cistern--copy))))
+        (cistern--log st "%s" (cdr (assq 'tutorial-step cistern--copy)))))))
 
 (defun cistern--cmd-skip-tutorial (st)
   "T skip (R4): mark the tutorial done so advance is a no-op.
 Use-case form — the index is state and mutates here, never in the
 driver (armed-verb precedent, L-010 pin 4)."
   (setf (cistern-st-tutorial st) t)
-  (cistern--log st "TUTORIAL SKIPPED"))
+  (cistern--log st "%s" (cdr (assq 'tutorial-skipped cistern--copy))))
 
 (defconst cistern-tutorial-scenario-losing
   (list

@@ -842,7 +842,7 @@ shows a SINGLE restart line, not one per post-over keypress."
     (with-temp-buffer
       (dotimes (_ 4) (cistern-tick))
       (let ((restarts (cl-count-if
-                       (lambda (e) (string-match-p "PRESS n FOR NEW GAME"
+                       (lambda (e) (string-match-p "PRESS n TO RESTART"
                                                    (car e)))
                        (cistern-st-log st))))
         (cl-assert (= restarts 1)
