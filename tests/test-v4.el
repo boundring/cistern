@@ -801,5 +801,81 @@ scores land in [3,18]."
   (cl-assert (= (cistern--rpg-sick-duration 4) 18) t "sick +4 clamp")
   (message "CISTERN-V4-10-OK"))
 
+(defconst cistern-test-v4-11--catalog-shape
+  '((long-drop 10 2 GRIT FLOW any)
+    (fall-shaft 8 2 FLOW GRIT no-adjacent-toilet)
+    (high-cistern 14 1 ARCHIVE NERVE wall-adjacent)
+    (archive-stall 12 3 NERVE ARCHIVE wall-adjacent)
+    (hermetic-booth 20 2 NERVE GRIT any)))
+
+(defun cistern-test-v4-11-toilet-catalog ()
+  "V4-11 (A3/A5): the fixture catalog is sole-source for
+cost/ticks/suits/placement; cmd-build charges the catalog price,
+stamps :type, and refuses illegal placement through the copy
+table; T cycles the armed type in catalog order and the badge
+names it."
+  ;; catalog shape, in order
+  (cl-assert (equal (mapcar #'car cistern--toilet-catalog)
+                    (mapcar #'car cistern-test-v4-11--catalog-shape))
+             t "catalog order/ids wrong")
+  (dolist (spec cistern-test-v4-11--catalog-shape)
+    (let ((e (cdr (assq (car spec) cistern--toilet-catalog))))
+      (cl-assert e t "type %s missing" (car spec))
+      (cl-assert (= (plist-get e :cost) (nth 1 spec)) t "%s cost" (car spec))
+      (cl-assert (= (plist-get e :ticks) (nth 2 spec)) t "%s ticks" (car spec))
+      (cl-assert (eq (plist-get e :primary) (nth 3 spec)) t "%s primary" (car spec))
+      (cl-assert (eq (plist-get e :secondary) (nth 4 spec)) t "%s secondary" (car spec))
+      (cl-assert (eq (plist-get e :placement) (nth 5 spec)) t "%s placement" (car spec))))
+  ;; A5: high-cistern — 14 alloy, :type stamped, wall placement verdict
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-toilet-type st) 'high-cistern)
+    (cistern--cmd-purge st 5 2)
+    (setf (cistern-st-alloy st) 20)
+    (setf (cistern-st-cursor st) (cons 8 6))
+    (let ((alloy (cistern-st-alloy st)))
+      (cl-assert (not (cistern--cmd-build st 'toilet 8 6))
+                 t "high-cistern built on free floor")
+      (cl-assert (string-match-p "FIXTURE REJECTED"
+                                 (car (cistern-st-log st)))
+                 t "placement refusal is not the copy-table line")
+      (cl-assert (= (cistern-st-alloy st) alloy)
+                 t "refused placement charged alloy"))
+    (cistern--cmd-build st 'toilet 8 1)   ; (8,0) is a wall → adjacent
+    (cl-assert (eq (plist-get (gethash (cons 8 1) (cistern-st-toilets st))
+                               :type)
+                   'high-cistern)
+               t "high-cistern :type not stamped")
+    (cl-assert (= (cistern-st-alloy st) 6)
+               t "high-cistern did not cost 14"))
+  ;; fall-shaft refuses beside an existing toilet
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-toilet-type st) 'fall-shaft)
+    (setf (cistern-st-alloy st) 40)
+    (cl-assert (not (cistern--cmd-build st 'toilet 4 3))
+               t "fall-shaft built beside the starter toilet")
+    (cl-assert (cistern--cmd-build st 'toilet 10 6)
+               t "fall-shaft refused a clear cell"))
+  ;; starter toilet is a long-drop; T cycles in catalog order
+  (let ((st (cistern--new-game 42)))
+    (cl-assert (eq (plist-get (gethash (cons 3 3) (cistern-st-toilets st))
+                               :type)
+                   'long-drop)
+               t "starter toilet is not a long-drop")
+    (setf (cistern-st-toilet-type st) 'long-drop)
+    (cistern--cmd-cycle-toilet-type st)
+    (cl-assert (eq (cistern-st-toilet-type st) 'fall-shaft)
+               t "cycle skipped fall-shaft")
+    (dotimes (_ 4) (cistern--cmd-cycle-toilet-type st))
+    (cl-assert (eq (cistern-st-toilet-type st) 'long-drop)
+               t "cycle does not wrap")))
+  ;; the badge names the selected type when a toilet is armed
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-toilet-type st) 'fall-shaft)
+    (setf (cistern-st-armed-verb st) 'toilet)
+    (cl-assert (string-match-p "ARMED: FALL-SHAFT"
+                               (cistern-view--header-badges st))
+               t "badge does not name the fixture type"))
+  (message "CISTERN-V4-11-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here

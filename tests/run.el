@@ -115,7 +115,8 @@
     cistern-test-v4-07-keybinds-coach
     cistern-test-v4-08-briefing
     cistern-test-v4-09-qol
-    cistern-test-v4-10-stat-blocks))
+    cistern-test-v4-10-stat-blocks
+    cistern-test-v4-11-toilet-catalog))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
