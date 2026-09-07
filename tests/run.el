@@ -51,7 +51,10 @@
     cistern-test-4b-m9-ceremony
   ;; smoke L-034 regressions (live-driver defects)
     cistern-test-smoke-run-line
-    cistern-test-smoke-help-briefing))
+    cistern-test-smoke-help-briefing
+  ;; UX Round-1 refactor (docs/ux/TOP-30.md, build order)
+    cistern-test-ux-q01-header-strip
+    cistern-test-ux-q02-score-rep))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
