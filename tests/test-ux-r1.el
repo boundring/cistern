@@ -574,5 +574,47 @@ line stays byte-identical (extension only)."
                         "CURSOR (0,0): MEGASTRUCTURE WALL")
                t "wall inspector byte-identical")))
 
+;; --- Q21: urgency colored ---------------------------------------------------------
+
+(defun cistern-test-ux-q21-urgency-color ()
+  "Colors, not words: the CONTAM segment faces by fraction
+\(yellow >= 50%%, red bold >= 75%%), and the pressure line faces
+by state (CRITICAL red bold, RISING yellow, NOMINAL dim)."
+  (let ((st (cistern--new-game 42)))
+    (setf (cistern-st-contam st) 16)         ; 80%: red bold
+    (let* ((header (cistern-view--header-line st))
+           (pos (string-match-p "CONTAM 16/20" header)))
+      (cl-assert pos t "contam segment present")
+      (cl-assert (eq (get-text-property pos 'face header)
+                     'cistern-toilet-down)
+                 t "contam >= 75%% renders red bold"))
+    (setf (cistern-st-contam st) 5)          ; 25%: not red bold
+    (let* ((header (cistern-view--header-line st))
+           (pos (string-match-p "CONTAM 5/20" header)))
+      (cl-assert (not (eq (get-text-property pos 'face header)
+                          'cistern-toilet-down))
+                 t "contam 25%% is not red bold")))
+  ;; pressure line faces by state
+  (let ((st (cistern--new-game 42)))
+    (puthash (cons 5 2) (list :load 60) (cistern-st-tanks st))
+    (cl-assert (eq (cistern-test-ux--pressure-row-face st)
+                   'cistern-toilet-down)
+               t "CRITICAL renders red bold"))
+  (let ((st (cistern--new-game 42)))
+    (puthash (cons 5 2) (list :load 54) (cistern-st-tanks st))
+    (cl-assert (eq (cistern-test-ux--pressure-row-face st)
+                   'cistern-tank-high)
+               t "RISING renders yellow"))
+  (let ((st (cistern--new-game 42)))
+    (cl-assert (eq (cistern-test-ux--pressure-row-face st) 'cistern-dim)
+               t "NOMINAL renders dim")))
+
+(defun cistern-test-ux--pressure-row-face (st)
+  (let* ((render (cistern-view--render st))
+         (pos (string-match-p "PRESSURE\\|LINES NOMINAL\\|SECTOR CONDEMNED"
+                              render)))
+    (cl-assert pos t "pressure row found")
+    (get-text-property pos 'face render)))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
