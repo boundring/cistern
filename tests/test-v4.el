@@ -748,5 +748,51 @@ migrant countdown logs exactly once at T−3."
                  t "countdown repeated at T−2")))
   (message "CISTERN-V4-09-OK"))
 
+(defun cistern-test-v4-10-stat-blocks ()
+  "V4-10 (A1/A2): workers roll 4d6-drop-lowest stat blocks from
+child stream 3 at spawn (seed ⊕ 3, mid-bits d6), fixture-pinned:
+seed 20260830 → α FLOW 15 GRIT 15 NERVE 9 ARCHIVE 14, rpg-pos
+1156891213 after spawn; modifiers are floor((score−10)/2) and all
+scores land in [3,18]."
+  ;; A1: the pinned fixture
+  (let ((st (cistern--new-game 20260830)))
+    (let ((w (car (cistern-st-creators st))))
+      (cl-assert (equal (cistern--worker-stats w) '(15 15 9 14))
+                 t "fixture stat block wrong: %S"
+                 (cistern--worker-stats w))
+      (cl-assert (eq (cistern--worker-clearance w) 1) t "spawn clearance")
+      (cl-assert (= (cistern--worker-xp w) 0) t "spawn xp"))
+    (cl-assert (= (cistern-st-rpg-pos st) 1156891213)
+               t "rpg-pos fixture wrong: %S" (cistern-st-rpg-pos st)))
+  ;; the sim LCG is untouched by stat generation (stream discipline)
+  (let ((a (cistern--new-game 42)) (b (cistern--new-game 42)))
+    (cistern--spawn-worker a 12 6)
+    (cl-assert (= (cistern-st-rng a) (cistern-st-rng b))
+               t "stat generation consumed the sim LCG"))
+  ;; A2: bounds + modifier math over 50 seeds × 4 stats
+  (dotimes (s 50)
+    (let ((st (cistern--new-game (+ 20260000 s))))
+      (dolist (w (cistern-st-creators st))
+        (dolist (score (cistern--worker-stats w))
+          (cl-assert (and (>= score 3) (<= score 18))
+                     t "score %d outside [3,18]" score)
+          (cl-assert (= (cistern--rpg-mod score) (floor (- score 10) 2))
+                     t "modifier math wrong for %d" score)))))
+  ;; the clamps per §1 table, at the extremes
+  (dolist (mod '(-4 -1 0 2 4))
+    (let ((seek (cistern--rpg-seek-eff mod))
+          (sick (cistern--rpg-sick-duration mod))
+          (mine (cistern--rpg-mine-rate mod)))
+      (cl-assert (and (>= seek 50) (<= seek 68)) t "seek clamp broken")
+      (cl-assert (and (>= sick 18) (<= sick 42)) t "sick clamp broken")
+      (cl-assert (and (>= mine 2) (<= mine 6)) t "mine clamp broken")))
+  (cl-assert (= (cistern--rpg-seek-eff -4) 68) t "seek -4 clamp")
+  (cl-assert (= (cistern--rpg-seek-eff 4) 50) t "seek +4 clamp")
+  (cl-assert (= (cistern--rpg-mine-rate -4) 6) t "mine -4 clamp")
+  (cl-assert (= (cistern--rpg-mine-rate 4) 2) t "mine +4 clamp")
+  (cl-assert (= (cistern--rpg-sick-duration -4) 42) t "sick -4 clamp")
+  (cl-assert (= (cistern--rpg-sick-duration 4) 18) t "sick +4 clamp")
+  (message "CISTERN-V4-10-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here
