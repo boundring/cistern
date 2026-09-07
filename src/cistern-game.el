@@ -378,10 +378,6 @@ it.  The stream position lives in state (§4 ParticleField.rng)."
   (setf (cistern-st-particle-rng st)
         (cistern--stream-next (cistern-st-particle-rng st))))
 
-(defconst cistern--goal-kinds
-  '(relieves-served bursts-allowed contamination-ceiling)
-  "Goal kinds per REWARDS-DESIGN §5.")
-
 (defun cistern--reputation-tier (rep)
   "Reputation tier (§5): 0–39 Tier 1, 40–69 Tier 2, 70–100
 Tier 3.  No production consumer yet — the pay-forward that sets
@@ -447,20 +443,6 @@ precedent).  Tier 2 = standard."
             (floor (* 5 target) 4)
           (floor (* 3 target) 4)))              ; harder: tighter caps
     (_ target)))
-
-(defun cistern--cmd-set-goal-card (st card)
-  "Set ST's active goal card (M3).  Validates the §5 shape — max 3
-goals, known kinds — and stamps :map-id from the game seed (the
-seed doubles as map_id, L-025 ruling).  An invalid card is an
-error: fail-first, no silent rejection."
-  (let ((goals (plist-get card :goals)))
-    (if (> (length goals) 3)
-        (error "GOAL CARD REJECTED — MAX 3 GOALS"))
-    (dolist (g goals)
-      (unless (memq (plist-get g :kind) cistern--goal-kinds)
-        (error "GOAL CARD REJECTED — UNKNOWN KIND %S" (plist-get g :kind))))
-    (setf (cistern-st-goal-card st)
-          (plist-put (copy-sequence card) :map-id (cistern-st-seed st)))))
 
 (defun cistern--cmd-cursor (st dir)
   "Move the cursor one cell in DIR (up/down/left/right), refusing

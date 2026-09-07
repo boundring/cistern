@@ -633,8 +633,49 @@ game layer (Phase 2)."
         (setf (cistern-st-creators st) (append (cistern-st-creators st)
                                                (list w)))))
     (setf (cistern-st-migrants st) 0)
+    ;; Q03 (REWARDS-DESIGN §1): the starter card is dealt from tick
+    ;; one — serve 3, ceiling 5 — so the whole goal loop is live
+    ;; without test injection.  One call, via the existing setter.
+    (cistern--cmd-set-goal-card st cistern--starter-card)
     (cistern--log st "SECTOR-7 ONLINE — KEEP THE WATER MOVING")
     st))
+
+;; Q03 layer note (ledger L-036): the directive pins the call to
+;; cistern-game.el, but `cistern--new-game' lives here in the
+;; innermost layer — a game-layer call would either run after
+;; construction (not one call) or invert the domain→game require
+;; edge.  The pure card setter + kind table therefore relocated here
+;; unchanged; every caller keeps the same symbol.
+
+(defconst cistern--goal-kinds
+  '(relieves-served bursts-allowed contamination-ceiling)
+  "Goal kinds per REWARDS-DESIGN §5.")
+
+(defconst cistern--starter-card
+  '(:tier 2 :goals ((:kind relieves-served :target 3)
+                    (:kind contamination-ceiling :target 5)))
+  "The starter goal card (Q03): serve 3, ceiling 5, tier 2
+\(standard) — dealt to every new game from tick one.")
+
+(defun cistern--cmd-set-goal-card (st card)
+  "Set ST's active goal card (M3).  Validates the §5 shape — max 3
+goals, known kinds — and stamps :map-id from the game seed (the
+seed doubles as map_id, L-025 ruling).  An invalid card is an
+error: fail-first, no silent rejection."
+  (let ((goals (plist-get card :goals)))
+    (if (> (length goals) 3)
+        (error "GOAL CARD REJECTED — MAX 3 GOALS"))
+    (dolist (g goals)
+      (unless (memq (plist-get g :kind) cistern--goal-kinds)
+        (error "GOAL CARD REJECTED — UNKNOWN KIND %S" (plist-get g :kind))))
+    ;; deep-copy the goals: the evaluator writes :satisfied back into
+    ;; each goal plist, and a shallow copy would share them with the
+    ;; caller's (often literal) card — state from two games would
+    ;; alias one card object (broke 4a replay identity).
+    (setf (cistern-st-goal-card st)
+          (plist-put (plist-put (copy-sequence card)
+                                :goals (mapcar #'copy-sequence goals))
+                     :map-id (cistern-st-seed st)))))
 
 (provide 'cistern-domain)
 ;;; cistern-domain.el ends here
