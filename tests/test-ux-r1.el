@@ -116,5 +116,41 @@ driven run reaches MAP COMPLETED with no test injection."
                            (cdr (cistern-st-rewards-outcome st)))
                t "driven run reaches MAP COMPLETED without injection")))
 
+;; --- Q04: goal progress rendered ---------------------------------------------
+
+(defun cistern-test-ux-q04-goal-progress ()
+  "The strip's GOALS n/m reads the active card's objectives; the
+first objective met shows in the same tick's render."
+  (let ((st (cistern--new-game 42)))
+    (cistern--cmd-set-goal-card
+     st '(:tier 2 :goals ((:kind relieves-served :target 1))))
+    (cl-assert (string-match-p "GOALS 0/1" (cistern-test-ux--header st))
+               t "strip reads the card's unmet objective")
+    (cistern-test-ux--drive-relief st)
+    (cl-assert (string-match-p "GOALS 1/1" (cistern-test-ux--header st))
+               t "first objective met shows in the same tick's strip")))
+
+;; --- Q05: milestone unlocks announce ------------------------------------------
+
+(defun cistern-test-ux-q05-milestone-announce ()
+  "Crossing 5 relieves announces: the milestone line rides both
+the log tail (faced) and the banner row of the same frame — the
+ANTAG-12 silence is gone."
+  (let ((st (cistern--new-game 42)))
+    (cistern--rewards-eval st (make-list 5 'relief))
+    (let* ((tail (cistern-view--log-tail st))
+           (banner (cdr (cistern-view--celebration-overlay st)))
+           (rows (split-string tail "\n"))
+           (hit (cl-find-if (lambda (r) (string-match-p "MILESTONE" r)) rows)))
+      (cl-assert (string-match-p "MILESTONE — BIG CISTERN ONLINE"
+                                 (cistern-test-ux--plain tail))
+                 t "milestone line in the log tail")
+      (cl-assert hit t "milestone row present in the tail")
+      (cl-assert (eq (get-text-property 0 'face hit) 'cistern-toilet)
+                 t "milestone rides the success face")
+      (cl-assert (string-match-p "MILESTONE — BIG CISTERN ONLINE"
+                                 (cistern-test-ux--plain banner))
+                 t "milestone on the banner row"))))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here
