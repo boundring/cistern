@@ -96,5 +96,25 @@ than before; REP matches state.  No game-layer change."
                   (regexp-quote (format "REP %d" (cistern-st-reputation st))) header)
                  t "strip REP reads state"))))
 
+;; --- Q03: goal card dealt from tick one -------------------------------------
+
+(defun cistern-test-ux-q03-starter-card ()
+  "Every new game holds a non-nil starter goal card (serve 3,
+ceiling 5) issued through `cistern--cmd-set-goal-card', and a
+driven run reaches MAP COMPLETED with no test injection."
+  (let ((st (cistern--new-game 42)))
+    (let ((card (cistern-st-goal-card st)))
+      (cl-assert card t "starter goal card dealt at tick one")
+      (cl-assert (= (plist-get card :map-id) 42)
+                 t "starter card stamped with the map seed")
+      (cl-assert (= (length (plist-get card :goals)) 2)
+                 t "starter card: serve 3 + ceiling 5"))
+    (dotimes (_ 3) (cistern-test-ux--drive-relief st))
+    (cl-assert (cl-find-if (lambda (i)
+                             (and (eq (plist-get i :layer) 'banner)
+                                  (equal (plist-get i :text) "MAP COMPLETED")))
+                           (cdr (cistern-st-rewards-outcome st)))
+               t "driven run reaches MAP COMPLETED without injection")))
+
 (provide 'test-ux-r1)
 ;;; test-ux-r1.el ends here

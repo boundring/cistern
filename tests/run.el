@@ -54,7 +54,8 @@
     cistern-test-smoke-help-briefing
   ;; UX Round-1 refactor (docs/ux/TOP-30.md, build order)
     cistern-test-ux-q01-header-strip
-    cistern-test-ux-q02-score-rep))
+    cistern-test-ux-q02-score-rep
+    cistern-test-ux-q03-starter-card))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
