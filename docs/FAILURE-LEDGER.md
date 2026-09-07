@@ -2582,3 +2582,38 @@ the relaunch is on their screen now.
   before V4-06), ledger entry per directive.
 
 ---
+
+## L-078 (2026-09-07, run: impl-v4-w1 — V4-02 log browser cistern-log-mode, S1.2/S1.3)
+
+- Outcome: LANDED (red ab50381-lineage draft by the dead prior run;
+  registered + captured red + green in this run).
+- Red: cistern-test-v4-02-log-browser failed "the oldest entry
+  renders with its tick prefix" (no T%-4d prefix existed).
+- Green: copy keys log-header/log-jump-none/log-hint (C2);
+  cistern-view--log-line (tick prefix + palette severity face +
+  cistern-source-cell span); cistern--cmd-cursor-goto use case +
+  cistern-input-cursor-goto adapter; cistern-log-mode (derived
+  special-mode) with keymap per S1.3; cistern-log grows the
+  cistern-log--built-for staleness gate (rebuild only when the log
+  grew — point survives the RET → L round trip); RET jumps land the
+  cursor via the adapter and pop back; coordinate-free lines post
+  the log-jump-none hint.  `g` = cistern-log-rebuild (replaces
+  inherited revert-buffer); n/p walk entries.
+- Draft-test corrections (prior run died before running these):
+  (1) "RET pops back" asserted current-buffer AFTER a
+  with-current-buffer scope — unpassable; now asserts the selected
+  window's buffer.  (2) pop-to-buffer (get-buffer "*cistern*") is
+  nil in test flow → pop by name.  (3) keymap probe expected
+  SPC/DEL/M-</M-> raw-nil, but lookup-key traverses the inherited
+  special-mode-map; spec says those stay NATIVE — probe asserts the
+  inherited bindings (scroll-up/down-command) and unshadowed M-</M->.
+- Carried guards honored: view keeps zero cell-kind pcase (R7 probe;
+  log-line uses nth reads — first green draft's pcase-let tripped
+  it); source-integrity gate rejects defvar-local as a top-level
+  head (defvar + setq-local after mode init, because
+  kill-all-local-variables wipes a buffer-local set before mode
+  init — the A1.4 point-survival defect).
+- VERIFY: canonical suite ALL 83 TESTS PASSED (batch).
+
+---
+

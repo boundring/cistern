@@ -128,7 +128,8 @@ NOT rebound), and no line exceeds 95 cols at tick 99999."
       (cistern-log-jump-to-source))
     (cl-assert (equal (cistern-st-cursor st) '(5 . 6))
                t "RET lands the game cursor on the line's (x,y)")
-    (cl-assert (eq (current-buffer) (get-buffer "*cistern*"))
+    (cl-assert (eq (window-buffer (selected-window))
+                   (get-buffer "*cistern*"))
                t "RET pops back to the game buffer")
     (with-current-buffer "*cistern log*"
       (goto-char (point-min))
@@ -166,9 +167,26 @@ NOT rebound), and no line exceeds 95 cols at tick 99999."
     (cl-assert (eq (lookup-key m "G") 'end-of-buffer) t "G ends")
     (cl-assert (eq (lookup-key m (kbd "RET"))
                    'cistern-log-jump-to-source) t "RET jumps")
-    (dolist (key '("C-n" "C-p" "C-f" "C-b" "C-s" "C-r" "M-<" "M->" "SPC" "DEL"))
+    ;; C-n/C-p/C-f/C-b/C-s/C-r: documented native motion — unbound in
+    ;; the browser chain (global map supplies them).  SPC/DEL/M-</M->
+    ;; are ALSO native, but arrive via the special-mode parent
+    ;; (scroll / first / last) — assert the inherited binding, not
+    ;; absence (SURFACE S1.3 table).
+    (dolist (key '("C-n" "C-p" "C-f" "C-b" "C-s" "C-r"))
       (cl-assert (null (lookup-key m (kbd key)))
                  t "native %s is documented, not rebound" key))
+    (cl-assert (eq (lookup-key m (kbd "SPC")) 'scroll-up-command)
+               t "SPC scrolls (native)")
+    (cl-assert (eq (lookup-key m (kbd "DEL")) 'scroll-down-command)
+               t "DEL scrolls back (native)")
+    ;; M-</M-> reach first/last via the global map (special-mode
+    ;; itself binds plain </>); the browser must not shadow them.
+    (let ((b (lookup-key m (kbd "M-<"))))
+      (cl-assert (memq b '(nil beginning-of-buffer))
+                 t "M-< first entry (native, unshadowed)"))
+    (let ((b (lookup-key m (kbd "M->"))))
+      (cl-assert (memq b '(nil end-of-buffer))
+                 t "M-> last entry (native, unshadowed)"))
     (cl-assert (eq (lookup-key m "q") 'quit-window) t "q closes")))
 
 (defun cistern-test-v4-02-log-width ()

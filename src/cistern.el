@@ -293,20 +293,73 @@ slow mode — 1 tick/second."
   (cistern-input-auto-run-toggle cistern--st slow))
 
 (defun cistern-log ()
-  "Q16: the full uncapped log, oldest first, in a read-only
-buffer — R2-Q13: a special-mode buffer, q closes it like every
-other surface.  The main screen keeps its 3-line tail."
+  "Q16 + V4-02 (SURFACE S1.2): the full uncapped log, oldest
+first, in the `cistern-log-mode' browser.  Re-opening does not
+touch the buffer unless the log has grown (`cistern-log--built-for'
+rings the length), so point survives the RET → L round trip.  The
+main screen keeps its 3-line tail."
   (interactive)
   (let ((buf (get-buffer-create "*cistern log*")))
-    (with-current-buffer buf
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert "— press q to close —\n")
-        (dolist (e (reverse (cistern-st-log cistern--st)))
-          (insert (car e) "\n"))
-        (goto-char (point-min)))
-      (special-mode))
-    (pop-to-buffer buf)))
+    (pop-to-buffer buf)
+    (if (and cistern-log--built-for
+             (= cistern-log--built-for (length (cistern-st-log cistern--st))))
+        nil                                ; no new events: keep point untouched
+      (cistern-log-rebuild))))
+
+(defvar cistern-log--built-for nil
+  "Ring length the browser was last built from (V4-02 staleness gate).")
+
+(defun cistern-log-rebuild ()
+  "V4-02 (S1.2): rebuild the browser from current state — `g',
+and the initial build; also covers auto-run having ticked under
+the open browser (S5: opening the log pauses nothing)."
+  (interactive)
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (insert (cdr (assq 'log-header cistern--copy)) "\n")
+    (dolist (e (reverse (cistern-st-log cistern--st)))
+      (insert (cistern-view--log-line e) "\n"))
+    (cistern-log-mode)
+    ;; after mode init: kill-all-local-variables would wipe an earlier
+    ;; buffer-local binding
+    (setq-local cistern-log--built-for
+                (length (cistern-st-log cistern--st)))
+    (goto-char (point-min))))
+
+(defun cistern-log-jump-to-source ()
+  "V4-02 (S1.2): RET on a browser line — land the game cursor on
+the line's `AT (x,y)' cell and pop back to `*cistern*'; a
+coordinate-free line refuses with the `log-jump-none' hint and
+changes no cursor."
+  (interactive)
+  (let ((line (buffer-substring (line-beginning-position)
+                                (line-end-position))))
+    (if (string-match "AT (\\([0-9]+\\),\\([0-9]+\\))" line)
+        (progn
+          (cistern-input-cursor-goto cistern--st
+                                     (string-to-number (match-string 1 line))
+                                     (string-to-number (match-string 2 line)))
+          (pop-to-buffer "*cistern*")
+          (cistern--refresh))
+      (setf (cistern-st-hint cistern--st)
+            (cdr (assq 'log-jump-none cistern--copy))))))
+
+(defvar cistern-log-mode-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m "n" #'next-line)         ; walk: events, not the game verb
+    (define-key m "p" #'previous-line)
+    (define-key m "/" #'isearch-forward)
+    (define-key m "g" #'cistern-log-rebuild)
+    (define-key m "G" #'end-of-buffer)
+    (define-key m (kbd "RET") #'cistern-log-jump-to-source)
+    (define-key m "q" #'quit-window)
+    m))
+
+(define-derived-mode cistern-log-mode special-mode "CISTERN-LOG"
+  "V4-02 (SURFACE S1.3): the log browser.  C-n/C-p/C-f/C-b,
+C-s/C-r, M-</M-> and SPC/DEL stay native (documented in the
+briefing); n/p walk entries, / isearches, g rebuilds, RET jumps
+to the line's source cell, q closes.")
 
 (defun cistern-help ()
   (interactive)

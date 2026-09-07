@@ -34,6 +34,11 @@ site (L-010 pin 4, L-013 migration)."
 adapter chain as arming, per the L-010 use-case-owned precedent."
   (cistern--cmd-disarm st))
 
+(defun cistern-input-cursor-goto (st x y)
+  "V4-02: a direct cursor placement at (X,Y) — the log browser's
+RET jump lands here, through the same adapter chain as every move."
+  (cistern--cmd-cursor-goto st x y))
+
 (defvar cistern--auto-run-timer nil
   "Auto-run timer handle.  Timer plumbing, never game state
 (Pinned D2 — the spec §3.3 one-global exception; it never enters

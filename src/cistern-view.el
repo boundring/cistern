@@ -92,6 +92,24 @@ auto-run) makes 4.  Never two independent numbers."
 Exact colors are Phase 4b; unknown faces pass through so
 hand-built test intents can use Emacs faces directly.")
 
+(defun cistern-view--log-line (e)
+  "V4-02 (SURFACE S1.2): project one (LINE SEVERITY TICK) entry to
+a browser line — dim fixed-width `T%-4d' tick prefix (ASCII, no
+fontset involvement), the Q13 severity face from the palette, and
+the `AT (x,y)' span text-propertized with `cistern-source-cell'."
+  ;; R7 probe: the view has no cell-kind pcase/case — plain nth reads.
+  (let ((line (nth 0 e)) (sev (nth 1 e)) (tick (nth 2 e)))
+    (let ((s (propertize (format "T%-4d%s" tick line)
+                         'face (or (cdr (assq sev cistern-view--palette-faces))
+                                   'cistern-dim))))
+      (when (string-match "AT (\\([0-9]+\\),\\([0-9]+\\))" line)
+        (put-text-property (+ 5 (match-beginning 0)) (+ 5 (match-end 0))
+                           'cistern-source-cell
+                           (cons (string-to-number (match-string 1 line))
+                                 (string-to-number (match-string 2 line)))
+                           s))
+      s)))
+
 (defun cistern-view--celebration-overlay (st)
   "Dumb celebration projection (§4 renderer purity): project the
 FIELD particles at their CURRENT positions — no mutation, no

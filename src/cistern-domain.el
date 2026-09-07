@@ -835,7 +835,11 @@ game layer (Phase 2)."
     (goal-met-ceiling . "GOAL MET — CONTAM UNDER %d")
     (tutorial-1 . "MOVE THE CURSOR ONTO A WORKER")
     (tutorial-2 . "PURGE A FILLING TANK (x)")
-    (tutorial-3 . "THE PURGE PAYS — ALLOY IN THE BANK"))
+    (tutorial-3 . "THE PURGE PAYS — ALLOY IN THE BANK")
+    ;; V4-02 (SURFACE S1.2/S1.3): the log browser's table copy
+    (log-header . "— press q to close —")
+    (log-jump-none . "NO CELL ON THIS LINE")
+    (log-hint . "LOG BROWSER — n/p WALK · / SEARCH · g REBUILD · RET JUMPS TO SOURCE"))
   "Q11 copy table, keyed by surface (Q05/Q08/Q10 milestones and
 pressure lines so far).")
 

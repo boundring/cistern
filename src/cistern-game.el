@@ -537,6 +537,13 @@ out-of-bounds steps (cistern.el:862-867 minus the render call)."
       ('right (when (cistern--in-bounds-p st (1+ x) y)
                 (setf (cistern-st-cursor st) (cons (1+ x) y)))))))
 
+(defun cistern--cmd-cursor-goto (st x y)
+  "V4-02 (SURFACE S1.2): place the cursor directly at (X,Y) — the
+log browser's RET jump-to-source landing.  Out-of-bounds cells are
+refused (cursor stays put), mirroring `cistern--cmd-cursor'."
+  (when (cistern--in-bounds-p st x y)
+    (setf (cistern-st-cursor st) (cons x y))))
+
 (defun cistern--cmd-click (st x y)
   "R1 use-case half: a click at (X,Y).  No build verb armed: the
 cursor moves and the clock does NOT tick (R6 names only

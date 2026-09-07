@@ -394,7 +394,10 @@ oldest first, uncapped."
     (let ((buf (get-buffer "*cistern log*")))
       (cl-assert buf t "the log buffer exists")
       (with-current-buffer buf
-        (cl-assert (eq major-mode 'special-mode) t "special-mode")
+        ;; V4-02: the browser is now `cistern-log-mode', derived from
+        ;; special-mode (SURFACE S1.2) — the intent (a special-mode
+        ;; read-only surface) is checked, not the mode symbol.
+        (cl-assert (derived-mode-p 'special-mode) t "special-mode")
         (cl-assert buffer-read-only t "read-only")
         (goto-char (point-min))
         (cl-assert (string-match-p "press q to close"
