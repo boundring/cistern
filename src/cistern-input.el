@@ -39,6 +39,14 @@ adapter chain as arming, per the L-010 use-case-owned precedent."
 RET jump lands here, through the same adapter chain as every move."
   (cistern--cmd-cursor-goto st x y))
 
+(defun cistern-input-cursor-scan (st dir)
+  "V4-07: structure scan (next/prev) through the adapter chain."
+  (cistern--cmd-cursor-scan st dir))
+
+(defun cistern-input-cursor-capacity (st)
+  "V4-07: the C-s capacity search through the adapter chain."
+  (cistern--cmd-cursor-capacity st))
+
 (defvar cistern--auto-run-timer nil
   "Auto-run timer handle.  Timer plumbing, never game state
 (Pinned D2 — the spec §3.3 one-global exception; it never enters

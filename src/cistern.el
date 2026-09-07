@@ -62,6 +62,21 @@ pure render.  Every state-mutating command ends here."
     (define-key m "n" #'cistern-new-game)
     (define-key m "?" #'cistern-help)
     (define-key m "q" #'quit-window)
+    ;; V4-07 (SURFACE S4.2): the emacs pairing layer — additive, the
+    ;; single-key roguelike map above is untouched
+    (define-key m (kbd "C-n") #'cistern-cursor-south)
+    (define-key m (kbd "C-p") #'cistern-cursor-north)
+    (define-key m (kbd "C-f") #'cistern-cursor-east)
+    (define-key m (kbd "C-b") #'cistern-cursor-west)
+    (define-key m (kbd "C-a") #'cistern-cursor-row-home)
+    (define-key m (kbd "C-e") #'cistern-cursor-row-end)
+    (define-key m (kbd "M-<") #'cistern-cursor-map-home)
+    (define-key m (kbd "M->") #'cistern-cursor-map-end)
+    (define-key m (kbd "M-f") #'cistern-cursor-scan-next)
+    (define-key m (kbd "M-b") #'cistern-cursor-scan-prev)
+    (define-key m (kbd "C-g") #'cistern-disarm)
+    (define-key m (kbd "C-s") #'cistern-cursor-capacity)
+    (define-key m "." #'cistern-repeat-arm)
     m))
 
 (define-derived-mode cistern-mode special-mode "CISTERN"
@@ -220,6 +235,7 @@ drop the others, so `cistern' reliably lands the user on the map."
 
 (defun cistern-new-game ()
   (interactive)
+  (setq cistern--teach-seen nil cistern--teach-fired nil cistern--last-armed nil)
   (when cistern--st (cistern--cmd-consume-hint cistern--st)) ; R2-Q06
   (setq cistern--st (cistern--new-game
                      (cistern--rand cistern--st 2147483647)))
@@ -243,24 +259,80 @@ drop the others, so `cistern' reliably lands the user on the map."
         (unless (equal (caar (cistern-st-log cistern--st)) line)
           (cistern--log cistern--st "%s" line)))
     (cistern--do-tick cistern--st))
+  (cistern--teach-note 'tick)
   (cistern--refresh))
 
 (defun cistern-cursor-north ()
   (interactive)
   (cistern-input-cursor-move cistern--st 'north)
+  (cistern--teach-note 'move)
   (cistern--refresh))
 (defun cistern-cursor-south ()
   (interactive)
   (cistern-input-cursor-move cistern--st 'south)
+  (cistern--teach-note 'move)
   (cistern--refresh))
 (defun cistern-cursor-west ()
   (interactive)
   (cistern-input-cursor-move cistern--st 'west)
+  (cistern--teach-note 'move)
   (cistern--refresh))
 (defun cistern-cursor-east ()
   (interactive)
   (cistern-input-cursor-move cistern--st 'east)
+  (cistern--teach-note 'move)
   (cistern--refresh))
+
+;; V4-07 (SURFACE S4.2): the emacs power layer — pure-geometry jumps
+;; and structure motion, all through the adapter chain.
+
+(defun cistern-cursor-row-home ()
+  (interactive)
+  (cistern-input-cursor-goto cistern--st 0 (cdr (cistern-st-cursor cistern--st)))
+  (cistern--teach-note 'move)
+  (cistern--refresh))
+
+(defun cistern-cursor-row-end ()
+  (interactive)
+  (cistern-input-cursor-goto cistern--st (1- (cistern-st-w cistern--st))
+                             (cdr (cistern-st-cursor cistern--st)))
+  (cistern--teach-note 'move)
+  (cistern--refresh))
+
+(defun cistern-cursor-map-home ()
+  (interactive)
+  (cistern-input-cursor-goto cistern--st 0 0)
+  (cistern--teach-note 'move)
+  (cistern--refresh))
+
+(defun cistern-cursor-map-end ()
+  (interactive)
+  (cistern-input-cursor-goto cistern--st (1- (cistern-st-w cistern--st))
+                             (1- (cistern-st-h cistern--st)))
+  (cistern--teach-note 'move)
+  (cistern--refresh))
+
+(defun cistern-cursor-scan-next ()
+  (interactive)
+  (cistern-input-cursor-scan cistern--st 'next)
+  (cistern--refresh))
+
+(defun cistern-cursor-scan-prev ()
+  (interactive)
+  (cistern-input-cursor-scan cistern--st 'prev)
+  (cistern--refresh))
+
+(defun cistern-cursor-capacity ()
+  (interactive)
+  (cistern-input-cursor-capacity cistern--st)
+  (cistern--refresh))
+
+(defun cistern-repeat-arm ()
+  "V4-07 (S4.2): `.` re-arms the last successfully armed verb."
+  (interactive)
+  (if cistern--last-armed
+      (cistern--arm-and-build cistern--last-armed)
+    (cistern--refresh)))
 
 (defun cistern-click (event)
   "Mouse-1 on a grid cell: translate buffer coordinates to (x,y)
@@ -291,13 +363,17 @@ no arm-then-fail noise."
   (when (cistern--cmd-build cistern--st kind
                             (car (cistern-st-cursor cistern--st))
                             (cdr (cistern-st-cursor cistern--st)))
-    (cistern-input-arm-verb cistern--st kind))
+    (cistern-input-arm-verb cistern--st kind)
+    (setq cistern--last-armed kind)          ; V4-07: `.` repeat fuel
+    (cistern--teach-note 'arm))
   (cistern--refresh))
 
 (defun cistern-disarm ()
   (interactive)
   (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
   (cistern-input-disarm cistern--st)
+  (setq cistern--last-armed nil)             ; ESC/u kills the repeat
+  (cistern--teach-note 'disarm)
   (cistern--refresh))
 
 (defun cistern-build-toilet ()
@@ -341,6 +417,38 @@ slow mode — 1 tick/second."
   (setq cistern-input--refresh #'cistern--refresh)
   (cistern-input-auto-run-toggle cistern--st slow))
 
+;; ---------------------------------------------------------------------------
+;; V4-07 (SURFACE S4.3): the emacs coach — driver-side ephemeral
+;; counters, NOT sim state (C5: determinism untouched).  The 3rd use
+;; of a coached action posts a one-lifetime hint through the Q17
+;; slot; the alist resets on `cistern-new-game'.
+
+(defvar cistern--teach-seen nil
+  "Alist (VERB . N) of coached-action use counts (input layer).")
+
+(defvar cistern--teach-fired nil
+  "Coached verbs that already fired their one hint per game.")
+
+(defvar cistern--last-armed nil
+  "Last successfully armed verb — the `.` repeat fuel (V4-07).")
+
+(defconst cistern--teach-pairs
+  '((move . teach-arrows) (arm . teach-cancel) (disarm . teach-emacs-cancel)
+    (tick . teach-auto-run) (log . teach-log))
+  "Coached action → copy key (SURFACE S4.3 table).")
+
+(defun cistern--teach-note (verb)
+  "Count VERB's use; on the 3rd, post its coach hint once."
+  (let ((cell (assq verb cistern--teach-seen)))
+    (if cell (setcdr cell (1+ (cdr cell)))
+      (push (cons verb 1) cistern--teach-seen)))
+  (when (and (>= (cdr (assq verb cistern--teach-seen)) 3)
+             (not (memq verb cistern--teach-fired)))
+    (push verb cistern--teach-fired)
+    (setf (cistern-st-hint cistern--st)
+          (cdr (assq (cdr (assq verb cistern--teach-pairs))
+                     cistern--copy)))))
+
 (defun cistern-log ()
   "Q16 + V4-02 (SURFACE S1.2): the full uncapped log, oldest
 first, in the `cistern-log-mode' browser.  Re-opening does not
@@ -349,6 +457,7 @@ rings the length), so point survives the RET → L round trip.  The
 main screen keeps its 3-line tail."
   (interactive)
   (let ((buf (get-buffer-create "*cistern log*")))
+    (cistern--teach-note 'log)
     (pop-to-buffer buf)
     (if (and cistern-log--built-for
              (= cistern-log--built-for (length (cistern-st-log cistern--st))))

@@ -557,6 +557,49 @@ refused (cursor stays put), mirroring `cistern--cmd-cursor'."
   (when (cistern--in-bounds-p st x y)
     (setf (cistern-st-cursor st) (cons x y))))
 
+(defun cistern--cmd-cursor-scan (st dir)
+  "V4-07 (SURFACE S4.2): jump the cursor to the next (or previous)
+structure — toilets, tanks, manifolds — in scan order (y then x),
+wrapping.  The emacs word-motion reading of the grid."
+  (let ((cells nil))
+    (dotimes (y (cistern-st-h st))
+      (dotimes (x (cistern-st-w st))
+        (when (memq (cistern--cell st x y) '(toilet tank manifold))
+          (push (cons x y) cells))))
+    (setq cells
+          (nreverse
+           (sort cells (lambda (a b)
+                         (or (< (cdr a) (cdr b))
+                             (and (= (cdr a) (cdr b)) (< (car a) (car b))))))))
+    (when cells
+      (let* ((cur (cistern-st-cursor st))
+             (pos (cl-position cur cells :test #'equal))
+             (idx (if (null pos)
+                      (if (eq dir 'next) 0 (1- (length cells)))
+                    (if (eq dir 'next)
+                        (% (1+ pos) (length cells))
+                      (% (+ pos (1- (length cells))) (length cells))))))
+        (setf (cistern-st-cursor st) (nth idx cells))))))
+
+(defun cistern--cmd-cursor-capacity (st)
+  "V4-07 (SURFACE S4.2): the game's C-s — cursor to the nearest
+free usable toilet (manhattan, Q20 geometry); else the nearest
+usable toilet; else refuse with the capacity-none hint and move
+nothing."
+  (let ((best nil) (best-d nil))
+    (maphash (lambda (k _)
+               (when (cistern--toilet-usable-p st (car k) (cdr k))
+                 (let* ((cur (cistern-st-cursor st))
+                        (d (+ (abs (- (car k) (car cur)))
+                              (abs (- (cdr k) (cdr cur))))))
+                   (when (or (not best) (< d best-d))
+                     (setq best k best-d d)))))
+             (cistern-st-toilets st))
+    (if best
+        (setf (cistern-st-cursor st) best)
+      (setf (cistern-st-hint st)
+            (cdr (assq 'capacity-none cistern--copy))))))
+
 (defun cistern--cmd-click (st x y)
   "R1 use-case half: a click at (X,Y).  No build verb armed: the
 cursor moves and the clock does NOT tick (R6 names only

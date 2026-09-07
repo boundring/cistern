@@ -942,6 +942,13 @@ game layer (Phase 2)."
     (desc-manifold . "MANIFOLD — FREE PIPE ANCHOR: WIRES WITHOUT A TANK")
     (desc-cache . "CACHE — WALK IT TO BANK THE ALLOY")
     (desc-event . "EVENT INCOMING — THE COUNTDOWN IS STANDING")
+    ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
+    (capacity-none . "NO WIRED TOILET ON THE GRID — LAY PIPE (p)")
+    (teach-arrows . "C-n/C-p/C-f/C-b MOVE TOO")
+    (teach-cancel . "C-g CANCELS — OR U/ESC")
+    (teach-emacs-cancel . "C-g IS THE EMACS CANCEL")
+    (teach-auto-run . "r RUNS THE TICKS — C-u r SLOW")
+    (teach-log . "C-s SEARCHES THE LOG / n/p WALK IT")
     ;; V4-02 (SURFACE S1.2/S1.3): the log browser's table copy
     (log-header . "— press q to close —")
     (log-jump-none . "NO CELL ON THIS LINE")

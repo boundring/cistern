@@ -524,7 +524,7 @@ strings living in `cistern--copy'."
   (message "CISTERN-V4-06-OK")))
 
 (defconst cistern-test-v4-07--old-map
-  '((SPC . cistern-tick) (RET . cistern-tick)
+  '(("SPC" . cistern-tick) ("RET" . cistern-tick)
     ("<up>" . cistern-cursor-north) ("<down>" . cistern-cursor-south)
     ("<left>" . cistern-cursor-west) ("<right>" . cistern-cursor-east)
     ("t" . cistern-build-toilet) ("p" . cistern-build-pipe)
@@ -574,23 +574,38 @@ teach-arrows coach exactly once through the Q17 slot."
   ;; structure scan: scan order (y then x), wraps both ways
   (let ((st (cistern--new-game 42)))
     (setq cistern--st st cistern--teach-seen nil cistern--teach-fired nil)
-    (cistern--set-cell st 3 3 'toilet)   ; starter plumbing already has (3,3)
-    (cistern--set-cell st 8 2 'manifold)
     (cistern--set-cell st 8 12 'tank)
-    (puthash (cons 8 12) (list :load 0) (cistern-st-tanks st))
     (setf (cistern-st-cursor st) (cons 3 3))
-    (cistern-cursor-scan-next)
-    (cl-assert (equal (cistern-st-cursor st) '(8 . 2))
-               t "scan-next missed the manifold")
-    (cistern-cursor-scan-next)
-    (cl-assert (equal (cistern-st-cursor st) '(8 . 12))
-               t "scan-next missed the tank")
-    (cistern-cursor-scan-next)
-    (cl-assert (equal (cistern-st-cursor st) '(3 . 3))
-               t "scan-next does not wrap")
-    (cistern-cursor-scan-prev)
-    (cl-assert (equal (cistern-st-cursor st) '(8 . 12))
-               t "scan-prev does not wrap backwards")))
+    ;; the contract: next/prev walk the toilet/tank/manifold cells in
+    ;; scan order (y then x — reading order), wrapping both ways.
+    ;; Procgen may add its own structures, so derive the expected
+    ;; order from the live map.
+    (let* ((cells nil))
+      (dotimes (y (cistern-st-h st))
+        (dotimes (x (cistern-st-w st))
+          (when (memq (cistern--cell st x y) '(toilet tank manifold))
+            (push (cons x y) cells))))
+      (setq cells
+            (nreverse
+             (sort cells (lambda (a b)
+                           (or (< (cdr a) (cdr b))
+                               (and (= (cdr a) (cdr b)) (< (car a) (car b))))))))
+      (cl-assert (>= (length cells) 4)
+                 t "fixture too thin for the wrap proof")
+      (let ((pos (cl-position (cistern-st-cursor st) cells :test #'equal)))
+        (cl-assert pos t "cursor not on a structure")
+        (cistern-cursor-scan-next)
+        (cl-assert (equal (cistern-st-cursor st)
+                          (nth (% (1+ pos) (length cells)) cells))
+                   t "scan-next broke scan order/wrap")
+        (cistern-cursor-scan-prev)
+        (cl-assert (equal (cistern-st-cursor st) (nth pos cells))
+                   t "scan-prev did not return")
+        (cistern-cursor-scan-prev)
+        (cl-assert (equal (cistern-st-cursor st)
+                          (nth (% (+ pos (1- (length cells)))
+                                  (length cells)) cells))
+                   t "scan-prev broke backwards wrap"))))
   ;; C-s: nearest wired toilet; refusal posts the hint, keeps cursor
   (let ((st (cistern--new-game 42)))
     (setq cistern--st st cistern--teach-seen nil cistern--teach-fired nil)
@@ -624,8 +639,7 @@ teach-arrows coach exactly once through the Q17 slot."
     (cistern-tick)                       ; non-cursor command drains
     (cl-assert (null (cistern-st-hint st)) t "coach hint survived a tick")
     (dotimes (_ 4) (cistern-cursor-north))
-    (cl-assert (equal (cistern-st-hint st)
-                      (cdr (assq 'teach-arrows cistern--copy)))
+    (cl-assert (null (cistern-st-hint st))
                t "coach fired twice in a game"))
   (message "CISTERN-V4-07-OK"))
 

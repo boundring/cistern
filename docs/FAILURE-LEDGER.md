@@ -2720,3 +2720,32 @@ the relaunch is on their screen now.
 
 ---
 
+
+## L-083 (2026-09-07, run: impl-v4-w1 — V4-07 emacs keybind aliases + coach, S4.1–S4.3)
+
+- Outcome: LANDED (red commit `git log 142dab2..HEAD~1`, green this
+  commit).
+- Red: missing S4.2 bindings (C-n/p/f/b, C-a/e, M-<, M->, M-f/b,
+  C-g, C-s, .) and no coach.
+- Green: keymap additions are purely additive (A4.1 — the pre-v4
+  binding table is pinned in the test and unchanged); row/map
+  home/end are pure-geometry driver commands routing through
+  cistern--cmd-cursor-goto (adapter chain); new use cases
+  cistern--cmd-cursor-scan (structure walk, scan order y-then-x,
+  wraps) and cistern--cmd-cursor-capacity (manhattan C-s: nearest
+  free usable toilet → nearest usable → capacity-none hint, cursor
+  unmoved); driver-side cistern--teach-seen/--teach-fired coach
+  alists (C5: input layer, reset on cistern-new-game) posting
+  3rd-use hints through the Q17 slot with R2-Q06 lifetime;
+  cistern--last-armed echo feeds `.` (repeat only re-arms a
+  successful arm; ESC/u clears it).
+- Draft fixes inside green: a mis-parenthesized test block closed
+  the defun early and executed asserts at LOAD time; the
+  fired-once assert was drafted backwards (hint must be NIL after
+  further uses); the scan fixture now derives the expected
+  structure order from the live map (procgen may seed its own
+  manifolds — a hardcoded fixture list asserted the wrong cell).
+- VERIFY: canonical suite ALL 91 TESTS PASSED (batch).
+
+---
+
