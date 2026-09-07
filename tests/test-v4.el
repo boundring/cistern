@@ -1328,5 +1328,51 @@ authored copy."
                  t "fallback variant missing")))
   (message "CISTERN-V4-17-OK"))
 
+(defun cistern-test-v4-19-matrix-consolidation ()
+  "V4-19 (§1.3/§3.5): bank matrices fold into the ONE shared
+(matrix-id . band) hash at load — both sources resolve through one
+gethash, and an id collision across sources is a load error."
+  (setq cistern--banks nil cistern--story-copy nil)
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v4--root)))
+  ;; the example's pressure-verdict resolves through the shared hash
+  (dolist (band '(0 1 2 3))
+    (cl-assert (gethash (cons 'pressure-verdict band) cistern--matrix-hash)
+               t "bank matrix band %d not folded" band))
+  (cl-assert (equal (cistern--matrix-effect 'pressure-verdict 0)
+                    '(:line-key story-verdict-fail :effect none :arg nil))
+             t "folded outcome wrong")
+  ;; the RPG matrices still resolve through the same hash
+  (cl-assert (cistern--matrix-effect 'exposure-grit 0)
+             t "RPG matrix lost from the shared hash")
+  ;; a second source re-using an id is a load error
+  (let* ((good (quote (:kind scenario :version "1"
+                       :copy ((k0 . "A") (k1 . "B") (k2 . "C") (k3 . "D"))
+                       :entries
+                       ((:id bad-s :premise k0 :acts 3 :tiers (60 30 10)
+                         :hooks ((:id h1 :act 1 :window (20 . 90)
+                                  :condition (tick) :requires nil
+                                  :matrix pressure-verdict :resolve-copy k1))
+                         :matrices
+                         ((:id pressure-verdict :difficulty 11
+                           :stat integrity :act-mods (0 2 4)
+                           :outcomes
+                           ((:line-key k1 :effect none :arg nil)
+                            (:line-key k1 :effect none :arg nil)
+                            (:line-key k1 :effect none :arg nil)
+                            (:line-key k1 :effect none :arg nil))))))))))
+    (let ((file (make-temp-file "cistern-badbank"))
+          (bad (copy-tree good)))
+      (with-temp-file file
+        (insert (format "(defconst cistern-bank-collision\n  (quote %S))" bad)))
+      (setq cistern--banks nil cistern--story-copy nil)
+      (let ((err (condition-case e
+                     (progn (cistern--banks-load (list file)) nil)
+                   (error (format "%S" (cadr e))))))
+        (cl-assert (and err (string-match-p "collision" err))
+                   t "matrix id collision not caught (err=%S)" err))))
+  (message "CISTERN-V4-19-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here

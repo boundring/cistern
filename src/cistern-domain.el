@@ -1541,6 +1541,29 @@ earlier act" id req))))
     ('scenario :scenarios) ('quirk :quirks)
     ('keyword :keywords) ('flavor :flavor)))
 
+(defvar cistern--matrix-sources (make-hash-table :test (quote eq))
+  "V4-19: hash MATRIX-ID -> source file, for cross-source id
+uniqueness (a second FILE claiming an id is a collision; the SAME
+file reloading its own id is an idempotent overwrite).")
+
+(defun cistern--bank-fold-matrices (file matrices)
+  "V4-19 (§1.3/§3.5): fold a bank's scenario matrices into the ONE
+shared (matrix-id . band) hash.  An id claimed by a DIFFERENT
+source file is a load error (cross-source id uniqueness); the same
+file reloading its own ids is an idempotent overwrite."
+  (dolist (m matrices)
+    (let* ((id (plist-get m :id))
+          (outs (plist-get m :outcomes))
+          (i 0)
+          (src (gethash id cistern--matrix-sources)))
+      (when (and src (not (string= src file)))
+        (cistern--bank-error file "matrix %s id collision with %s"
+                             id src))
+      (puthash id file cistern--matrix-sources)
+      (dolist (o outs)
+        (puthash (cons id i) o cistern--matrix-hash)
+        (setq i (1+ i))))))
+
 (defun cistern--bank-validate-entry (file kind e registry)
   "Validate one entry of KIND; returns its :id.  REGISTRY carries
 the ids seen so far (duplicate detection across banks)."
@@ -1631,6 +1654,10 @@ one (or more) defconsts of pure data named cistern-bank-*."
                       (push id seen)
                       (cistern--bank-validate-entry
                        f kind e cistern--banks))))
+                (when (eq kind 'scenario)
+                  (dolist (e entries)
+                    (cistern--bank-fold-matrices
+                     f (plist-get e :matrices))))
                 (setq loaded
                       (plist-put loaded
                                  (pcase kind

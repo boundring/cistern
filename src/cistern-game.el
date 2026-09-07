@@ -445,8 +445,9 @@ with at most ONE story banner."
                      (margin (+ roll stat (- diff)))
                      (band (cond ((<= margin -5) 0) ((<= margin -1) 1)
                                  ((<= margin 4) 2) (t 3)))
-                     (outcomes (plist-get m :outcomes))
-                     (outcome (nth band outcomes))
+                     ;; V4-19: one shared hash serves both sources
+                     (outcome (cistern--matrix-effect
+                               (plist-get m :id) band))
                      (line-key (plist-get outcome :line-key))
                      (effect (plist-get outcome :effect)))
                 (plist-put h :state 'resolved)
