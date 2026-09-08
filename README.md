@@ -6,6 +6,11 @@ bladders fill. You wire toilets to tanks by pipe, purge the tanks,
 clean what leaks. Contamination is the clock. THE STRUCTURE DOES NOT
 CARE.
 
+Each worker carries a dossier — FLOW, GRIT, NERVE, ARCHIVE — rolled at
+the gate. The sector keeps a story: a premise banner, three acts, hooks
+that hold or breach. The palette derives itself from your theme. The
+Structure does not explain itself either.
+
 ## Run it
 
 ```sh
