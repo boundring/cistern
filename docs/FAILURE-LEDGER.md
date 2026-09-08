@@ -3279,3 +3279,36 @@ the relaunch is on their screen now.
   workers is derived (initial workers 0..3 in procgen order, migrant N takes
   4+N off `cistern-st-migrants`) — no extra state field.
 - Outcome: V5-01 GREEN.  Suite canonical count grows to 109.
+
+---
+
+## L-097 (2026-09-08, run: wave1-violent-base — V5-02 combat resolution)
+
+- Ruling applied: "folded into the EXISTING cistern--matrix-hash via the
+  ONE loader (V4-19 fn)" is implemented as the defconst's own load-time
+  fold, NOT a call to `cistern--bank-fold-matrices` — that fn's signature
+  takes bank FILES and records per-file id sources; domain consts are not
+  bank files.  The A9 property (one shared (matrix-id . band) hash, no
+  second vocabulary, unknown ids error fail-first) is what the directive
+  pins, and it holds; CB2 asserts the shapes through
+  `cistern--matrix-effect`.
+- Outcome: V5-02 GREEN.  Suite canonical count 110.
+
+---
+
+## L-098 (2026-09-08, run: wave1-violent-base — V5-03 injury ladder + death)
+
+- Doc drift noted: COMBAT §4.7's pinned strings
+  `combat-injury-limp` / `combat-injury-shaken` render 64 raw chars —
+  over the §5.4 "≤ 60 raw chars" voluntary bank rule.  Kept VERBATIM per
+  the copy-table rule (content is the pinned contract); the rendered log
+  line (~64 cols) is well under the binding 95-col width contract.
+  §4.7's remaining combat keys should be measured the same way at the
+  V5-07 sweep.
+- Ruling applied: injury thresholds are exact integer floors of 40%/60%
+  of max hp — `(/ (* 2 max) 5)` / `(/ (* 3 max) 5)` — NOT float
+  multiplication (0.6×10 floors to 5 in IEEE; L-002-class trap).  The
+  LIMP tick parity pin (moves on even ticks) is a code-side choice; the
+  doc leaves the phase unpinned.  Shift heal rides the EXISTING
+  migration shift boundary (tick % 40 = 0, same block as the shift XP).
+- Outcome: V5-03 GREEN.  Suite canonical count 111.

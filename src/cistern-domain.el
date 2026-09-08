@@ -667,6 +667,93 @@ format drift, no off-by-one)."
           (mod i (length cistern--worker-glyphs)))))
 
 ;; ---------------------------------------------------------------------------
+;; V5-03 (COMBAT §3.3/§3.4): the injury ladder and worker death.
+;; Effects land on EXISTING numbers only (P4): no combat effect ever
+;; writes bladder, use ticks, purge rate, or costs.
+
+(defun cistern--worker-hp-max (w)
+  "Max hp: 8 + GRIT mod, fixed at spawn (derived from the dossier)."
+  (+ 8 (cistern--rpg-mod (nth 1 (cistern--worker-stats w)))))
+
+(defun cistern--worker-injury-state (w)
+  "The injury state from hp: `limp' at ≤ 60% of max, `shaken' at
+≤ 40%, nil when healthy (COMBAT §3.3)."
+  (when (cistern--worker-hp w)
+    (let* ((max (cistern--worker-hp-max w))
+           (hp (cistern--worker-hp w)))
+      ;; exact integer floors of 40% / 60% of max (no float rounding)
+      (cond ((<= hp (/ (* 2 max) 5)) 'shaken)
+            ((<= hp (/ (* 3 max) 5)) 'limp)
+            (t nil)))))
+
+(defun cistern--worker-nerve-eff (w)
+  "NERVE mod with the SHAKEN −2; `cistern--rpg-seek-eff' applies
+the EXISTING [50,68] clamp, so the envelope is untouched."
+  (- (cistern--rpg-stat-mod w 2)
+     (if (eq (cistern--worker-injury-state w) 'shaken) 2 0)))
+
+(defun cistern--worker-mine-rate (w)
+  "Ore-ticks per alloy with the injury couplings: hp < max → +1
+through the EXISTING clamp (mining loss, never mobility); sickness
+doubles (RPG §1, unchanged)."
+  (let ((rate (cistern--rpg-mine-rate (cistern--rpg-stat-mod w 0))))
+    (when (and (cistern--worker-hp w)
+               (< (cistern--worker-hp w) (cistern--worker-hp-max w)))
+      (setq rate (clamp 2 (1+ rate) 6)))
+    (if (> (cistern--worker-sick w) 0) (* 2 rate) rate)))
+
+(defun cistern--worker-death (st w)
+  "The death procedure (COMBAT §3.4): remove from creators, drop
+any journey, clear a mid-use toilet's :busy, remove a gripping
+leech with the body, log + emit `worker-death' (pending list;
+rewards-eval ignores the kind, the story hook machine reads it).
+The spawn-index pins identity — the death renames nobody."
+  (let ((glyph (cistern--worker-glyph st w)))
+    (when (cistern--worker-using w)
+      (let ((tp (cistern--worker-toilet w)))
+        (when tp
+          (puthash tp (list :busy nil
+                            :type (or (plist-get (gethash tp
+                                                          (cistern-st-toilets st))
+                                                 :type)
+                                      'long-drop))
+                    (cistern-st-toilets st)))))
+    (setf (cistern--worker-using w) nil)
+    (setf (cistern--worker-journey w) nil)
+    (setf (cistern-st-creators st) (delq w (cistern-st-creators st)))
+    ;; a leech whose host dies is removed with the body (no
+    ;; goblin-death event for it — ruling 3)
+    (setf (cistern-st-hostiles st)
+          (cl-remove-if (lambda (e) (eq (cistern--enemy-grip e) w))
+                        (cistern-st-hostiles st)))
+    (cistern--log-sev st 'error "%s"
+                      (format (cdr (assq 'combat-worker-death cistern--copy))
+                              glyph))
+    (push (list 'worker-death glyph) (cistern-st-rewards-events st))))
+
+(defun cistern--worker-damage (st w n)
+  "Subtract N hp from worker W (COMBAT §3.3), log the injury-state
+crossings through the copy table, and run the death procedure at
+hp ≤ 0 — in the same phase the damage landed."
+  (when (cistern--worker-hp w)
+    (let ((prev (cistern--worker-injury-state w)))
+      (setf (cistern--worker-hp w) (- (cistern--worker-hp w) n))
+      (let ((now (cistern--worker-injury-state w))
+            (glyph (cistern--worker-glyph st w)))
+        (cond ((and (eq now 'shaken) (not (eq prev 'shaken)))
+               (cistern--log st "%s"
+                             (format (cdr (assq 'combat-injury-shaken
+                                                cistern--copy))
+                                     glyph)))
+              ((and (eq now 'limp) (not (member prev '(limp shaken))))
+               (cistern--log st "%s"
+                             (format (cdr (assq 'combat-injury-limp
+                                                cistern--copy))
+                                     glyph)))))
+      (when (<= (cistern--worker-hp w) 0)
+        (cistern--worker-death st w)))))
+
+;; ---------------------------------------------------------------------------
 ;; 3. Grid primitives.  Ported verbatim from cistern.el:104-119.
 
 (defun cistern--in-bounds-p (st x y)
@@ -1028,12 +1115,16 @@ entering a toilet IS seating yourself.  Toilets are rooms, not floors."
 ;; 5. Worker lifecycle (cistern.el:236-258).
 
 (defun cistern--spawn-worker (st x y)
-  (let ((w (cistern--worker-make :x x :y y :bladder 20
+  (let* ((stats (cistern--rpg-roll-stats st))
+         (w (cistern--worker-make :x x :y y :bladder 20
                                  ;; V5-01: the stable spawn-index is
                                  ;; monotonic — initial procgen workers
                                  ;; take 0..3, migrant N takes 4+N
                                  :spawn-idx (+ 4 (cistern-st-migrants st))
-                                 :stats (cistern--rpg-roll-stats st))))
+                                 ;; V5-03 (COMBAT §3.3): max hp rolled
+                                 ;; at spawn alongside the dossier
+                                 :hp (+ 8 (cistern--rpg-mod (nth 1 stats)))
+                                 :stats stats)))
     (setf (cistern-st-creators st)
           (append (cistern-st-creators st) (list w)))
     (setf (cistern-st-migrants st) (1+ (cistern-st-migrants st)))
@@ -1049,10 +1140,9 @@ entering a toilet IS seating yourself.  Toilets are rooms, not floors."
         (progn
           (setf (cistern--worker-mine w) (1+ (cistern--worker-mine w)))
           (when (>= (cistern--worker-mine w)
-                    (let ((rate (cistern--rpg-mine-rate
-                                 (cistern--rpg-stat-mod w 0))))
-                      ;; sickness halves throughput (RPG §1), never mobility
-                      (if (> (cistern--worker-sick w) 0) (* 2 rate) rate)))
+                    ;; V5-03: the mine rate reads the worker helper —
+                    ;; mining loss (+1, clamped) and sickness (×2)
+                    (cistern--worker-mine-rate w))
             (setf (cistern--worker-mine w) 0)
             (setf (cistern-st-alloy st) (1+ (cistern-st-alloy st)))
             (setf (cistern-st-earned st) (1+ (cistern-st-earned st)))))
@@ -1097,14 +1187,24 @@ occupancy grid so two workers can never share a tile."
           ;; moves 2 steps this tick, never fewer than the base 1
           (let* ((fresh (not (equal (cistern--worker-journey w)
                                     (cons tx ty))))
-                 (steps (if (and fresh
-                                 (>= (cistern--rpg-band
-                                      st
-                                      (cdr (assq 'stride-dc
-                                                 cistern--rpg-const))
-                                      (cistern--rpg-stat-mod w 3))
-                                     2))
-                            2 1)))
+                 ;; V5-03 (COMBAT §3.3/P5): LIMP = 1 step per 2 ticks,
+                 ;; stride off — SUSPENDED on relief journeys (the gait
+                 ;; normalizes until the worker is seated).  Mining and
+                 ;; rally journeys limp normally.
+                 (limp (eq (cistern--worker-injury-state w) 'limp))
+                 (relief (eq (cistern--cell st tx ty) 'toilet))
+                 (stride (and fresh
+                              (not (and limp (not relief)))
+                              (>= (cistern--rpg-band
+                                   st
+                                   (cdr (assq 'stride-dc
+                                              cistern--rpg-const))
+                                   (cistern--rpg-stat-mod w 3))
+                                  2)))
+                 (steps (cond ((and limp (not relief))
+                               (if (= 0 (% (cistern-st-tick st) 2)) 1 0))
+                              (stride 2)
+                              (t 1))))
             (when fresh
               (setf (cistern--worker-journey w) (cons tx ty)))
             (dotimes (_ steps)
@@ -1128,8 +1228,9 @@ occupancy grid so two workers can never share a tile."
                                      'toilet)
                                  (= (car nxt) tx) (= (cdr nxt) ty)
                                  (>= (cistern--worker-bladder w)
+                                     ;; V5-03: SHAKEN reads NERVE −2
                                      (cistern--rpg-seek-eff
-                                      (cistern--rpg-stat-mod w 2))))
+                                      (cistern--worker-nerve-eff w))))
                         ;; stepping onto the target toilet = seating
                         (let ((type (or (plist-get
                                          (gethash nxt
@@ -1337,7 +1438,8 @@ limit — it steals ticks, not health."
           (cistern--accident st w))
          ;; V4-12 (RPG §1): NERVE files the relief request early or late
          ((>= (cistern--worker-bladder w)
-              (cistern--rpg-seek-eff (cistern--rpg-stat-mod w 2)))
+              ;; V5-03: SHAKEN reads NERVE −2
+              (cistern--rpg-seek-eff (cistern--worker-nerve-eff w)))
           (cistern--seek-toilet st w))
          (t (cistern--seek-work st w))))))
 
@@ -1377,7 +1479,12 @@ permanent scarring: stop bleeding and the marks fade."
   (when (and (> (cistern-st-tick st) 0)
              (= 0 (% (cistern-st-tick st) cistern-migrant-every)))
     (dolist (w (cistern-st-creators st))
-      (cistern--rpg-grant-xp st w 1)))
+      (cistern--rpg-grant-xp st w 1)
+      ;; V5-03 (COMBAT §3.3): +1 hp per shift boundary — no cost, no
+      ;; roll, deterministic recovery
+      (when (and (cistern--worker-hp w)
+                 (< (cistern--worker-hp w) (cistern--worker-hp-max w)))
+        (setf (cistern--worker-hp w) (1+ (cistern--worker-hp w))))))
   ;; V4-09 (S5.5): the arrival announces itself three ticks out —
   ;; exactly once per cycle, and only when an arrival will actually
   ;; happen (pop cap not reached)
@@ -1478,9 +1585,12 @@ game layer (Phase 2)."
           (cistern--stream-init (cistern-st-seed st) 4))
     (let ((i 0))
       (dolist (p cistern--procgen-spawns)
-      (let ((w (cistern--worker-make :x (nth 0 p) :y (nth 1 p)
-                                     :spawn-idx i
-                                     :stats (cistern--rpg-roll-stats st))))
+      (let* ((stats (cistern--rpg-roll-stats st))
+             (w (cistern--worker-make :x (nth 0 p) :y (nth 1 p)
+                                      :spawn-idx i
+                                      ;; V5-03 (COMBAT §3.3): max hp at spawn
+                                      :hp (+ 8 (cistern--rpg-mod (nth 1 stats)))
+                                      :stats stats)))
         (setf (cistern-st-creators st) (append (cistern-st-creators st)
                                                (list w)))
         (setq i (1+ i)))))
@@ -1638,6 +1748,11 @@ legal no-op state for tests)."
     (cache-pickup . "CACHE BANKED BY %s - +%d ALLOY")
     (inspector-stat-fmt . "F%+d G%+d N%+d A%+d")
     (inspector-clear-fmt . "CL.%s")
+    ;; V5-03 (COMBAT §4.7): injury ladder + death (the full combat
+    ;; subsection lands with V5-07's copy sweep)
+    (combat-injury-limp . "WORKER %s INJURED — LIMP LOGGED — GAIT NORMALIZED ON RELIEF RUNS")
+    (combat-injury-shaken . "WORKER %s SHAKEN — NERVE DEGRADED — WATCH THE THRESHOLD")
+    (combat-worker-death . "WORKER %s LOST — SERVICE RECORD SEALED")
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
     (capacity-none . "NO WIRED TOILET ON THE GRID — LAY PIPE (p)")
     (teach-arrows . "C-n/C-p/C-f/C-b MOVE TOO")

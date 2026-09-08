@@ -194,86 +194,119 @@ the production band fn through it (returns the band)."
 ;;; --- V5-03: injury ladder + worker death (CB3, CB4) ----------------------------
 
 (defun cistern-test-v5-03-injury ()
-  "V5-03 (CB3): a worker at hp ≤ 60% limps (1 step per 2 ticks,
-stride off, SUSPENDED on relief journeys); at hp ≤ 40% is shaken
-(NERVE −2 inside the existing [50,68] clamp); any damage < max
-worsens mine rate via the existing clamp; +1 hp at each shift
-boundary.  (CB4): hp 0 removes the worker from creators, frees
-their toilet, drops a gripping leech, emits `worker-death' — and
-survivors keep their glyphs (spawn-index, not list position)."
-  (let ((st (cistern--new-game 43)))
-    (let ((w (nth 0 (cistern-st-creators st))))
-      ;; hp max = 8 + GRIT mod, rolled at spawn alongside the dossier
-      (cl-assert (= (cistern--worker-hp w)
-                    (+ 8 (cistern--rpg-mod (nth 1 (cistern--worker-stats w)))))
-                 t "spawn hp max = 8 + GRIT mod")
-      (cl-assert (null (cistern--worker-injury-state w))
-                 t "a fresh worker has no injury state")
-      ;; LIMP at ≤ 60% of max
-      (setf (cistern--worker-hp w) (floor (* 0.6 (cistern--worker-hp w))))
-      (cl-assert (eq (cistern--worker-injury-state w) 'limp)
-                 t "hp at 60% limps")
-      ;; SHAKEN at ≤ 40%: NERVE −2 → seek_eff inside the existing clamp
-      (setf (cistern--worker-hp w) (floor (* 0.4 (cistern--worker-hp w))))
-      (cl-assert (eq (cistern--worker-injury-state w) 'shaken)
-                 t "hp at 40% is shaken")
-      (let ((base (cistern--rpg-stat-mod w 2)))
-        (cl-assert (= (cistern--worker-nerve-eff w) (- base 2))
-                   t "shaken lowers NERVE by 2")
-        ;; the existing clamp holds: worst case still inside [50,68]
-        (cl-assert (<= 50 (cistern--rpg-seek-eff (cistern--worker-nerve-eff w)) 68)
-                   t "seek_eff stays inside the existing clamp")))
-    ;; mining loss: hp < max → mine rate +1 via the existing clamp
-    (let ((w (nth 1 (cistern-st-creators st))))
-      (let ((healthy (cistern--worker-mine-rate w)))
-        (setf (cistern--worker-hp w) (1- (cistern--worker-hp w)))
-        (cl-assert (= (cistern--worker-mine-rate w) (clamp 2 (1+ healthy) 6))
-                   t "damage worsens mine rate through the clamp"))))
-  ;; LIMP gait: 1 step per 2 ticks, stride off; relief journeys exempt
-  (let ((st (cistern--new-game 47)))
-    (let ((w (nth 0 (cistern-st-creators st))))
-      (setf (cistern--worker-hp w) 1)   ; limp, any stats
-      (setf (cistern--worker-journey w) nil)
-      (let ((x0 (cistern--worker-x w)) (y0 (cistern--worker-y w)))
-        ;; two consecutive limping steps: exactly one cell total
-        (cistern--step-toward st w 0 0)
-        (cistern--step-toward st w 0 0)
-        (cl-assert (= (+ (abs (- (cistern--worker-x w) x0))
-                         (abs (- (cistern--worker-y w) y0)))
-                      1)
-                   t "limping: one step per two ticks, stride off")))))
-  ;; shift-boundary heal: +1 hp, deterministic, no roll
-  (let ((st (cistern--new-game 53)))
-    (let ((w (nth 0 (cistern-st-creators st))))
-      (setf (cistern--worker-hp w) (1- (cistern--worker-hp w)))
-      (setf (cistern-st-tick st) 39)
-      (cistern--phase-migration st)
-      (cl-assert (= (cistern--worker-hp w)
-                    (+ 8 (cistern--rpg-mod (nth 1 (cistern--worker-stats w)))))
-                 t "+1 hp at the shift boundary restores the max"))))
-  ;; CB4: death procedure + identity pin
-  (let ((st (cistern--new-game 59)))
-    (let ((a (nth 0 (cistern-st-creators st)))
-          (b (nth 1 (cistern-st-creators st))))
-      ;; α mid-use: the toilet's :busy must clear
-      (setf (cistern--worker-using a) t)
-      (setf (cistern--worker-toilet a) '(11 9))
-      (puthash '(11 9) (list :busy t :type 'long-drop) (cistern-st-toilets st))
-      ;; a leech grips α: it dies with the body
-      (let ((leech (cistern--spawn-enemy st 'fauna 'leech 12 9)))
-        (setf (cistern--enemy-grip leech) a)
-        (setf (cistern--worker-hp a) 1)
-        (cistern--worker-damage st a 5)
-        (cl-assert (not (memq a (cistern-st-creators st)))
-                   t "the dead worker is removed from creators")
-        (cl-assert (null (plist-get (gethash '(11 9) (cistern-st-toilets st))
-                                    :busy))
-                   t "a mid-use toilet's :busy clears")
-        (cl-assert (not (memq leech (cistern-st-hostiles st)))
-                   t "the gripping leech is removed with the body")
-        (cl-assert (memq 'worker-death (mapcar #'cistern--event-kind
-                                               (cistern-st-rewards-events st)))
-                   t "a worker-death event joins the pending list")
-        (cl-assert (equal (cistern--worker-glyph st b) "β")
-                   t "β still renders β — identity is the spawn-index")))))
+  "V5-03 (CB3/CB4): the injury ladder, shift heal, and the death
+procedure with the spawn-index identity pin.  See the section
+helpers below for each coupling."
+  (cistern-test-v5-03--states)
+  (cistern-test-v5-03--gait)
+  (cistern-test-v5-03--heal)
+  (cistern-test-v5-03--death)
   (message "CISTERN-V5-03-OK"))
+
+(defun cistern-test-v5-03--states ()
+  "hp max = 8 + GRIT mod at spawn; LIMP at <= 60%; SHAKEN at
+<= 40% with NERVE -2 inside the existing [50,68] clamp; damage
+worsens mine rate via the existing clamp."
+  (let* ((st (cistern--new-game 43))
+         (w (nth 0 (cistern-st-creators st)))
+         (max (+ 8 (cistern--rpg-mod (nth 1 (cistern--worker-stats w))))))
+    (cl-assert (= (cistern--worker-hp w) max)
+               t "spawn hp max = 8 + GRIT mod")
+    (cl-assert (null (cistern--worker-injury-state w))
+               t "a fresh worker has no injury state")
+    (setf (cistern--worker-hp w) (/ (* 3 max) 5))
+    (cl-assert (eq (cistern--worker-injury-state w) 'limp)
+               t "hp at the 60% threshold limps")
+    (setf (cistern--worker-hp w) 1)
+    (cl-assert (eq (cistern--worker-injury-state w) 'shaken)
+               t "hp at 40% is shaken")
+    (let ((base (cistern--rpg-stat-mod w 2)))
+      (cl-assert (= (cistern--worker-nerve-eff w) (- base 2))
+                 t "shaken lowers NERVE by 2")
+      (cl-assert (<= 50 (cistern--rpg-seek-eff (cistern--worker-nerve-eff w)) 68)
+                 t "seek_eff stays inside the existing clamp")))
+  (let* ((st (cistern--new-game 43))
+         (w (nth 1 (cistern-st-creators st)))
+         (healthy (cistern--worker-mine-rate w)))
+    (setf (cistern--worker-hp w) (1- (cistern--worker-hp w)))
+    (cl-assert (= (cistern--worker-mine-rate w) (clamp 2 (1+ healthy) 6))
+               t "damage worsens mine rate through the clamp")))
+
+(defun cistern-test-v5-03--find-cell (st kind)
+  "First (coordinate-order) cell of KIND on the map, as (X . Y)."
+  (let ((found nil) (i 0))
+    (while (and (not found) (< i (length (cistern-st-map st))))
+      (when (eq (aref (cistern-st-map st) i) kind)
+        (setq found (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st)))))
+      (setq i (1+ i)))
+    found))
+
+(defun cistern-test-v5-03--gait ()
+  "LIMP: 1 step per 2 ticks (even ticks move), stride off.  Relief
+journeys exempt (P5): toward a toilet the gait normalizes."
+  (let* ((st (cistern--new-game 47))
+         (w (nth 0 (cistern-st-creators st)))
+         (floor-cell (cistern-test-v5-03--find-cell st 'floor))
+         (toilet-cell (cistern-test-v5-03--find-cell st 'toilet)))
+    (cl-assert floor-cell t "fixture: the map has a floor cell")
+    (cl-assert toilet-cell t "fixture: the map has a toilet cell")
+    ;; exactly at the 60% threshold: LIMP (not shaken) for any stats
+    (setf (cistern--worker-hp w) (/ (* 3 (cistern--worker-hp-max w)) 5))
+    (setf (cistern--worker-journey w) nil)
+    (let ((x0 (cistern--worker-x w)) (y0 (cistern--worker-y w)))
+      (cistern--step-toward st w (car floor-cell) (cdr floor-cell))
+      (cl-assert (= 1 (+ (abs (- (cistern--worker-x w) x0))
+                         (abs (- (cistern--worker-y w) y0))))
+                 t "limping: exactly one step on the even tick")
+      (setf (cistern-st-tick st) 1)
+      (cistern--step-toward st w (car floor-cell) (cdr floor-cell))
+      (cl-assert (= 1 (+ (abs (- (cistern--worker-x w) x0))
+                         (abs (- (cistern--worker-y w) y0))))
+                 t "limping: the odd tick does not move"))
+    ;; relief suspension: toward a toilet the limping worker moves
+    (let ((x0 (cistern--worker-x w)) (y0 (cistern--worker-y w)))
+      (setf (cistern-st-tick st) 1)
+      (setf (cistern--worker-journey w) nil)
+      (cl-assert (eq t (cistern--step-toward st w (car toilet-cell)
+                                        (cdr toilet-cell)))
+                 t "relief journeys are exempt from the limp gait"))))
+
+(defun cistern-test-v5-03--heal ()
+  "Shift boundary (tick % 40 = 0): +1 hp, no cost, no roll."
+  (let* ((st (cistern--new-game 53))
+         (w (nth 0 (cistern-st-creators st)))
+         (max (+ 8 (cistern--rpg-mod (nth 1 (cistern--worker-stats w))))))
+    (setf (cistern--worker-hp w) (1- max))
+    (setf (cistern-st-tick st) 40)
+    (cistern--phase-migration st)
+    (cl-assert (= (cistern--worker-hp w) max)
+               t "+1 hp at the shift boundary")))
+
+(defun cistern-test-v5-03--death ()
+  "CB4: hp 0 removes the worker from creators, frees their
+mid-use toilet, removes a gripping leech, emits `worker-death' —
+and survivors keep their glyphs (the spawn-index, not list
+position)."
+  (let* ((st (cistern--new-game 59))
+         (a (nth 0 (cistern-st-creators st)))
+         (b (nth 1 (cistern-st-creators st))))
+    ;; α mid-use: the toilet's :busy must clear
+    (setf (cistern--worker-using a) t)
+    (setf (cistern--worker-toilet a) '(11 9))
+    (puthash '(11 9) (list :busy t :type 'long-drop) (cistern-st-toilets st))
+    (let ((leech (cistern--spawn-enemy st 'fauna 'leech 12 9)))
+      (setf (cistern--enemy-grip leech) a)
+      (setf (cistern--worker-hp a) 1)
+      (cistern--worker-damage st a 5)
+      (cl-assert (not (memq a (cistern-st-creators st)))
+                 t "the dead worker is removed from creators")
+      (cl-assert (null (plist-get (gethash '(11 9) (cistern-st-toilets st))
+                                  :busy))
+                 t "a mid-use toilet's :busy clears")
+      (cl-assert (not (memq leech (cistern-st-hostiles st)))
+                 t "the gripping leech is removed with the body")
+      (cl-assert (memq 'worker-death (mapcar #'cistern--event-kind
+                                             (cistern-st-rewards-events st)))
+                 t "a worker-death event joins the pending list")
+      (cl-assert (equal (cistern--worker-glyph st b) "β")
+                 t "β still renders β — identity is the spawn-index"))))
