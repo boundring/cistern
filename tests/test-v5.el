@@ -374,6 +374,15 @@ routed close carries `warband-routed' instead of the CLOSED line."
     (cistern--maybe-raid st)
     (cl-assert (null (cistern-st-raid st)) t "P1: contam >= 18 suppresses")
     (cl-assert (null (cistern-st-hostiles st)) t "P1: no raiders spawn"))
+  ;; P1: the pinned boundary itself — contam = limit-2 is already
+  ;; inside the valve (COMBAT §5.3: no OPEN while contam >= limit-2)
+  (let ((st (cistern--new-game 20260830)))
+    (setf (cistern-st-tick st) 120)
+    (setf (cistern-st-contam st) (- cistern-contam-limit 2))
+    (cistern-test-v5-04--find-nat st 8)  ; even a nat-20 stays a no-op
+    (cistern--maybe-raid st)
+    (cl-assert (null (cistern-st-raid st))
+               t "P1: contam = limit-2 suppresses (doc boundary)"))
   ;; P1: pop <= 1 suppresses
   (let ((st (cistern--new-game 20260830)))
     (setf (cistern-st-tick st) 120)

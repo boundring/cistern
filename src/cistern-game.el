@@ -854,10 +854,10 @@ this."
       (when (and (consp e) (eq (cistern--event-kind e) 'clearance))
         (cistern--field-spawn st (cons (nth 2 e) (nth 3 e)) (cons 0 -1) 3
                               "CLEARANCE UP" 'success 'popup)))
-    ;; M7 three-tier log grammar: faced log intents ride the stored
-    ;; slot; the view's log-tail applies the faces to the matching
-    ;; log lines.  Game-changing events present via the banner row
-    ;; (the M3 MapCompleted intent); banner copy DEFERRED per §6.
+    ;; M7 log grammar: events log at their source sites (domain
+    ;; cistern--log-sev); the faced log intents are the stored slot's
+    ;; assertion surface (the log-tail faces entries by severity, Q13
+    ;; — it does NOT match these intents).  Banners: the M3 intent.
     (dolist (e events)
       (let ((sev (cistern--event-severity e)))
         (when (and (consp e) sev (not (eq sev 'game-changing)))

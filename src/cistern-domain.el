@@ -1077,7 +1077,7 @@ draw is suppressed entirely, no stream consumption."
                (or (null raid)
                    (and (plist-get raid :last-end)
                         (< (plist-get raid :last-end) floor-tick)))
-               (< (cistern-st-contam st) (1- cistern-contam-limit))
+               (< (cistern-st-contam st) (- cistern-contam-limit 2))
                (> (length (cistern-st-creators st)) 1))
       (when (>= (cistern--combat-d20 st)
                 (if (= act 3) (cistern--combat-k 'raid-dc-act3)

@@ -135,6 +135,10 @@ git clone https://github.com/boundring/cistern
 emacs -Q -l src/cistern.el
 ```
 
+The story engine loads `cistern-banks-example.el` from beside the
+driver (or the load path); without that file the Sector Record stays
+silent. The file is your problem. THE STRUCTURE DOES NOT REPLACE IT.
+
 Day one: `SPC` ticks the clock — one fixture is already wired to one tank; cursor
 onto a worker and read the inspector. When the pressure line reports a backup,
 cursor to the tank, press `x` — free toilets, free alloy. Then expand: pipe (`p`)

@@ -3614,3 +3614,69 @@ the relaunch is on their screen now.
   fix restored the true red before any green was claimed.
 - Outcome: V5 close-fix GREEN.  Suite canonical ALL 132 TESTS PASSED
   (exit 0) at the L-107 boundary.
+
+## L-108 (2026-09-08, run: review-v5 — v5 phase-closing review)
+
+- Attempt: the six-item HANDBRIEF phase-closing checklist over
+  ce3856d..51a3a30 (19/19 directives, ~65 commits incl. the README
+  dossier and docs).  Small fixes committed directly in the review
+  commit: P1's contamination valve restored to the COMBAT §5.3 pin —
+  `cistern--maybe-raid` allowed a draw at contam = limit−2 while both
+  the doc and the fn's own docstring pin "no OPEN while contam ≥
+  limit−2"; CB6's P1 assert extended to the pinned boundary (the test
+  had pinned only limit−1, so the off-by-one was invisible).  README
+  §9 now names the shipped `cistern-banks-example.el` — L-095's
+  docs-pass item ("the file name IS user-visible; docs pass should
+  mention it under install") had been DROPPED by the V5-19 dossier.
+  Stale M7 comment corrected (it claimed the log-tail matches stored
+  intents — that pass was removed by the Q13/Q16 log-tail rewrite).
+  Checklist otherwise clean: one `cistern--stream-next` primitive
+  serves all four child streams with the shared mid-bits slice; the
+  two copy-subsection lookups (`combat`/`social`) are minimal — comedy
+  correctly has none (ruling 4 routes it through the bank `:copy`
+  chain); all combat copy keys resolve; do-tick order is the pinned
+  sim → story → social → comedy → dialogue → rewards with the L-107
+  wiring and accurate comments; narrative code touches neither the
+  sim LCG nor `particle-rng`; pins trace (RALLY on `H` / FOCUS on `f`
+  per L-100 — `h` unbound; `cistern-combat-enabled` default nil per
+  L-099; streams 0–6 per §1.2; combat d20 is 1-based per COMBAT §3
+  while the story/dialogue 0-based deviation remains L-094 #3's
+  recorded v4 finding, unchanged).
+- Ledger audit L-095..L-107: L-099's fixture TODO applied (L-100);
+  L-098's V5-07 copy sweep done (L-101); L-095's docs item DROPPED —
+  fixed this review (above); no other explicit "Change for next
+  attempt" items; L-100's README f/H ruling held (README §7).
+- Structural findings (NOT fixed in passing; one consolidated owning
+  condition — the v5 narrative DELIVERY surface, owner: the narrative-
+  surface pass over COMEDY §5.3 / SOCIAL §1.4/§3.2):
+  1. Comedy beats are computed but never delivered live:
+     `cistern--do-tick` binds `comedy-out` and drops it — the stored
+     `(outcome . intents)` 2-list appends only story and dialogue
+     intents, so every whimsey log line and the safety-drill banner
+     are discarded on the live path.  Every CY test calls
+     `cistern--comedy-eval` directly (the L-095/L-107 class again).
+  2. The intent grammar's `:layer 'log` has NO renderer: the Q13/Q16
+     log-tail rewrite removed the M7-era match-intents face pass and
+     nothing re-homed it, so story verdicts (HELD/BREACHED), dialogue
+     lines, and comedy lines exist only as stored intents — invisible
+     in live play (only `:layer 'banner` renders).  README §8's
+     "resolve in the log" and COMEDY §5.3's delivery contract are
+     unreachable as pinned.  Findings 1+2 want ONE decision: log at
+     source (social's FILE channel pattern) or re-home the log-tail
+     intent pass.
+  3. SOCIAL trigger rows 9/11 are dead: `cistern--social-friction`
+     pushes `faction-mock` events but the thought pass has no row-9
+     handler, so the pinned `social-objection` FILED-OBJECTIONS copy
+     is an orphaned key; row 11 (`idle-proximity` → `fond-proximity`)
+     has no implementation anywhere.  No test names either row.
+  4. `star-crossed-raid` (SOCIAL §3.2; V5-SPEC ruling 7 + the V5-12
+     row) is pinned but unimplemented: no raid-targets-beloved
+     detection, no `(:social 'star-crossed-raid …)` push, no story
+     beat.
+  5. `src/cistern-domain.el` is 3501 lines (sim + combat + RPG +
+     social/romance + comedy consts); the combat/social/comedy const
+     blocks and the hostiles phase are the natural first split.
+     Splitting is structural per the review authority split.
+- Outcome: review complete.  Suite canonical ALL 132 TESTS PASSED at
+  the close boundary (the P1 assert extends the existing CB6 test —
+  the count holds); code untouched on the structural findings.
