@@ -2993,7 +2993,7 @@ legal no-op state for tests)."
     (tutorial-complete . "TUTORIAL COMPLETE — THE SECTOR IS YOURS")
     (tutorial-step . "TUTORIAL: OBJECTIVE COMPLETE")
     (tutorial-skipped . "TUTORIAL SKIPPED")
-    (tutorial-line-fmt . "TUTORIAL %d/%d: %s  (T skips)")
+    (tutorial-line-fmt . "TUTORIAL %d/%d: %s  (C-t skips)")
     (help-arm . "t/p/K arm — click to place")
     (bearing-floor . "FLOOR — %s")
     (same-tick-free . " — SAME-TICK: FREE UNDO")
