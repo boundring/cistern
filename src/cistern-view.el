@@ -52,7 +52,8 @@ optionals; batch tests pass synthetic integers."
           :map-cols cols :map-lines lines :cam cam
           :header-lines header-lines
           :legend-rows (length (split-string
-                                (cistern-view--legend-line) "\n" t))
+                                (cistern-view--legend-lines body-cols)
+                                "\n" t))
           :help-row (let ((rows (cistern-view--help-rows)))
                       (and (<= (length (nth 0 rows)) body-cols)
                            (<= (length (nth 1 rows)) body-cols)))
@@ -360,37 +361,53 @@ variants only — base glyphs never leave the table."
 ;; ---------------------------------------------------------------------------
 ;; Render composition: every piece is a pure function of ST.
 
-(defun cistern-view--header-line (st)
-  "Q01 strip contract: fixed segment order TICK ALLOY POP
-CONTAM SCORE GOALS REP.  SEED and the version moved to the ?
-briefing (width budget at 95 cols); one dim badge slot (Q19
-armed, Q29 auto-run) is reserved after REP.  Q21: the CONTAM
-segment faces by fraction — yellow >= 50%%, red bold >= 75%% —
-so the strip returns already-faced."
+(defun cistern-view--header-line (st &optional body-cols)
+  "V6-02 (W1.4): the strip is an ORDERED priority list — identity
+first (never elided), then ALLOY/POP, CONTAM (pressure), SCORE/
+GOALS/REP — elided deepest-priority first until it fits the live
+width.  Elision changes CONTENT, never the row; at 95+ cols the
+concat is byte-identical to the v5 strip (the C1' supersession:
+95 survives as the template-authoring ceiling only).  Q21: the
+CONTAM segment faces by fraction — yellow >= 50%%, red bold >=
+75%%.  BODY-COLS nil (direct/legacy call sites) means never elide."
   (let* ((gc (cistern-view--goal-counts st))
          (pct (/ (* 100.0 (cistern-st-contam st)) cistern-contam-limit))
          (contam-face (cond ((>= pct 75) 'cistern-toilet-down)
                             ((>= pct 50) 'cistern-tank-high)
                             (t 'cistern-header))))
-    (concat (propertize
-             (format "CISTERN — SECTOR-7  TICK %d  ALLOY %d  POP %d/%d"
-                     (cistern-st-tick st)
-                     (cistern-st-alloy st)
-                     (length (cistern-st-creators st)) cistern-pop-cap)
-             'face 'cistern-header)
-            (propertize (format "  CONTAM %d/%d"
-                                (cistern-st-contam st) cistern-contam-limit)
-                        'face contam-face)
-            (propertize
-             (format "  SCORE %d  GOALS %s  REP %d%s"
-                     (or (cistern-st-score st) 0)
-                     (if gc (format "%d/%d" (car gc) (cdr gc)) "-/-")
-                     (cistern-st-reputation st)
-                     (if (cistern-st-over st)
-                         (concat "   " (cdr (assq 'condemn-append
-                                                  cistern--copy)))
-                       ""))
-             'face 'cistern-header))))
+    (cistern-view--strip-elide
+     body-cols
+     (list (propertize
+            (format "CISTERN — SECTOR-7  TICK %d" (cistern-st-tick st))
+            'face 'cistern-header)
+           (propertize
+            (format "  ALLOY %d  POP %d/%d"
+                    (cistern-st-alloy st)
+                    (length (cistern-st-creators st)) cistern-pop-cap)
+            'face 'cistern-header)
+           (propertize (format "  CONTAM %d/%d"
+                               (cistern-st-contam st) cistern-contam-limit)
+                       'face contam-face)
+           (propertize
+            (format "  SCORE %d  GOALS %s  REP %d%s"
+                    (or (cistern-st-score st) 0)
+                    (if gc (format "%d/%d" (car gc) (cdr gc)) "-/-")
+                    (cistern-st-reputation st)
+                    (if (cistern-st-over st)
+                        (concat "   " (cdr (assq 'condemn-append
+                                                 cistern--copy)))
+                      ""))
+            'face 'cistern-header)))))
+
+(defun cistern-view--strip-elide (body-cols segs)
+  "Keep the strip's leading segments while they fit BODY-COLS;
+the deepest-priority (rightmost) segment drops first.  The
+identity segment never elides (W1.4 order 1)."
+  (let ((segs (nreverse segs)))
+    (while (and body-cols (> (length segs) 1)
+                (> (apply #'+ (mapcar #'length segs)) body-cols))
+      (setq segs (cdr segs)))
+    (apply #'concat (nreverse segs))))
 
 (defun cistern-view--goal-counts (st)
   "Active-card progress (Q04): (MET . TOTAL) from the card's
@@ -442,15 +459,7 @@ can never be listed twice."
   ;; never orphans onto a wrapped display line at 95 cols.  The legend
   ;; renders below the map (the pre-map block is pinned at the
   ;; header-lines constant; see R2-Q02's block-height derivation).
-  (let* ((entries (mapconcat
-                   (lambda (entry)
-                     (let* ((kind (car entry))
-                            (dead (plist-get (cdr entry) :dead-glyph))
-                            (glyph (or dead (cistern--tile-glyph kind)))
-                            (name (cdr (assq kind cistern-view--kind-names))))
-                       (format "%s %s" glyph
-                               (if dead (concat "dead " name) name))))
-                   cistern--tile-table "  "))
+  (let* ((entries (cistern-view--legend-entries))
          ;; wrap before the last two entries: row 1 fits 85 cols,
          ;; the continuation is GLYPHS:-aligned and carries the worker
          (split-at (string-match-p "  ▣" entries)))
@@ -459,6 +468,54 @@ can never be listed twice."
             (make-string 9 ?\s)
             (substring entries (+ split-at 2))
             "  " (aref cistern--worker-glyphs 0) " worker\n")))
+
+(defun cistern-view--legend-entries ()
+  "Q12: the legend's entry text, generated from the tile table —
+one shared builder for the v5 two-row wrap and the V6-02 generic
+wrap (a kind with :dead-glyph lists the dead glyph)."
+  (mapconcat
+   (lambda (entry)
+     (let* ((kind (car entry))
+            (dead (plist-get (cdr entry) :dead-glyph))
+            (glyph (or dead (cistern--tile-glyph kind)))
+            (name (cdr (assq kind cistern-view--kind-names))))
+       (format "%s %s" glyph
+               (if dead (concat "dead " name) name))))
+   cistern--tile-table "  "))
+
+(defun cistern-view--legend-lines (body-cols)
+  "V6-02 (W1.4): the legend wraps (R2-Q01) and, when even
+wrapping cannot fit BODY-COLS, collapses to the [L] pointer row.
+BODY-COLS nil = the v5 two-row wrap, never elided (legacy call
+sites, and the 95-col reference width renders un-clipped)."
+  (let ((v5 (cistern-view--legend-line)))
+    (if (or (null body-cols)
+            (<= (apply #'max (mapcar #'length (split-string v5 "\n" t)))
+                body-cols))
+        v5
+      (let* ((toks (append (split-string
+                            (cistern-view--legend-entries) "  " t)
+                           (list (format "%s worker"
+                                         (aref cistern--worker-glyphs 0)))))
+             (ok (cl-every (lambda (tk) (< (length tk) body-cols)) toks))
+             (rows nil) (cur nil))
+        (if (not ok)
+            (concat (cdr (assq 'legend-pointer cistern--copy)) "\n")
+          (dolist (tk toks)
+            (if (and cur
+                     (> (+ 9 (apply #'+ (mapcar #'length (cons tk cur)))
+                         (* 2 (1- (length (cons tk cur)))))
+                        body-cols))
+                (progn (push (concat (make-string 9 ?\s)
+                                     (mapconcat #'identity
+                                                (nreverse cur) "  "))
+                             rows)
+                       (setq cur (list tk)))
+              (push tk cur)))
+          (push (concat "GLYPHS:  "
+                        (mapconcat #'identity (nreverse cur) "  "))
+                rows)
+          (concat (mapconcat #'identity (nreverse rows) "\n") "\n"))))))
 
 (defun cistern-view--persona-clause (st base id)
   "V5-12 (SOCIAL §4.5): the persona clause — mood word, first
@@ -488,8 +545,12 @@ All state reads happen through domain queries (r5/v4-16 pins)."
               (t (if (<= (length (concat base " — " mood)) 95)
                      (concat base " — " mood) base)))))))
 
-(defun cistern-view--inspector (st)
-  "One sentence describing whatever the cursor rests on."
+(defun cistern-view--inspector (st &optional body-cols)
+  "One sentence describing whatever the cursor rests on.
+V6-02 (WO1.3): the floor cursor's bearing clause is the elidable
+tail — it shortens (drops) before the identity line would exceed
+BODY-COLS, the A13 width-degradation pattern; the identity never
+vanishes.  BODY-COLS nil keeps every clause (legacy call sites)."
   (let* ((x (car (cistern-st-cursor st)))
          (y (cdr (cistern-st-cursor st)))
          (kind (cistern--cell st x y))
@@ -541,9 +602,19 @@ All state reads happen through domain queries (r5/v4-16 pins)."
             ;; bearings — nearest toilet and tank, manhattan from the
             ;; shared geometry.  All non-floor lines untouched.
             (let ((bearing (cistern-view--floor-bearing st x y)))
-              (if bearing
-                  (format (cdr (assq 'bearing-floor cistern--copy)) bearing)
-                (cdr (assq kind cistern-view--kind-descriptions)))))
+              (cond ((null bearing)
+                     (cdr (assq kind cistern-view--kind-descriptions)))
+                    ((and body-cols
+                          (> (+ (length (format "CURSOR (%d,%d): " x y))
+                                (length (format
+                                         (cdr (assq 'bearing-floor
+                                                    cistern--copy))
+                                         bearing)))
+                             body-cols))
+                     ;; bearing drops, the identity shortens but stays
+                     (upcase (cdr (assq kind cistern-view--kind-names))))
+                    (t (format (cdr (assq 'bearing-floor cistern--copy))
+                               bearing)))))
            (t (or (cdr (assq kind cistern-view--kind-descriptions))
                   ;; V4-06: new kinds carry their line in the copy table
                   (cdr (assq (intern (format "desc-%s" kind))
@@ -611,6 +682,17 @@ pressure-line state cond."
                   (* 0.85 (cistern--tank-capacity-total st))))
          'cistern-tank-high)
         (t 'cistern-dim)))
+
+(defun cistern-view--pressure-idle-p (st)
+  "The NOMINAL verdict state (`cistern-view--pressure-line''s t
+branch).  W1.4: elision may drop the idle line in a too-narrow
+window; a live S2 alert verdict is never dropped, never rewritten."
+  (and (not (cistern-st-over st))
+       (not (cistern--toilets-severed-p st))
+       (not (cistern--toilets-backed-up-p st))
+       (not (and (> (cistern--tank-capacity-total st) 0)
+                 (>= (cistern--tank-load-total st)
+                     (* 0.85 (cistern--tank-capacity-total st)))))))
 
 (defun cistern-view--floor-bearing (st x y)
   "Q20: nearest toilet and tank bearings for the floor cursor at
@@ -727,19 +809,20 @@ literal-colored).")
 (defun cistern-view--enemy-face (e)
   (cdr (cistern-view--enemy-entry e)))
 
-(defun cistern-view--tutorial-line (st)
+(defun cistern-view--tutorial-line (st &optional body-cols)
   ;; R2-Q11 (c): suppressed while over — the death frame is the
   ;; tutorial's end
   (unless (cistern-st-over st)
     (let ((idx (cistern-st-tutorial st))
           (steps (cistern--tutorial-steps)))
       (when (and (numberp idx) (< idx (length steps)))
-        (propertize (concat (format (cdr (assq 'tutorial-line-fmt
-                                              cistern--copy))
-                                    (1+ idx) (length steps)
-                                    (car (nth idx steps)))
-                            "\n")
-                    'face 'cistern-tutorial)))))
+        (let ((tl (format (cdr (assq 'tutorial-line-fmt cistern--copy))
+                          (1+ idx) (length steps)
+                          (car (nth idx steps)))))
+          ;; V6-02 (WO1.3): a too-narrow window drops the coaching
+          ;; line (content elides; C-t carries it) rather than overflow
+          (when (or (null body-cols) (<= (length tl) body-cols))
+            (propertize (concat tl "\n") 'face 'cistern-tutorial)))))))
 
 (defun cistern-view--log-tail (st)
   "Three-line tail (Q15): consecutive identical lines collapse
@@ -824,7 +907,8 @@ tests pass one in; without LAY a wide synthetic window is derived
                                     (cistern-st-h st)
                                     (cistern-st-cursor st)
                                     (and (cistern-view--header-badges st) t))))
-  (let* (;; the rewards use case is read exactly ONCE per render (§3.6)
+  (let* ((cols (plist-get lay :body-cols))
+         ;; the rewards use case is read exactly ONCE per render (§3.6)
          (celebration (cistern-view--celebration-overlay st))
          (overlay (car celebration))
          ;; reserved banner row (§3.5): after the map rows, before the
@@ -848,7 +932,7 @@ tests pass one in; without LAY a wide synthetic window is derived
                                         'face 'cistern-dim))))))
     (concat
      ;; Q21: the header line arrives already-faced (CONTAM segment)
-     (propertize (concat (cistern-view--header-line st) "\n")
+     (propertize (concat (cistern-view--header-line st cols) "\n")
                  'face 'cistern-header)
      ;; R2-Q02: the badges render on ONE reserved dim row directly
      ;; below the strip; the block height is the one constant
@@ -859,13 +943,17 @@ tests pass one in; without LAY a wide synthetic window is derived
      ;; below the map — the pre-map block stays header-lines tall.
      ;; V6-01: a too-narrow window elides row B's CONTENT to keep the
      ;; block height fixed (W1.4) — the reserved row renders dim-blank.
-     (if (plist-get lay :help-row)
-         (propertize (cistern-view--help-line) 'face 'cistern-dim)
-       (propertize (concat (car (cistern-view--help-rows)) "\n\n")
-                   'face 'cistern-dim))
+     (propertize
+      (let ((rows (cistern-view--help-rows)))
+        (cond ((plist-get lay :help-row) (cistern-view--help-line))
+              ((<= (length (nth 0 rows)) cols)
+               (concat (nth 0 rows) "\n\n"))          ; row A only
+              (t (concat (cdr (assq 'help-pointer cistern--copy))
+                         "\n\n"))))                   ; [?] alone
+      'face 'cistern-dim)
      (cistern-view--map-rows st lay overlay)
      (propertize (concat banner "\n") 'face 'cistern-header)
-     (propertize (concat (cistern-view--inspector st) "\n")
+     (propertize (concat (cistern-view--inspector st cols) "\n")
                  'face 'cistern-dim)
      ;; Q17: the one-tick transient hint slot, under the inspector —
      ;; R2-Q06: the row is RESERVED (dim blank when idle) so the
@@ -874,14 +962,20 @@ tests pass one in; without LAY a wide synthetic window is derived
      ;; drain it (see the driver commands)
      (propertize (concat (or (cistern-st-hint st) "") "\n")
                  'face 'cistern-dim)
-     (propertize (concat (cistern-view--pressure-line st) "\n")
-                 'face (cistern-view--pressure-face st))
-     (cistern-view--tutorial-line st)
+     ;; W1.4: the S2-protected pressure words — dropped (a reserved
+     ;; blank row), never rewritten, when the idle line cannot fit
+     (let ((pl (cistern-view--pressure-line st)))
+       (if (or (not (cistern-view--pressure-idle-p st))
+               (<= (length pl) cols))
+           (propertize (concat pl "\n") 'face (cistern-view--pressure-face st))
+         (propertize "\n" 'face (cistern-view--pressure-face st))))
+     (cistern-view--tutorial-line st cols)
      (cistern-view--log-tail st)
      ;; R2-Q01: the wrapped legend renders at the frame foot — the
      ;; banner→inspector adjacency and the header-lines-tall pre-map
      ;; block both stay pinned
-     (propertize (cistern-view--legend-line) 'face 'cistern-dim))))
+     (propertize (cistern-view--legend-lines cols)
+                'face 'cistern-dim))))
 
 ;; ---------------------------------------------------------------------------
 ;; Buffer geometry (Pair 2 slice; shares the header-lines constant).

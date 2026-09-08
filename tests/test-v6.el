@@ -154,5 +154,74 @@ pure batch."
         (delete-frame frm)
         (kill-buffer buf)))))
 
+;;; --- V6-02: header strip reflow — priority elision (WO1.3) ----------------
+
+(defconst cistern-test-v6-02--idle-pressure
+  "LINES NOMINAL — THE STRUCTURE DOES NOT CARE"
+  "The S2 idle verdict (byte-identical when present).")
+
+(defun cistern-test-v6-02-header ()
+  "WO1.3: no permanent row exceeds a narrow synthetic width; the
+strip keeps its identity segment and elides deepest-priority
+first; the S2 pressure words are byte-identical when present and
+the idle line is dropped (never rewritten) in a too-narrow
+window; wide widths render byte-identical to the v5 strip; new
+elision copy lives in `cistern--copy' (Q11)."
+  ;; wide widths: zero elision, byte-identical to the default render
+  (let* ((st (cistern--new-game 42))
+         (wide (substring-no-properties
+                (cistern-view--render
+                 st (cistern-view--layout 120 40 34 16 '(0 . 0)))))
+         (def (substring-no-properties (cistern-view--render st))))
+    (cl-assert (equal wide def) t "120-col render == default render"))
+  ;; narrow 60: everything fits; the idle pressure line is PRESENT and
+  ;; byte-identical
+  (let* ((st (cistern--new-game 42))
+         (rows (split-string
+                (cistern-view--render
+                 st (cistern-view--layout 60 20 34 16 '(0 . 0))) "\n")))
+    (dolist (r rows)
+      (cl-assert (<= (length r) 60) t "row over 60 cols: %S" r))
+    (cl-assert (cl-find cistern-test-v6-02--idle-pressure rows
+                        :test (lambda (s row) (string-match-p s row)))
+                t "idle pressure byte-identical at 60"))
+  ;; narrow 40: rows still fit; idle line DROPPED (never rewritten);
+  ;; identity strip survives, deep segments elided; [?] help pointer
+  (let* ((st (cistern--new-game 42))
+         (rows (split-string
+                (cistern-view--render
+                 st (cistern-view--layout 40 20 34 16 '(0 . 0))) "\n")))
+    (dolist (r rows)
+      (cl-assert (<= (length r) 40) t "row over 40 cols: %S" r))
+    (cl-assert (string-match-p "TICK" (nth 0 rows)) t "identity survives")
+    (cl-assert (not (string-match-p "SCORE" (nth 0 rows)))
+                t "deepest strip segment elided first")
+    (cl-assert (not (cl-find "LINES NOM" rows
+                             :test (lambda (s row) (string-match-p s row))))
+                t "idle pressure dropped, not rewritten")
+    (cl-assert (cl-find (cdr (assq 'help-pointer cistern--copy)) rows
+                        :test (lambda (s row) (string-match-p s row)))
+                t "help elides to the [?] pointer"))
+  ;; S2 alert: the pressure verdict, when present, is byte-identical
+  ;; (a live alert is never rewritten, never dropped)
+  (let* ((st (cistern--new-game 42))
+         (lay (cistern-view--layout 60 20 34 16 '(0 . 0)))
+         (rows (split-string (cistern-view--render st lay) "\n")))
+    (setf (cistern-st-contam st) 0)
+    (puthash (cons 5 2) (list :load 85) (cistern-st-tanks st))
+    (setq rows (split-string (cistern-view--render st lay) "\n"))
+    (cl-assert (cl-find (cistern-view--pressure-line st) rows
+                        :test (lambda (s row) (string= s row)))
+                t "alert verdict present, byte-identical: %S"
+                (cistern-view--pressure-line st)))
+  ;; Q11: the two new elision strings are copy-table keys, not literals
+  (with-temp-buffer
+    (insert-file-contents
+     (expand-file-name "src/cistern-domain.el" cistern-test-v6--root))
+    (cl-assert (string-match-p "(help-pointer" (buffer-string))
+               t "help pointer is a copy key")
+    (cl-assert (string-match-p "(legend-pointer" (buffer-string))
+               t "legend pointer is a copy key")))
+
 (provide 'test-v6)
 ;;; test-v6.el ends here

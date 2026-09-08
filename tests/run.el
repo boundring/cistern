@@ -163,7 +163,8 @@
     cistern-test-v5-18-determinism
     cistern-test-v6-01-layout
     cistern-test-v6-01-roundtrip
-    cistern-test-v6-01-gui))
+    cistern-test-v6-01-gui
+    cistern-test-v6-02-header))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

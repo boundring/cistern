@@ -3775,3 +3775,30 @@ the relaunch is on their screen now.
   loads in one-off batch probes.
 - Outcome: suite canonical ALL 139 TESTS PASSED (136 + 3: layout,
   roundtrip, gui). GREEN-BOUNDARY SYNC.
+
+## L-111 (2026-09-08, run: v6-wave-1 — V6-02 header strip reflow, priority elision)
+
+- RED captured: "row over 60 cols: 85" (un-elided strip). GREEN: the
+  strip is an ordered priority list (identity TICK never elides →
+  ALLOY/POP → CONTAM → SCORE/GOALS/REP), elided deepest-priority first
+  via `cistern-view--strip-elide'; byte-identical concat at 95+ cols —
+  the C1' supersession closes (95 = template-authoring ceiling only).
+- PERMANENT-ROW COVERAGE beyond the W1.4 table (WO1.3's letter): the
+  inspector's floor-bearing clause elides first (A13 width-degradation
+  pattern, identity shortens but stays) and the tutorial coaching line
+  drops in a too-narrow window (C-t carries it). Log-tail rows still
+  rely on the copy ≤60-char authoring ceiling — owner-owned by wave 3's
+  log work (V6-18+) if a live line ever exceeds the width.
+- Q11 AUDIT COLLISION (caught by cistern-test-ux-q11-copy-table): the
+  pointer copy values "[?]"/"[L]" collide as substrings with the
+  view's grandfathered help-line literals — the audit forbids any table
+  value appearing in another src file. Values changed to "? — HELP
+  BRIEFING" / "? — GLYPH BRIEFING"; the audit stays the guard.
+- S2 protection honored: pressure verdicts render byte-identical when
+  present; only the idle NOMINAL line drops (reserved blank row, never
+  rewritten); alert verdicts stay even past the width.
+- Deferred (least-active): the "shortens before vanishing" middle stage
+  for the goals/pressure segment — segments drop whole today; add
+  shortening when a real width between full and dropped is reported.
+- Outcome: suite canonical ALL 140 TESTS PASSED (139 + header). RED
+  first; GREEN-BOUNDARY SYNC at the boundary per the standing rule.

@@ -3063,6 +3063,10 @@ legal no-op state for tests)."
     (desc-manifold . "MANIFOLD — FREE PIPE ANCHOR: WIRES WITHOUT A TANK")
     (desc-cache . "CACHE — WALK IT TO BANK THE ALLOY")
     (desc-event . "EVENT INCOMING — THE COUNTDOWN IS STANDING")
+    ;; V6-02 (W1.4): elision pointers — a too-narrow window replaces
+    ;; the help rows / legend with these one-cell pointers (Q11 keys)
+    (help-pointer . "? — HELP BRIEFING")
+    (legend-pointer . "? — GLYPH BRIEFING")
     ;; V4-09 (SURFACE S5.3/S5.5)
     (death-log-hint . "L — FULL HISTORY")
     (migrant-in-fmt . "MIGRANT IN %d TICKS")
