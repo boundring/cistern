@@ -3216,3 +3216,38 @@ the relaunch is on their screen now.
     remains the post-playtest presentation pass.
 
 ---
+
+## L-095 (2026-09-07, run: install-v4 — shipped-bank install wiring)
+
+- Failure caught: V4-15's bank loader shipped complete and tested
+  (L-094 took the review note), but NO src caller ever invoked
+  `cistern--banks-load` — the driver's `cistern` /
+  `cistern-new-game` entries went straight to `cistern--new-game`,
+  so on the owner's installed copy the story engine was a silent
+  no-op: `cistern--banks` nil ⇒ nil story, forever.  Classic
+  wired-machinery-never-powered gap: every unit test loads the
+  bank itself, so the suite was green while the product did
+  nothing.
+- Fix (red-first): `cistern-test-v4-15-shipped-bank-wiring` in
+  tests/test-v4.el simulates the shipped layout (example bank
+  copied beside a temp dir as `cistern-banks-example.el`), fails
+  on the unwired driver (RED, 1/108), then passes with the wiring
+  (GREEN, ALL 108 TESTS PASSED).  `cistern--ensure-story-bank` in
+  src/cistern.el resolves the bank L-034-style — explicit filename
+  relative to the driver's own directory (pinned at load time via
+  `cistern--bank-example`), load-path fallback — and is called
+  before the first `cistern--new-game` from both `cistern` and
+  `cistern-new-game` (idempotent: guarded on `cistern--banks`).
+- Known ceiling (accepted): a MISSING bank file degrades to a
+  one-line warning + idle story engine rather than an error,
+  because the batch suite loads the driver from src/ where no bank
+  sits beside it; a malformed bank still fails loudly via the
+  V4-14 loader.  The install-time verification step (driver render
+  showing the premise banner) is the tripwire for the missing-file
+  case.
+- Outcome: FIX CONFIRMED.  Suite canonical: ALL 108 TESTS PASSED
+  (was 107 + the new red).  Install copies data/banks/example.el
+  to ~/.emacs.d/lisp/cistern-banks-example.el; the file name IS
+  user-visible (docs pass should mention it under install/troubleshooting).
+
+---

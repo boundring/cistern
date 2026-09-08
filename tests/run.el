@@ -122,6 +122,7 @@
     cistern-test-v4-12-rpg-machinery
     cistern-test-v4-13-envelope-guard
     cistern-test-v4-14-banks-loader
+    cistern-test-v4-15-shipped-bank-wiring
     cistern-test-v4-18-gen-bank
     cistern-test-v4-15-story-generation
     cistern-test-v4-16-story-eval

@@ -1143,6 +1143,40 @@ story section first, then bank :copy in load order."
                      t "%s not caught (err=%S)" (cdr spec) err)))))
   (message "CISTERN-V4-14-OK"))
 
+;; V4-15 (install wiring): the shipped driver must load the example
+;; bank from beside itself (L-034 explicit-filename + load-path
+;; fallback) before the first `cistern--new-game' — no banks ⇒ nil
+;; story, a silent no-op for the player.
+(defun cistern-test-v4-15-shipped-bank-wiring ()
+  "Simulate the shipped install layout (driver + bank beside it)
+and assert `cistern--ensure-story-bank' + `cistern--new-game'
+yield a live story (premise present, goal-mod applied)."
+  (let ((tmp (make-temp-file "cistern-install" t)))
+    (copy-file (expand-file-name "data/banks/example.el"
+                                 cistern-test-v4--root)
+               (expand-file-name "cistern-banks-example.el" tmp))
+    (let ((cistern--bank-example (expand-file-name
+                                  "cistern-banks-example.el" tmp))
+          (cistern--banks nil) (cistern--story-copy nil)
+          (cistern--matrix-sources (make-hash-table :test 'eq)))
+      (cistern--ensure-story-bank)
+      (cl-assert (plist-get cistern--banks :scenarios)
+                 t "shipped bank not loaded by the driver wiring")
+      (let ((st (cistern--new-game 42)))
+        (cl-assert (cistern-st-story st)
+                   t "nil story despite shipped bank (V4-15 silent no-op)")
+        (cl-assert (plist-get (cistern-st-story st) :premise-id)
+                   t "story premise missing")
+        (cl-assert (string-match-p
+                    "PRESSURE LOGGED"
+                    (cistern--story-copy-key 'story-sealed-premise))
+                    t "bank copy not folded in")))
+    (delete-directory tmp t))
+  ;; restore the unwired registry state other tests expect
+  (setq cistern--banks nil cistern--story-copy nil
+        cistern--matrix-sources (make-hash-table :test 'eq))
+  (message "CISTERN-V4-15-WIRING-OK"))
+
 (defun cistern-test-v4-18-gen-bank ()
   "V4-18 (S3): the generator's reruns are byte-identical, its
 output re-loads and validates through the real loader, and

@@ -18,6 +18,30 @@
 (require 'cistern-input (and load-file-name (expand-file-name "cistern-input.el" (file-name-directory load-file-name))))
 (require 'cistern-view (and load-file-name (expand-file-name "cistern-view.el" (file-name-directory load-file-name))))
 
+(defconst cistern--bank-example
+  (and load-file-name
+       (expand-file-name "cistern-banks-example.el"
+                         (file-name-directory load-file-name)))
+  "L-034 explicit-filename resolution for the shipped story bank:
+pinned to this file's directory at load time, load-path fallback
+at use time (V4-15 install wiring).")
+
+(defun cistern--ensure-story-bank ()
+  "V4-15: load the shipped example bank once, before the first
+`cistern--new-game' — no banks ⇒ nil story, a silent no-op for
+the player.  A malformed bank still fails loudly via
+`cistern--banks-load'; a MISSING file degrades to a warning (the
+batch suite loads the driver from src/ with no bank beside it)."
+  (unless cistern--banks
+    (let ((f (or (and cistern--bank-example
+                      (file-exists-p cistern--bank-example)
+                      cistern--bank-example)
+                 (locate-library "cistern-banks-example.el"))))
+      (if f
+          (cistern--banks-load (list f))
+        (message "cistern: shipped story bank %s not found — story engine idle"
+                 (or cistern--bank-example "cistern-banks-example.el"))))))
+
 ;; The one module global (spec §3.3, legacy cistern.el:785 pattern).
 ;; The D2 timer-handle exception (`cistern--auto-run-timer') lives in
 ;; the input adapter (L-015 pin 1: inward dependency).
@@ -231,6 +255,7 @@ drop the others, so `cistern' reliably lands the user on the map."
   (unless (eq major-mode 'cistern-mode)
     (cistern-mode))
   (unless cistern--st
+    (cistern--ensure-story-bank)             ; V4-15: bank before first story
     (setq cistern--st (cistern--new-game)))
   (cistern--refresh)
   (cistern--own-frame)
@@ -240,6 +265,7 @@ drop the others, so `cistern' reliably lands the user on the map."
   (interactive)
   (setq cistern--teach-seen nil cistern--teach-fired nil cistern--last-armed nil)
   (when cistern--st (cistern--cmd-consume-hint cistern--st)) ; R2-Q06
+  (cistern--ensure-story-bank)               ; V4-15: idempotent (guarded on cistern--banks)
   (setq cistern--st (cistern--new-game
                      (cistern--rand cistern--st 2147483647)))
   (cistern--refresh)
