@@ -1386,6 +1386,10 @@ Social-disabled runs (banks absent) are byte-identical sims
           (puthash id (plist-put p :urge nil) (cistern-st-personas st)))))
     ;; the romance graph: proximity + shared events + gates
     (cistern--romance-proximity-tick st)
+    ;; L-108 #4: a raid targeting a beloved's cell pushes the
+    ;; star-crossed story event (the story engine opens the beat
+    ;; on its next read; combat resolves the raid — ruling 7)
+    (cistern--social-star-crossed st)
     ;; the thought pass (trigger table, channels, budgets)
     (cistern--social-thoughts st)))
 

@@ -157,6 +157,7 @@
     cistern-test-v5-16-delivery
     cistern-test-v5-19-faction-mock
     cistern-test-v5-19-idle-proximity
+    cistern-test-v5-19-star-crossed
     cistern-test-v5-17-hooks
     cistern-test-v5-log-delivery
     cistern-test-v5-18-determinism))

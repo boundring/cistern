@@ -741,6 +741,28 @@ copy-keys (fail-first on a missing entry)."
                  :copy-key)
       (error "UNRESOLVED QUIRK ID %S" id)))
 
+(defun cistern--social-star-crossed (st)
+  "SOCIAL §3.2: a raid whose target cell is a beloved's cell — an
+endpoint of a stage >= 2 cross-faction pair — pushes
+`(:social 'star-crossed-raid :pair P :at (X . Y))' into the pending
+events.  A story event: the social layer emits it, the story engine
+opens the beat, COMBAT resolves the raid.  Social reads combat's
+fired raid events; combat never reads social (ruling 7)."
+  (dolist (ev (cistern-st-rewards-events st))
+    (when (and (consp ev) (eq (car ev) 'raid) (eq (nth 1 ev) 'open))
+      (let ((rx (nth 2 ev)) (ry (nth 3 ev)))
+        (maphash
+         (lambda (k v)
+           (when (>= (or (plist-get v :stage) 0) 2)
+             (let ((pa (cistern--romance-position st (car k)))
+                   (pb (cistern--romance-position st (cdr k))))
+               (when (or (and pa (= (car pa) rx) (= (cdr pa) ry))
+                         (and pb (= (car pb) rx) (= (cdr pb) ry)))
+                 (push (list :social 'star-crossed-raid :pair k
+                             :at (cons rx ry))
+                       (cistern-st-rewards-events st))))))
+         (cistern-st-relationships st))))))
+
 (defun cistern--social-thought-push-key (st id key)
   "V5-17 (COMEDY §3.2): the dry-channel variant of the thought-push
 helper — takes a COPY-KEY directly instead of doing a class-based

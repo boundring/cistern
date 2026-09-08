@@ -1787,6 +1787,32 @@ previously an orphaned key — budget-capped like any mutter."
                t "row 9: the objection is heard speech"))
   (message "CISTERN-V5-19-FACTION-MOCK-OK"))
 
+(defun cistern-test-v5-19-star-crossed ()
+  "V5 last round (L-108 #4): a raid whose target cell is the
+beloved entity's cell — a stage >= 2 cross-faction pair endpoint —
+pushes (:social 'star-crossed-raid :pair P :at (X . Y)) into the
+pending events (SOCIAL §3.2, ruling 7: social reads combat's fired
+events; combat never reads social)."
+  (cistern-test-v5--load-social-banks)
+  (let* ((st (cistern--new-game 20260830))
+         (alpha (cistern--worker-glyph st (nth 0 (cistern-st-creators st))))
+         (g (cistern--spawn-enemy st 'warband 'warband 10 10))
+         (gid (cistern--enemy-id g))
+         (key (cistern--romance-pair-key alpha gid)))
+    (cistern--romance-file st alpha gid)
+    ;; stage >= 2 + positioned at the raid cell
+    (plist-put (gethash key (cistern-st-relationships st)) :stage 2)
+    (push (list 'raid 'open 10 10) (cistern-st-rewards-events st))
+    (cistern--social-eval st)
+    (cl-assert (cl-some (lambda (ev)
+                          (and (consp ev) (eq (car ev) :social)
+                               (eq (cadr ev) 'star-crossed-raid)
+                               (equal (plist-get (cddr ev) :pair) key)
+                               (equal (plist-get (cddr ev) :at) '(10 . 10))))
+                        (cistern-st-rewards-events st))
+               t "L-108: the star-crossed-raid event fired"))
+  (message "CISTERN-V5-19-STAR-CROSSED-OK"))
+
 ;; --- W3-2 fixtures: V5-17 comedy hooks, V5-18 determinism close-out -------------
 
 (defun cistern-test-v5-17-hooks ()
