@@ -251,6 +251,9 @@ drop the others, so `cistern' reliably lands the user on the map."
 (defun cistern ()
   "Open the CISTERN sanitation management sim."
   (interactive)
+  ;; V5-04: live play runs the violent base (tests keep it off unless
+  ;; they opt in — the PROTECT no-op guarantee)
+  (setq cistern-combat-enabled t)
   (switch-to-buffer "*cistern*")
   (unless (eq major-mode 'cistern-mode)
     (cistern-mode))
@@ -263,6 +266,7 @@ drop the others, so `cistern' reliably lands the user on the map."
 
 (defun cistern-new-game ()
   (interactive)
+  (setq cistern-combat-enabled t)
   (setq cistern--teach-seen nil cistern--teach-fired nil cistern--last-armed nil)
   (when cistern--st (cistern--cmd-consume-hint cistern--st)) ; R2-Q06
   (cistern--ensure-story-bank)               ; V4-15: idempotent (guarded on cistern--banks)

@@ -282,14 +282,6 @@ predicate.  Returns the final state; signals on an unmet expect."
      (let ((rep (cistern-st-reputation st)))
        (cond ((>= rep 80) 2) ((>= rep 50) 1) (t 0))))))
 
-(defun cistern--story-tick-act (tick)
-  "The act whose window TICK falls in (STORY §3.5) — derived
-from the pinned `cistern--story-act-ticks' spans, not a second
-copy of the windows."
-  (let ((act 1))
-    (dolist (a cistern--story-act-ticks act)
-      (when (>= tick (car (cdr a))) (setq act (car a))))))
-
 (defun cistern--story-condition-p (st h events)
   "Does hook H's :condition hold this tick (STORY §7.1/§7.5)?
 Events are the pending tick event kinds."

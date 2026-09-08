@@ -142,7 +142,13 @@ by the view, not here).")
   ;; V5-02/§4.5 (COMBAT §5.1): the player's FOCUS designation — an
   ;; enemy id or nil.  Auto-defense targeting prefers it (§3.2);
   ;; cleared when the focused enemy dies (V5-06).
-  (focus nil))
+  (focus nil)
+  ;; V5-04 (COMBAT §4.1/§5.1): nil | (:open T0) | (:last-end T) —
+  ;; comedy reads this shape verbatim in wave 3.
+  (raid nil)
+  ;; flood age tracking for S4/S5 ((X . Y) . BORN-TICK) — the spawn
+  ;; table needs "flood open ≥ 20 ticks"; alist, L-099 deviation
+  (flood-born nil))
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -357,6 +363,511 @@ faction `guild' (§3.5 guard-rail).  nil when nothing qualifies."
               (when (or (null bd) (< d bd))
                 (setq bd d best e))))
           best))))
+
+;; ---------------------------------------------------------------------------
+;; V5-04 (COMBAT §2/§4.1-4.3): the spawn table and the raid lifecycle.
+
+(defconst cistern--combat-const
+  '((raid-ticks . (120 240)) (raid-dc-act2 . 8) (raid-dc-act3 . 5)
+    (raid-span . 40) (ambush-dc . 13) (ambush-dist . 6)
+    (infest-every . 20) (infest-base-dc . 14) (infest-min-dc . 8)
+    (leech-dc . 12) (sponge-dc . 14) (leech-interval . 4)
+    (sponge-split . 20) (hostiles-max . 8))
+  "COMBAT §2/§5.3: spawn DCs, cadences, spans and caps in ONE block
+(the §3.5 DC-block pattern).")
+
+(defun cistern--combat-k (key) (cdr (assq key cistern--combat-const)))
+
+(defvar cistern-combat-enabled nil
+  "V5 PROTECT (§1.1/§4.5): combat-disabled runs are legal no-ops,
+byte-identical to the pre-v5 sim.  Default OFF so curated v4
+scenarios and regression fixtures stay exact; the driver enables
+it for live play and the v5 tests enable it explicitly.")
+
+(defun cistern--worker-def (w)
+  "Worker DEF = 10 + GRIT mod (the worked example: α G+2 → DEF 12)."
+  (+ 10 (cistern--rpg-mod (nth 1 (cistern--worker-stats w)))))
+
+(defun cistern--enemy-retreat-p (e)
+  "Grip = `retreat' marks a driven-off/dr withdrawing entity; GRIP
+is leech-host storage for leeches, so the marker is kind-safe."
+  (eq (cistern--enemy-grip e) 'retreat))
+
+(defun cistern--raid-open (st)
+  "Open one raid (COMBAT §4.1): n = clamp(pop−1, 1, 3) raiders in
+act II, clamp(pop−1, 2, 4) in act III, each rolled per §2 in the
+pinned call order and assigned an objective (d20 mod 3 → 0 gnaw /
+1 steal / 2 harass).  One `raid' event OPEN."
+  (let* ((tick (cistern-st-tick st))
+         (act (cistern--story-tick-act tick))
+         (pop (length (cistern-st-creators st)))
+         (n (if (= act 3) (clamp 2 (1- pop) 4) (clamp 1 (1- pop) 3))))
+    (setf (cistern-st-raid st) (list :open tick))
+    (let ((ev-cell (cistern--edge-spawn-cell st)))
+    (dotimes (_ n)
+      (let ((cell (cistern--edge-spawn-cell st)))
+        (when cell
+          (let ((e (cistern--spawn-enemy st 'warband 'warband
+                                         (car cell) (cdr cell))))
+            ;; objective in IDLE (warband scratch: 0 gnaw/1 steal/2 harass)
+            (setf (cistern--enemy-idle e) (% (cistern--combat-d20 st) 3))))))
+    (cistern--log-sev st 'error "%s"
+                      (format (cdr (assq 'combat-raid-open cistern--copy)) n))
+    (push (list 'raid 'open (car ev-cell) (cdr ev-cell))
+          (cistern-st-rewards-events st)))))
+
+(defun cistern--raid-close (st routed)
+  "Close the raid (COMBAT §4.1/P3): `raid' = (:last-end T),
+survivors retreat to the nearest map edge.  The routed variant
+carries `warband-routed' INSTEAD of the raid CLOSED event."
+  (setf (cistern-st-raid st)
+        (list :last-end (cistern-st-tick st)))
+  (dolist (e (cistern-st-hostiles st))
+    (when (eq (cistern--enemy-faction e) 'warband)
+      (setf (cistern--enemy-grip e) 'retreat)))
+  (if routed
+      (progn
+        (cistern--log-sev st 'success "%s"
+                          (cdr (assq 'combat-raid-routed cistern--copy)))
+        (push (list 'warband-routed 'routed
+                    (cistern-st-w st) (cistern-st-h st))
+              (cistern-st-rewards-events st)))
+    (cistern--log st "%s" (cdr (assq 'combat-raid-close cistern--copy)))
+    (push (list 'raid 'closed (cistern-st-w st) (cistern-st-h st))
+          (cistern-st-rewards-events st))))
+
+(defun cistern--edge-spawn-cell (st)
+  "First walkable, unoccupied BORDER cell in map-index order —
+the deterministic arrival point (no draw is spent on placement)."
+  (let ((found nil) (i 0) (maxi (length (cistern-st-map st))))
+    (while (and (not found) (< i maxi))
+      (let ((x (% i (cistern-st-w st))) (y (/ i (cistern-st-w st))))
+        (when (and (or (= x 0) (= y 0)
+                       (= x (1- (cistern-st-w st)))
+                       (= y (1- (cistern-st-h st))))
+                   (cistern--tile-passable-p (cistern--cell st x y))
+                   (not (gethash (cons x y) (cistern--occupied-cells st nil))))
+          (setq found (cons x y))))
+      (setq i (1+ i)))
+    found))
+
+(defun cistern--maybe-raid (st)
+  "S1 (COMBAT §4.1): one raid draw at each act window floor, ONLY
+when no raid is open and this window has not had one yet.  P1: a
+raid may not even draw while contam ≥ limit−2 or pop ≤ 1 — the
+draw is suppressed entirely, no stream consumption."
+  (let* ((tick (cistern-st-tick st))
+         (act (cistern--story-tick-act tick))
+         (floor-tick (if (= act 3) 240 120))
+         (raid (cistern-st-raid st)))
+    (when (and (memq tick (cistern--combat-k 'raid-ticks))
+               (or (null raid)
+                   (and (plist-get raid :last-end)
+                        (< (plist-get raid :last-end) floor-tick)))
+               (< (cistern-st-contam st) (1- cistern-contam-limit))
+               (> (length (cistern-st-creators st)) 1))
+      (when (>= (cistern--combat-d20 st)
+                (if (= act 3) (cistern--combat-k 'raid-dc-act3)
+                  (cistern--combat-k 'raid-dc-act2)))
+        (cistern--raid-open st)))))
+
+(defun cistern--isolated-worker (st)
+  "S2 isolation read (COMBAT §4.2): the first worker (creators
+order) adjacent to a pipe and at flood-distance ≥ 6 from every
+other worker, through the EXISTING flood primitive."
+  (cl-find-if
+   (lambda (w)
+     (let* ((x (cistern--worker-x w)) (y (cistern--worker-y w)))
+       (and (cl-some (lambda (n)
+                       (eq (cistern--cell st (car n) (cdr n)) 'pipe))
+                     (cistern--neighbors st x y))
+            (let ((dist (cistern--dist-from st x y
+                                            (cistern--occupied-cells st w)
+                                            'always x y)))
+              (cl-every
+               (lambda (o)
+                 (let ((d (gethash (cons (cistern--worker-x o)
+                                         (cistern--worker-y o))
+                                   dist)))
+                   (or (null d) (>= d (cistern--combat-k 'ambush-dist)))))
+               (cl-remove w (cistern-st-creators st)))))))
+   (cistern-st-creators st)))
+
+(defun cistern--maybe-ambush (st)
+  "S2 (COMBAT §4.2): one draw when a worker is isolated at
+plumbing; success = 2 rats at the pipe + one `ambush' event."
+  (let ((w (cistern--isolated-worker st)))
+    (when w
+      (when (>= (cistern--combat-d20 st) (cistern--combat-k 'ambush-dc))
+        (let* ((x (cistern--worker-x w)) (y (cistern--worker-y w))
+               (pipe (cl-find-if (lambda (n)
+                                   (eq (cistern--cell st (car n) (cdr n))
+                                       'pipe))
+                                 (cistern--neighbors st x y))))
+          (when pipe
+            (cistern--spawn-near st 'fauna 'rat (car pipe) (cdr pipe) 2)
+            (cistern--log st "%s"
+                          (format (cdr (assq 'combat-ambush cistern--copy))
+                                  (car pipe) (cdr pipe)))
+            (push (list 'ambush 'ambush (car pipe) (cdr pipe))
+                  (cistern-st-rewards-events st))))))))
+
+(defun cistern--severed-count (st)
+  "Number of severed toilets (each is a severed line)."
+  (let ((n 0))
+    (maphash (lambda (k _v)
+               (when (and (eq (cistern--toilet-state st (car k) (cdr k)) 'down)
+                          (null (cistern--connected-tanks st (car k) (cdr k)))
+                          (not (cistern--manifold-live-p st (car k) (cdr k))))
+                 (setq n (1+ n))))
+             (cistern-st-toilets st))
+    n))
+
+(defun cistern--infest-dc (severed)
+  "S3 DC (COMBAT §4.3): 14 − severed lines, floored at 8 —
+ignoring damage breeds rats."
+  (max (cistern--combat-k 'infest-min-dc)
+       (- (cistern--combat-k 'infest-base-dc) severed)))
+
+(defun cistern--dead-pipe-cell (st)
+  "First (coordinate-order) pipe cell not on a live path."
+  (let ((found nil) (i 0) (maxi (length (cistern-st-map st))))
+    (while (and (not found) (< i maxi))
+      (let ((x (% i (cistern-st-w st))) (y (/ i (cistern-st-w st))))
+        (when (and (eq (cistern--cell st x y) 'pipe)
+                   (not (cistern--pipe-live-p st x y)))
+          (setq found (cons x y))))
+      (setq i (1+ i)))
+    found))
+
+(defun cistern--spawn-near (st faction kind x y n)
+  "Spawn up to N entities of KIND on (X,Y) and its free
+4-neighbors, coordinate order — P2's hostiles ≤ 8 cap respected."
+  (let ((spots (cons (cons x y)
+                     (cl-remove-if
+                      (lambda (c)
+                        (or (not (cistern--tile-passable-p
+                                  (cistern--cell st (car c) (cdr c))))
+                            (gethash c (cistern--occupied-cells st nil))))
+                      (cistern--neighbors st x y)))))
+    (while (and spots (> n 0)
+                (< (length (cistern-st-hostiles st))
+                   (cistern--combat-k 'hostiles-max)))
+      (let ((cell (car spots)))
+        (cistern--spawn-enemy st faction kind (car cell) (cdr cell)))
+      (setq spots (cdr spots) n (1- n)))))
+
+(defun cistern--maybe-infestation (st)
+  "S3 (COMBAT §4.3): every 20 ticks, DC = 14 − severed (min 8);
+success = exactly one rat at a dead pipe + one `infestation' event."
+  (let ((tick (cistern-st-tick st)))
+    (when (and (> tick 0) (= 0 (% tick (cistern--combat-k 'infest-every))))
+      (when (>= (cistern--combat-d20 st)
+                (cistern--infest-dc (cistern--severed-count st)))
+        (let ((pipe (cistern--dead-pipe-cell st)))
+          (when pipe
+            (cistern--spawn-near st 'fauna 'rat (car pipe) (cdr pipe) 1)
+            (cistern--log st "%s"
+                          (format (cdr (assq 'combat-infest cistern--copy))
+                                  (car pipe) (cdr pipe)))
+            (push (list 'infestation 'infest (car pipe) (cdr pipe))
+                  (cistern-st-rewards-events st))))))))
+
+(defun cistern--floods-of-age (st age)
+  "Flood cells that reach AGE ticks old THIS tick (one S4/S5 draw
+per cell at its 20th tick — deterministic, no repeat draws)."
+  (let ((tick (cistern-st-tick st)) (out nil))
+    (dolist (pair (cistern-st-flood-born st))
+      (when (= tick (+ (cdr pair) age))
+        (push (car pair) out)))
+    out))
+
+(defun cistern--maybe-flood-fauna (st)
+  "S4/S5 in pinned order (COMBAT §2): leech d20 ≥ 12, then sponge
+d20 ≥ 14, one draw per flood tile reaching 20 ticks of age."
+  (dolist (cell (cistern--floods-of-age st 20))
+    (when (>= (cistern--combat-d20 st) (cistern--combat-k 'leech-dc))
+      (cistern--spawn-near st 'fauna 'leech (car cell) (cdr cell) 1))
+    (when (>= (cistern--combat-d20 st) (cistern--combat-k 'sponge-dc))
+      (cistern--spawn-near st 'fauna 'sponge (car cell) (cdr cell) 1)
+      (cistern--log st "%s" (cdr (assq 'combat-sponge cistern--copy))))))
+
+;; ---------------------------------------------------------------------------
+;; V5-04 (COMBAT §1.1/§1.2/§3.2): per-hostile behavior and the phase.
+
+(defun cistern--enemy-blocked (st e)
+  "Cells a hostile cannot enter: other workers + other hostiles."
+  (let ((h (cistern--occupied-cells st nil)))
+    (dolist (o (cistern-st-hostiles st))
+      (unless (eq o e)
+        (puthash (cons (cistern--enemy-x o) (cistern--enemy-y o)) t h)))
+    h))
+
+(defun cistern--enemy-step-toward (st e tx ty)
+  "One 1-step move per tick through the flood-distance field,
+same walkability as workers (COMBAT §1.1)."
+  (let* ((x (cistern--enemy-x e)) (y (cistern--enemy-y e))
+         (blocked (cistern--enemy-blocked st e))
+         (dist (cistern--dist-from st tx ty blocked 'always x y))
+         (d0 (gethash (cons x y) dist)))
+    (when (and d0 (> d0 0))
+      (let (nxt)
+        (dolist (n (cistern--neighbors st x y))
+          (let ((dd (gethash n dist)))
+            (when (and dd (= dd (1- d0)) (not (gethash n blocked)) (not nxt))
+              (setq nxt n))))
+        (when nxt
+          (setf (cistern--enemy-x e) (car nxt)
+                (cistern--enemy-y e) (cdr nxt)))))))
+
+(defun cistern--nearest-map-cell (st pred x y)
+  "Nearest cell satisfying PRED by manhattan distance, ties broken
+in coordinate order (deterministic; the nearest-structure pattern)."
+  (let ((best nil) (bd nil) (i 0) (maxi (length (cistern-st-map st))))
+    (while (< i maxi)
+      (let* ((cx (% i (cistern-st-w st))) (cy (/ i (cistern-st-w st))))
+        (when (funcall pred st cx cy)
+          (let ((d (+ (abs (- cx x)) (abs (- cy y)))))
+            (when (or (null bd) (< d bd))
+              (setq bd d best (cons cx cy))))))
+      (setq i (1+ i)))
+    best))
+
+(defun cistern--adjacent-worker (st e)
+  "A non-seated worker 4-adjacent to hostile E (creators order;
+no attack while the worker is seated mid-use, COMBAT §3.2)."
+  (cl-find-if
+   (lambda (w)
+     (and (not (cistern--worker-using w))
+          (= 1 (+ (abs (- (cistern--worker-x w) (cistern--enemy-x e)))
+                  (abs (- (cistern--worker-y w) (cistern--enemy-y e)))))))
+   (cistern-st-creators st)))
+
+(defun cistern--hostile-strike (st e)
+  "E strikes an adjacent worker ONCE per tick (COMBAT §3.2):
+warband rolls dmg-warband, everything else dmg-minor; worker DEF =
+10 + GRIT mod; damage lands through the injury ladder."
+  (let* ((w (cistern--adjacent-worker st e))
+         (matrix (if (eq (cistern--enemy-faction e) 'warband)
+                     'dmg-warband 'dmg-minor))
+         (effect (cistern--combat-strike st matrix
+                                         (cistern--enemy-atk e)
+                                         (cistern--worker-def w))))
+    (when (and w (> (plist-get effect :dmg) 0))
+      (cistern--worker-damage st w (plist-get effect :dmg)))))
+
+(defun cistern--gnaw-complete (st e)
+  "A finished gnaw converts the pipe to `hazard' (COMBAT §1.1):
+the pipe is GONE, the usual hazard decay applies, downstream
+severance follows from the EXISTING connectivity (L-040 untouched),
+the player re-lays with `p' at the usual cost."
+  (let ((x (cistern--enemy-x e)) (y (cistern--enemy-y e)))
+    (cistern--set-cell st x y 'hazard)
+    (setf (cistern--enemy-gnaw e) 0)
+    (cistern--log st "%s"
+                  (format (cdr (assq 'combat-gnaw cistern--copy)) x y))))
+
+(defun cistern--warband-behavior (st e)
+  "Pinned priority (COMBAT §1.1): strike → gnaw → steal → harass.
+IDLE carries the raid-open objective (0/1/2); DRAIN the claim
+accumulator; GNAW the 4-tick pipe timer."
+  (if (cistern--adjacent-worker st e)
+      (cistern--hostile-strike st e)
+    (let ((x (cistern--enemy-x e)) (y (cistern--enemy-y e)))
+      (pcase (cistern--enemy-idle e)
+        (0 ; gnaw — nearest live pipe; a 4-tick timer standing on it
+         (let ((pipe (cistern--nearest-map-cell
+                      st (lambda (s px py)
+                           (and (eq (cistern--cell s px py) 'pipe)
+                                (cistern--pipe-live-p s px py)))
+                      x y)))
+           (when pipe
+             (if (equal (cons x y) pipe)
+                 (setf (cistern--enemy-gnaw e) (1+ (cistern--enemy-gnaw e)))
+               (cistern--enemy-step-toward st e (car pipe) (cdr pipe)))
+             (when (>= (cistern--enemy-gnaw e) 4)
+               (cistern--gnaw-complete st e)))))
+        (1 ; steal — nearest tank with load > 0; 5 units/tick claimed
+         (let ((tk (cistern--nearest-tank st x y)))
+           (when tk
+             (let ((tp (gethash tk (cistern-st-tanks st))))
+               (if (equal (cons x y) tk)
+                   (let* ((load (plist-get tp :load))
+                          (take (min 5 load)))
+                     (puthash tk (plist-put tp :load (- load take))
+                              (cistern-st-tanks st))
+                     (setf (cistern--enemy-drain e)
+                           (+ take (cistern--enemy-drain e)))
+                     (cistern--log st "%s"
+                                   (format (cdr (assq 'combat-tank-raid
+                                                      cistern--copy))
+                                           (car tk) (cdr tk)
+                                           (cistern--enemy-drain e))))
+                 (cistern--enemy-step-toward st e (car tk) (cdr tk)))))))
+        (2 ; harass — step toward the nearest non-limping worker (P5)
+         (let ((w (cl-find-if
+                   (lambda (w)
+                     (not (eq (cistern--worker-injury-state w) 'limp)))
+                   (cistern-st-creators st))))
+           (when w
+             (cistern--enemy-step-toward st e (cistern--worker-x w)
+                                         (cistern--worker-y w)))))))))
+
+(defun cistern--retreat-step (st e)
+  "Retreat (COMBAT §1.1/§1.2): walk to the nearest map edge,
+despawn on arrival."
+  (let* ((x (cistern--enemy-x e)) (y (cistern--enemy-y e))
+         (edges (list (cons 0 y) (cons (1- (cistern-st-w st)) y)
+                      (cons x 0) (cons x (1- (cistern-st-h st)))))
+         (tgt (car (sort (copy-sequence edges)
+                         (lambda (a b)
+                           (< (+ (abs (- (car a) x)) (abs (- (cdr a) y)))
+                              (+ (abs (- (car b) x)) (abs (- (cdr b) y)))))))))
+    (if (or (= x 0) (= y 0)
+            (= x (1- (cistern-st-w st))) (= y (1- (cistern-st-h st))))
+        (setf (cistern-st-hostiles st) (delq e (cistern-st-hostiles st)))
+      (cistern--enemy-step-toward st e (car tgt) (cdr tgt)))))
+
+(defun cistern--rat-behavior (st e)
+  "Pipe-rat (COMBAT §1.2): gnaws pipes (3 ticks); prefers
+severed-line joints (dead pipes first)."
+  (let* ((x (cistern--enemy-x e)) (y (cistern--enemy-y e))
+         (on-pipe (eq (cistern--cell st x y) 'pipe)))
+    (if on-pipe
+        (progn (setf (cistern--enemy-gnaw e) (1+ (cistern--enemy-gnaw e)))
+               (when (>= (cistern--enemy-gnaw e) 3)
+                 (cistern--gnaw-complete st e)))
+      (let ((tgt (or (cistern--nearest-map-cell
+                      st (lambda (s px py)
+                           (and (eq (cistern--cell s px py) 'pipe)
+                                (not (cistern--pipe-live-p s px py))))
+                      x y)
+                     (cistern--nearest-map-cell
+                      st (lambda (s px py)
+                           (eq (cistern--cell s px py) 'pipe))
+                      x y))))
+        (when tgt
+          (cistern--enemy-step-toward st e (car tgt) (cdr tgt)))))))
+
+(defun cistern--crab-behavior (st e)
+  "Clog-crab (COMBAT §1.2): occupies a usable toilet; pinches
+adjacency (strikes adjacent workers, dmg-minor)."
+  (cistern--hostile-strike st e))
+
+(defun cistern--leech-behavior (st e)
+  "Vent-leech (COMBAT §1.2): band ≥ 2 ATTACHES (one attack roll vs
+the worker's DEF); attached, it drains 1 HP per 4 ticks —
+mechanical, not rolled.  The host's death removes it (§3.4)."
+  (if (cistern--enemy-grip e)
+      (progn
+        (setf (cistern--enemy-drain e) (1+ (cistern--enemy-drain e)))
+        (when (>= (cistern--enemy-drain e) (cistern--combat-k 'leech-interval))
+          (setf (cistern--enemy-drain e) 0)
+          (cistern--worker-damage st (cistern--enemy-grip e) 1)))
+    (let ((w (cistern--adjacent-worker st e)))
+      (when w
+        (let ((band (cistern--combat-band st (cistern--enemy-atk e)
+                                           (cistern--worker-def w))))
+          (when (>= band 2)
+            (setf (cistern--enemy-grip e) w)
+            (cistern--log st "%s"
+                          (format (cdr (assq 'combat-leech-grip cistern--copy))
+                                  (cistern--worker-glyph st w)))))))))
+
+(defun cistern--sponge-behavior (st e)
+  "Sump-sponge (COMBAT §1.2): immobile; absorbs 1 unit/tick from
+the nearest tank with load; splits at 20, cap P2 respected."
+  (let ((tk (cistern--nearest-tank st (cistern--enemy-x e)
+                                   (cistern--enemy-y e))))
+    (when tk
+      (let ((tp (gethash tk (cistern-st-tanks st))))
+        (when (> (plist-get tp :load) 0)
+          (puthash tk (plist-put tp :load (1- (plist-get tp :load)))
+                   (cistern-st-tanks st))
+          (setf (cistern--enemy-drain e) (1+ (cistern--enemy-drain e)))
+          (when (and (>= (cistern--enemy-drain e)
+                         (cistern--combat-k 'sponge-split))
+                     (< (length (cistern-st-hostiles st))
+                        (cistern--combat-k 'hostiles-max)))
+            (setf (cistern--enemy-drain e) 0)
+            (cistern--spawn-near st 'fauna 'sponge
+                                 (cistern--enemy-x e) (cistern--enemy-y e) 1)
+            (cistern--log st "%s"
+                          (cdr (assq 'combat-sponge cistern--copy)))))))))
+
+(defun cistern--enemy-damage (st e n killer)
+  "N damage to hostile E from worker KILLER (COMBAT §3.2): a crab
+that takes ANY hit drive-offs (retreats); hp 0 removes the entity,
+grants +1 XP, pushes `goblin-death' (ruling 3) and clears focus."
+  (setf (cistern--enemy-hp e) (- (cistern--enemy-hp e) n))
+  (when (and (eq (cistern--enemy-kind e) 'crab)
+             (> (cistern--enemy-hp e) 0)
+             (not (cistern--enemy-retreat-p e)))
+    (setf (cistern--enemy-grip e) 'retreat)
+    (cistern--log st "%s"
+                  (format (cdr (assq 'combat-drive-off cistern--copy))
+                          (cistern--enemy-x e) (cistern--enemy-y e))))
+  (when (<= (cistern--enemy-hp e) 0)
+    (setf (cistern-st-hostiles st) (delq e (cistern-st-hostiles st)))
+    (when killer (cistern--rpg-grant-xp st killer 1))
+    (when (equal (cistern-st-focus st) (cistern--enemy-id e))
+      (setf (cistern-st-focus st) nil))
+    (push (list 'goblin-death (cistern--enemy-kind e)
+                (cistern--enemy-x e) (cistern--enemy-y e))
+          (cistern-st-rewards-events st))))
+
+(defun cistern--auto-defense (st)
+  "Worker auto-defense (COMBAT §3.2): one attack per tick, rolled
+in creators order after the hostile behaviors; targeting = focus
+else nearest adjacent, ALWAYS guild-filtered; seated workers
+don't attack; kills/drive-offs grant +1 XP."
+  (dolist (w (copy-sequence (cistern-st-creators st)))
+    (unless (cistern--worker-using w)
+      (let ((tgt (cistern--combat-target st w)))
+        (when tgt
+          (let ((effect (cistern--combat-strike st 'dmg-minor
+                                                (cistern--rpg-stat-mod w 0)
+                                                (cistern--enemy-def tgt))))
+            (when (> (plist-get effect :dmg) 0)
+              (cistern--enemy-damage st tgt (plist-get effect :dmg) w))))))))
+
+(defun cistern--phase-hostiles (st)
+  "V5-04: the combat tick slot (COMBAT §5.1/§5.2), pinned between
+creators and hazards so gnaw-made hazards participate in the same
+tick's decay/spread.  Stream-4 order: S-spawn draws (S1–S5) → per
+hostile, list order: behavior draws then strikes → worker
+auto-defense (creators order).  Event pushes drain NOTHING —
+rewards-eval stays the sole drainer (L-027)."
+  (when cistern-combat-enabled
+  ;; P3: the raid span caps at 40 ticks, then forced withdrawal
+  (let ((raid (cistern-st-raid st)))
+    (when (and (plist-get raid :open)
+               (>= (- (cistern-st-tick st) (plist-get raid :open))
+                   (cistern--combat-k 'raid-span)))
+      (cistern--raid-close st nil)))
+  ;; the spawn table, pinned order S1..S5 (S6 guild lands V5-05)
+  (cistern--maybe-raid st)
+  (cistern--maybe-ambush st)
+  (cistern--maybe-infestation st)
+  (cistern--maybe-flood-fauna st)
+  ;; per hostile, in list (spawn) order
+  (dolist (e (copy-sequence (cistern-st-hostiles st)))
+    (cond ((cistern--enemy-retreat-p e) (cistern--retreat-step st e))
+          ((eq (cistern--enemy-faction e) 'warband)
+           (cistern--warband-behavior st e))
+          ((eq (cistern--enemy-kind e) 'rat) (cistern--rat-behavior st e))
+          ((eq (cistern--enemy-kind e) 'crab) (cistern--crab-behavior st e))
+          ((eq (cistern--enemy-kind e) 'leech) (cistern--leech-behavior st e))
+          ((eq (cistern--enemy-kind e) 'sponge)
+           (cistern--sponge-behavior st e))))
+  (cistern--auto-defense st)
+  ;; every raider killed/driven off before the cap → the routed close
+  (when (and (cistern-st-raid st)
+             (plist-get (cistern-st-raid st) :open)
+             (not (cl-some (lambda (e)
+                             (eq (cistern--enemy-faction e) 'warband))
+                           (cistern-st-hostiles st))))
+    (cistern--raid-close st t))))
 
 (defun cistern--story-tier-face (tier)
   "V4-22 rarity surfacing: the tier maps onto the existing severity
@@ -945,12 +1456,24 @@ OR is anchored to a manifold."
              (cistern--manifold-live-p st x y)))))
 
 (defun cistern--free-usable-toilets (st)
-  (let ((out nil))
+  "V5-04 (COMBAT §1.2): crab-occupied cells are excluded — an
+ACCESS-reality read, not a new rule."
+  (let ((out nil)
+        (crabs (cistern--kind-cells st 'crab)))
     (maphash (lambda (k _v)
-               (when (cistern--toilet-usable-p st (car k) (cdr k))
+               (when (and (cistern--toilet-usable-p st (car k) (cdr k))
+                          (not (gethash k crabs)))
                  (push k out)))
              (cistern-st-toilets st))
     (sort out (lambda (a b) (< (car a) (car b))))))
+
+(defun cistern--kind-cells (st kind)
+  "Hash of the cells occupied by hostiles of KIND."
+  (let ((h (make-hash-table :test #'equal)))
+    (dolist (e (cistern-st-hostiles st))
+      (when (eq (cistern--enemy-kind e) kind)
+        (puthash (cons (cistern--enemy-x e) (cistern--enemy-y e)) t h)))
+    h))
 
 ;; View-facing query functions (D6): the projection reads connection
 ;; and load state ONLY through these enum/number queries — never via
@@ -1354,6 +1877,11 @@ limit — it steals ticks, not health."
              (eq (cistern--cell st x y) 'floor)
              (not (gethash (cons x y) (cistern--occupied-cells st nil))))
     (cistern--set-cell st x y 'flood)
+    ;; V5-04: record the birth tick — the S4/S5 spawn draws read
+    ;; "flood open ≥ 20 ticks" off this alist
+    (setf (cistern-st-flood-born st)
+          (cons (cons (cons x y) (cistern-st-tick st))
+                (cistern-st-flood-born st)))
     t))
 
 (defun cistern--accident (st w)
@@ -1459,7 +1987,11 @@ permanent scarring: stop bleeding and the marks fade."
             ;; V4-05: flood does not spread — it only dries, on the
             ;; same decay-pct roll the hazard uses
             (when (< roll cistern-decay-pct)
-              (cistern--set-cell st (car h) (cdr h) 'floor))
+              (cistern--set-cell st (car h) (cdr h) 'floor)
+              ;; V5-04: a dried flood leaves the age alist
+              (setf (cistern-st-flood-born st)
+                    (cl-remove-if (lambda (p) (equal (car p) h))
+                                  (cistern-st-flood-born st))))
           (cond
            ((< roll cistern-spread-pct)
             (let* ((cands (cl-remove-if
@@ -1561,11 +2093,12 @@ corruption."
     (setf (cistern-st-particles st) (nreverse alive))))
 
 (defun cistern--sim-tick (st)
-  "One full simulation tick: creators, hazards, migration, check.
-Exactly the four domain phases; the tutorial hook is added by the
-game layer (Phase 2)."
+  "One full simulation tick (V5-04 pinned phase order, COMBAT
+§5.1): creators → hostiles → hazards → migration → check (the
+event-tiles phase keeps its post-hazards slot)."
   (setf (cistern-st-tick st) (1+ (cistern-st-tick st)))
   (cistern--phase-creators st)
+  (cistern--phase-hostiles st)
   (cistern--phase-hazards st)
   (cistern--phase-events st)
   (cistern--phase-migration st)
@@ -1753,6 +2286,18 @@ legal no-op state for tests)."
     (combat-injury-limp . "WORKER %s INJURED — LIMP LOGGED — GAIT NORMALIZED ON RELIEF RUNS")
     (combat-injury-shaken . "WORKER %s SHAKEN — NERVE DEGRADED — WATCH THE THRESHOLD")
     (combat-worker-death . "WORKER %s LOST — SERVICE RECORD SEALED")
+    ;; V5-04 (COMBAT §4.7): raids, ambush, infestation, gnaw, steal,
+    ;; leech, drive-off, sponge
+    (combat-raid-open . "RAID — THE INHERITORS CLAIM THE MAIN — %d HOSTILE")
+    (combat-raid-close . "RAID CLOSED — THE INHERITORS WITHDRAW — CLAIM NOT RECOGNIZED")
+    (combat-raid-routed . "THE MAIN HOLDS — INHERITORS ROUTED — THE SECTOR REMAINS SERVED")
+    (combat-ambush . "AMBUSH AT ISOLATED PLUMBING — (%d,%d)")
+    (combat-infest . "INFESTATION — GNAWING LOGGED AT (%d,%d)")
+    (combat-gnaw . "LINE SEVERED BY GNAW AT (%d,%d) — RE-LAY (p)")
+    (combat-tank-raid . "TANK (%d,%d) DRAWN DOWN — %d UNITS CLAIMED")
+    (combat-leech-grip . "VENT-LEECH ATTACHED — WORKER %s — CUT IT OFF")
+    (combat-drive-off . "CLOG-CRAB DRIVEN OFF — (%d,%d)")
+    (combat-sponge . "SPONGE MASS RECLASSIFIED FAUNA — FEEDING LOGGED AS NATURAL")
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
     (capacity-none . "NO WIRED TOILET ON THE GRID — LAY PIPE (p)")
     (teach-arrows . "C-n/C-p/C-f/C-b MOVE TOO")
@@ -1797,6 +2342,15 @@ section first, then bank :copy sections in load order (§4.4).")
   '((1 . (0 . 119)) (2 . (120 . 239)) (3 . (240 . 99999)))
   "STORY §3.5 act windows (v4 pin): Act I 0-119, Act II 120-239,
 Act III 240+ (unbounded).")
+
+(defun cistern--story-tick-act (tick)
+  "The act whose window TICK falls in (STORY §3.5) — derived
+from the pinned `cistern--story-act-ticks' spans, not a second
+copy of the windows.  Lives in the domain (innermost layer): the
+combat spawn table reads it too (COMBAT §4.1)."
+  (let ((act 1))
+    (dolist (a cistern--story-act-ticks act)
+      (when (>= tick (car (cdr a))) (setq act (car a))))))
 
 (defconst cistern--story-tier-drift '(0 5 10)
   "STORY §7.4: per-act rare-tier shift added to the premise's

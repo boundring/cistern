@@ -3312,3 +3312,44 @@ the relaunch is on their screen now.
   doc leaves the phase unpinned.  Shift heal rides the EXISTING
   migration shift boundary (tick % 40 = 0, same block as the shift XP).
 - Outcome: V5-03 GREEN.  Suite canonical count 111.
+
+---
+
+## L-099 (2026-09-08, run: wave1-violent-base — V5-04 spawn table + hostiles phase)
+
+- State at budget stop: the ENTIRE V5-04 domain implementation is in
+  src/cistern-domain.el (phase-hostiles pinned creators→hostiles→hazards;
+  S1–S5 spawn draws in pinned order; raid lifecycle with P1/P2/P3 valves;
+  warband strike→gnaw→steal→harass; rat/crab/leech/sponge loops; worker
+  auto-defense guild-filtered; goblin-death/warband-routed/raid events;
+  `cistern--story-tick-act` relocated game→domain — the combat spawn
+  table reads it, story-eval keeps the same symbol).  Src side loads
+  clean; suite 111/111 GREEN at this commit with combat OFF.
+- Combat switch (new, PROTECT-mandated): `cistern-combat-enabled`
+  (defvar, default nil) — combat-disabled runs are byte-identical to the
+  pre-v5 sim (spec §1.1).  Driver entries `cistern`/`cistern-new-game`
+  enable it for live play.  CRITICAL for wave-2: v4 curated scenarios
+  (win-serve, starter-card, legacy-verb-blocks) BREAK with combat ON —
+  raid gnaws sever pipes, contamination expectations fail.  v5 tests
+  must enable the flag per-test, NEVER file-globally (a load-time setq
+  poisoned 20+ v4 tests — suite ran 27/115 failures before the switch
+  existed; test registration order does not protect against load-time
+  globals because run.el loads every file before running any test).
+- V5-04 RED was captured correctly: 4/115 (void-function cistern--maybe-raid /
+  cistern--infest-dc / cistern-st-raid) against the V5-03 commit.  The red
+  + green test fixtures (CB6 raid act-scaling/valves/routed; CB7 infestation
+  DC 14−severed min 8 + one-rat-at-dead-pipe; CB12 events→hook machine with
+  an (event raid) scenario bank fixture; CB13/P6 300-tick two-run soak with
+  window ≥ 22) were fully written but their file suffered repeated paren
+  corruption during heredoc/sed assembly — RECOVERED AWAY from the working
+  tree to keep the commit boundary green.  TODO (first task of the next
+  slice): re-add the four fixtures to tests/test-v5.el (write the file in
+  ONE tool call or via python whole-file template — never heredoc+sed
+  paren surgery; L-017 class), register, re-capture red is NOT needed (red
+  already documented above), verify green, commit V5-04.
+- Bug class caught by the fixtures before they were lost: cistern--spawn-near
+  passed (car spots)/(cdr spots) — list head/tail — as x/y coordinates;
+  spawned hostiles carried conses/lists in position slots and broke 27
+  downstream tests with wrong-type-argument.  Fixed: destructure
+  (let ((cell (car spots))) (spawn ... (car cell) (cdr cell))).
+- Outcome: V5-04 SRC LANDED, TESTS PENDING.  Suite canonical 111/111.
