@@ -55,7 +55,9 @@ demolish verb, a lighter fee than plumbing removal.")
     ;; pin-covered ranges: U+259A, U+2591, U+256C)
     (rubble   :glyph "▚" :passable nil :buildable nil :firebreak t   :conn nil)
     (flood    :glyph "░" :passable nil :buildable nil :firebreak nil :conn nil)
-    (manifold :glyph "╬" :passable nil :buildable nil :firebreak t   :conn nil))
+    (manifold :glyph "╬" :passable nil :buildable nil :firebreak t   :conn nil)
+    (event :glyph "!" :passable t   :buildable nil :firebreak nil :conn nil)
+    (cache :glyph "?" :passable t   :buildable nil :firebreak nil :conn nil))
   "One entry per cell kind.  No cell-kind pcase/case may exist
 outside this table (the connection-dependent pipe glyph is computed
 by the view, not here).")
@@ -121,7 +123,9 @@ by the view, not here).")
   (toilet-type 'long-drop)
   ;; V4-15 (STORY §3.6): the session story plist; nil = no story
   ;; (banks not loaded — a legal no-op state for tests)
-  (story nil))
+  (story nil)
+  ;; V4-22: alist ((X . Y) . TICKS-LEFT) - the ! tiles' countdowns
+  (event-tiles nil))
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -205,6 +209,58 @@ clamp(3 − mod, 2, 6); sick workers take twice as many (§1)."
 (defun clamp (lo v hi)
   "V4-10 helper: clamp V into [LO, HI]."
   (min hi (max lo v)))
+
+(defconst cistern--cache-alloy 3
+  "V4-22 (S3.2): the alloy bonus banked by the first worker to walk
+over a cache tile.")
+
+(defun cistern--story-tier-face (tier)
+  "V4-22 rarity surfacing: the tier maps onto the existing severity
+faces - common = info (dim), occasional = warning, rare = error
+(the most prominent face in the browser)."
+  (pcase tier
+    ('occasional 'warning)
+    ('rare 'error)
+    (_ 'info)))
+
+(defun cistern--add-event-tile (st x y)
+  "V4-22 (S3.2): spawn a ! event tile on clean, unoccupied floor -
+a silent 3-tick countdown (each standing tick logs nothing)."
+  (when (and (cistern--in-bounds-p st x y)
+             (eq (cistern--cell st x y) 'floor)
+             (not (gethash (cons x y) (cistern--occupied-cells st nil))))
+    (cistern--set-cell st x y 'event)
+    (setf (cistern-st-event-tiles st)
+          (append (cistern-st-event-tiles st)
+                  (list (cons (cons x y) 3))))
+    t))
+
+(defun cistern--phase-events (st)
+  "V4-22: decay the event tiles' countdowns per tick; expiry
+renders nothing (the cell returns to floor)."
+  (let ((remaining nil))
+    (dolist (tile (cistern-st-event-tiles st))
+      (let* ((cell (car tile))
+             (left (1- (cdr tile))))
+        (if (> left 0)
+            (push (cons cell left) remaining)
+          (when (eq (cistern--cell st (car cell) (cdr cell)) 'event)
+            (cistern--set-cell st (car cell) (cdr cell) 'floor)))))
+    (setf (cistern-st-event-tiles st) (nreverse remaining))
+    st))
+
+(defun cistern--cache-pickup (st w)
+  "V4-22 (S3.2): the first worker to walk over a cache banks its
+alloy bonus; the tile clears to floor and the pickup logs success."
+  (let ((x (cistern--worker-x w)) (y (cistern--worker-y w)))
+    (when (eq (cistern--cell st x y) 'cache)
+      (cistern--set-cell st x y 'floor)
+      (setf (cistern-st-alloy st) (+ (cistern-st-alloy st)
+                                     cistern--cache-alloy))
+      (cistern--log-sev st 'success "%s"
+                        (format (cdr (assq 'cache-pickup cistern--copy))
+                                (cistern--worker-glyph st w)
+                                cistern--cache-alloy)))))
 
 ;; ---------------------------------------------------------------------------
 ;; V4-11 (RPG §2): the fixture catalog — sole source for cost, ticks,
@@ -1241,6 +1297,7 @@ game layer (Phase 2)."
   (setf (cistern-st-tick st) (1+ (cistern-st-tick st)))
   (cistern--phase-creators st)
   (cistern--phase-hazards st)
+  (cistern--phase-events st)
   (cistern--phase-migration st)
   (cistern--phase-check st))
 
@@ -1274,7 +1331,9 @@ game layer (Phase 2)."
 Stream 1 only (one consumption pass); stream 2's :roll-pos is
 initialized but never advanced here.  No banks means nil story (a
 legal no-op state for tests)."
-  (when cistern--banks
+  (when (and cistern--banks
+             (consp (plist-get cistern--banks :scenarios))
+             (consp (plist-get cistern--banks :quirks)))
     (let* ((pos (cistern--stream-init (cistern-st-seed st) 1))
            (scenarios (plist-get cistern--banks :scenarios))
            (quirks (plist-get cistern--banks :quirks))
@@ -1406,6 +1465,7 @@ legal no-op state for tests)."
     (exposure-fail . "WORKER %s CONTAMINATED — DEGRADATION UNDERWAY")
     (toilet-type-fmt . "FIXTURE — %s — %s")
     (story-goal-mod . "WATCH ORDER AMENDED — %d SERVED")
+    (cache-pickup . "CACHE BANKED BY %s - +%d ALLOY")
     (inspector-stat-fmt . "F%+d G%+d N%+d A%+d")
     (inspector-clear-fmt . "CL.%s")
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy

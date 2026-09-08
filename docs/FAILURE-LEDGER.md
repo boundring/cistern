@@ -3067,3 +3067,58 @@ the relaunch is on their screen now.
 - VERIFY: canonical suite ALL 104 TESTS PASSED (batch).
 
 ---
+
+## L-093 (2026-09-07, run: impl-v4-w2a — BATCH 3B: V4-22 event tiles + rarity tiers + V4-23 final sweep + WAVE-3/V4 END SUMMARY)
+
+- Outcome: LANDED (red commits in the batch, green this commit).
+- V4-22 (event tiles): tile table gains event ! / cache ? (passable
+  transient kinds, ASCII — C3 in-range); cistern--add-event-tile
+  (floor-only, unoccupied, silent 3-tick countdown per §S3.2);
+  cistern--phase-events in sim-tick (decay per tick, expiry clears
+  to floor — renders nothing); cistern--cache-pickup (first walker
+  banks +3 alloy, tile clears, success log); the story-eval
+  tile-place effect (stream-2-picked floor cell, countdown spawn).
+- V4-21 residual (rarity tiers surfaced): cistern--story-tier-face —
+  common → info (dim), occasional → warning, rare → error (the
+  most prominent browser face); the tier-face mapping is the
+  ledger's stated convention.  Dialogue tree selection now draws
+  the tier (weights 60/30/10+drift, §7.5) before the gate check;
+  the trees carry :tier.
+- V4-23 (final sweep): M-f/M-b scan includes manifolds (V4-07);
+  the death-panel full-history line with story+dialogue lines in
+  the log (V4-09 + this batch's story lines); §5.6 stream guards —
+  the sim LCG tick-for-tick identical vs a no-narrative run, the
+  particle stream is rewards-driven (the goal-mod legitimately
+  shifts sparkle pacing — the guard is the static no-draw check);
+  the five soars re-probed once each.
+- Defect class (the batch's hard lesson): check-parens + the
+  form-walk (forward-sexp with the line report) pinpointed every
+  paren-disease break in seconds — the earlier hand-counting
+  approach burned three failed suite runs.  Rule: after ANY
+  multi-form elisp edit, run check-parens BEFORE the suite.
+- VERIFY: canonical suite ALL 107 TESTS PASSED (batch).
+
+### WAVE-3 END SUMMARY + V4 END SUMMARY (all 23 directives)
+
+- WAVE 3: V4-20 (dialogue bank kind + validation) LANDED in batch
+  3a; V4-21 (dialogue-eval: tier selection, participant stat rolls,
+  cooldown, log-intent-only delivery) LANDED in batches 3a/3b;
+  V4-22 (event tiles + tile-place + cache pickup) LANDED; V4-23
+  (final sweep: scan manifolds, death-panel history, §5.6 guards,
+  five soars) LANDED.  3/3 wave-3 directives.
+- V4 TOTALS: 23/23 directives landed across waves 1-3 (V4-01..V4-09
+  surface foundations; V4-10..V4-19 narrative core; V4-20..V4-23
+  dialogue + integration + QoL).  Suite: 81 → 107 tests, all green;
+  the GUI probes registered + skipped without display.  Ledger:
+  L-077..L-093 (per-directive + batch + end summaries, red-first
+  per R10, commit-per-green held throughout).
+- v4-close readiness: tree clean; the canonical suite green; the
+  PROTECT soars intact (S1 inspector width degradation, S2
+  pressure voice copy untouched, S3 popups at the act, S4 purge
+  ledger untouched, S5 non-modal delivery); the stream discipline
+  asserted (sim LCG + particle-rng forbidden to story/dialogue/
+  RPG code, stream 2 pos-in/pos-out on state); the 95-col contract
+  asserted in the briefing/log/legend/inspector tests.  Handoff to
+  the verifier gate is ready.
+
+---

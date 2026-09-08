@@ -367,6 +367,22 @@ effects.  Returns presentation intents (popup), possibly nil."
                       (cistern-st-tanks st))))))
       ('alloy-grant
        (setf (cistern-st-alloy st) (+ (cistern-st-alloy st) (or arg 0))))
+      ('tile-place
+       ;; V4-22 (S3.1): the story beat lands an ! event tile — the arg
+       ;; names the resolution kind; the cell is stream-2-picked floor
+       (let* ((floors nil) (i 0))
+         (while (< i (length (cistern-st-map st)))
+           (when (eq (aref (cistern-st-map st) i) 'floor)
+             (push (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st)))
+                   floors))
+           (cl-incf i))
+         (setq floors (nreverse floors))
+         (when floors
+           (let* ((p (cistern--stream-next
+                      (plist-get (cistern-st-story st) :roll-pos)))
+                  (cell2 (nth (% (ash p -6) (length floors)) floors)))
+             (plist-put (cistern-st-story st) :roll-pos p)
+             (cistern--add-event-tile st (car cell2) (cdr cell2))))))
       ('popup
        (cistern--field-spawn st cell (cons 0 -1) 3
                              (or (and (stringp arg) arg) "NOTED")
@@ -541,7 +557,7 @@ default; :as pass|fail pins the verdict), cooldown honored."
                (eq (plist-get hook :resolved-as) (plist-get tree :as))
              t))
          (let ((last (cdr (assq (plist-get tree :id)
-                                (plist-get story :dlg-cooldowns)))))
+                                (plist-get (plist-get story :dlg) :cooldowns)))))
            (or (null last) (>= (- tick last)
                                cistern--dialogue-cooldown))))))
 
@@ -563,11 +579,19 @@ nothing; emits only faced log intents (info severity)."
           (plist-put dlg :pending (cdr (plist-get dlg :pending))))
          ;; open a new tree
          (cistern--banks
-          (let ((act (plist-get story :act))
-                (chosen nil))
+          (let* ((act (plist-get story :act))
+                 (drift (nth (1- act) cistern--story-tier-drift))
+                 ;; §7.5: ONE stream-2 draw selects the tier band
+                 ;; (weights 60/30/10+drift); the matching tree fires
+                 (tier-draw (cistern--story-draw st (+ 100 drift)))
+                 (tier (cond ((< tier-draw 60) 'common)
+                             ((< tier-draw 90) 'occasional)
+                             (t 'rare)))
+                 (chosen nil))
             (dolist (tree (plist-get cistern--banks :dialogues))
               (unless chosen
                 (when (and (plist-get tree :root)
+                           (eq (plist-get tree :tier) tier)
                            (cistern--dialogue-eligible-p st tree))
                   (setq chosen tree))))
             (when chosen
@@ -609,7 +633,10 @@ nothing; emits only faced log intents (info severity)."
                      (pending (list rootline))
                      (node root)
                      (rolls 0))
+                (princ (format "DBGW0 branch=%S\\n" (plist-get node :branch)))
+                (princ (format "DBGW1 node=%S br=%S\\n" node (plist-get node :branch)))
                 (while (plist-get node :branch)
+                  (princ (format "DBGW1-iter br=%S\\n" (plist-get node :branch)))
                   (let* ((br (plist-get node :branch))
                          (stat (or (cdr (assq (plist-get br :stat)
                                               branch-stats))
@@ -626,6 +653,8 @@ nothing; emits only faced log intents (info severity)."
                                          :key (lambda (x)
                                                 (plist-get x :id)))))
                     (setq rolls (1+ rolls))
+                    (princ (format "DBGW2 roll=%S band=%S nnode=%S\\n" roll band (and nnode (plist-get nnode :id))))
+                    (princ (format "DBGW3 pending=%S\\n" pending))
                     (setq node nnode)
                     (when node
                       (push (cistern--story-fill

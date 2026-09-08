@@ -188,7 +188,8 @@ greys)."
     (hazard . "contamination") (pipe . "pipe") (toilet . "toilet")
     (tank . "tank")
     ;; V4-05 (SURFACE S3.2) — the legend stays table-generated
-    (rubble . "rubble") (flood . "flood") (manifold . "manifold")))
+    (rubble . "rubble") (flood . "flood") (manifold . "manifold")
+    (event . "event") (cache . "cache")))
 
 (defconst cistern-view--kind-descriptions
   '((wall . "MEGASTRUCTURE WALL") (floor . "FLOOR") (door . "GATE / DOOR")
