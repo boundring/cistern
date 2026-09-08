@@ -135,7 +135,11 @@
   ;; v5 wave 1 — the violent base (docs/v5/V5-SPEC.md §3)
     cistern-test-v5-01-entities
     cistern-test-v5-02-resolution
-    cistern-test-v5-03-injury))
+    cistern-test-v5-03-injury
+    cistern-test-v5-04-raid
+    cistern-test-v5-04-infestation
+    cistern-test-v5-04-events
+    cistern-test-v5-04-determinism))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

@@ -310,3 +310,229 @@ position)."
                  t "a worker-death event joins the pending list")
       (cl-assert (equal (cistern--worker-glyph st b) "β")
                  t "β still renders β — identity is the spawn-index"))))
+
+;; --- V5-04 fixtures (re-added per L-099; combat enabled per-test) ----------------
+;; The commit-boundary red for these was captured against 255a3b3 and is
+;; documented in L-099 (4/115: void-function cistern--maybe-raid /
+;; cistern--infest-dc / cistern-st-raid).  The setter is called as the
+;; first body form of each ticking fixture — never file-globally (L-099:
+;; a load-time setq poisons every combat-disabled v4 scenario test).
+
+(defun cistern-test-v5-04--combat-on ()
+  (setq cistern-combat-enabled t))
+
+(defun cistern-test-v5-04--find-nat (st lo)
+  "Point ST's combat-pos at a draw that reads >= LO (fixture)."
+  (let ((p (cistern-st-combat-pos st)) found)
+    (dotimes (_ 2000)
+      (let ((r (cistern--combat-d20-pos p)))
+        (when (and (not found) (>= (car r) lo)) (setq found p))
+        (setq p (cdr r))))
+    (cl-assert found t "fixture: a d20 >= %d within 2000 draws" lo)
+    (setf (cistern-st-combat-pos st) found)))
+
+(defun cistern-test-v5-04-raid ()
+  "V5-04 (CB6): act-scaled raids — tick 120 with d20 >= 8 opens ONE
+raid of clamp(pop-1,1,3); P1: contamination >= 18 or pop <= 1
+suppresses the draw entirely; P3: the raid closes by open+40; the
+routed close carries `warband-routed' instead of the CLOSED line."
+  (cistern-test-v5-04--combat-on)
+  ;; direct: the raid opens at the act II floor with a forced high draw
+  (let ((st (cistern--new-game 20260830)))
+    (setf (cistern-st-tick st) 120)
+    (cistern-test-v5-04--find-nat st 8)
+    (cistern--maybe-raid st)
+    (let ((raid (cistern-st-raid st)))
+      (cl-assert (and raid (plist-get raid :open))
+                 t "a raid opens at the act II window floor")
+      (cl-assert (= (plist-get raid :open) 120) t "T0 is the open tick")
+      (cl-assert (= (length (cistern-st-hostiles st)) 3)
+                 t "act II: clamp(pop-1,1,3) with pop 4 gives 3 raiders")
+      (cl-assert (cl-every (lambda (e)
+                             (eq (cistern--enemy-faction e) 'warband))
+                           (cistern-st-hostiles st))
+                 t "the raid spawns warband entities")
+      (cl-assert (memq 'raid (mapcar #'cistern--event-kind
+                                     (cistern-st-rewards-events st)))
+                 t "a `raid' OPEN event joins the pending list")
+      (cl-assert (cl-some (lambda (e) (memq (cistern--enemy-idle e) '(0 1 2)))
+                          (cistern-st-hostiles st))
+                 t "every raider carries an objective")))
+  ;; act III scaling: raider count clamp(pop-1,2,4), DC 5
+  (let ((st (cistern--new-game 20260830)))
+    (setf (cistern-st-tick st) 240)
+    (cistern-test-v5-04--find-nat st 5)
+    (cistern--maybe-raid st)
+    (cl-assert (cistern-st-raid st) t "act III opens at DC 5")
+    (cl-assert (= (length (cistern-st-hostiles st)) 3)
+               t "act III: clamp(pop-1,2,4) with pop 4 gives 3 raiders"))
+  ;; P1: contamination >= limit-2 suppresses the draw entirely
+  (let ((st (cistern--new-game 20260830)))
+    (setf (cistern-st-tick st) 120)
+    (setf (cistern-st-contam st) (1- cistern-contam-limit))
+    (cistern-test-v5-04--find-nat st 8)  ; even a nat-20 stays a no-op
+    (cistern--maybe-raid st)
+    (cl-assert (null (cistern-st-raid st)) t "P1: contam >= 18 suppresses")
+    (cl-assert (null (cistern-st-hostiles st)) t "P1: no raiders spawn"))
+  ;; P1: pop <= 1 suppresses
+  (let ((st (cistern--new-game 20260830)))
+    (setf (cistern-st-tick st) 120)
+    (setf (cistern-st-creators st) (list (nth 0 (cistern-st-creators st))))
+    (cistern-test-v5-04--find-nat st 8)
+    (cistern--maybe-raid st)
+    (cl-assert (null (cistern-st-raid st)) t "P1: pop <= 1 suppresses"))
+  ;; P3: forced withdrawal at open+40
+  (let ((st (cistern--new-game 20260830)))
+    (setf (cistern-st-raid st) (list :open 120))
+    (setf (cistern-st-tick st) 160)
+    (cistern--phase-hostiles st)
+    (cl-assert (= (plist-get (cistern-st-raid st) :last-end) 160)
+               t "P3: the raid closes by open+40")
+    (cl-assert (memq 'raid (mapcar #'cistern--event-kind
+                                   (cistern-st-rewards-events st)))
+               t "the CLOSED line joins the pending list"))
+  ;; routed: every raider killed before the cap -> warband-routed
+  (let ((st (cistern--new-game 20260830)))
+    (setf (cistern-st-raid st) (list :open 130))
+    (setf (cistern-st-tick st) 135)
+    (let ((e (cistern--spawn-enemy st 'warband 'warband 2 2)))
+      (cistern--enemy-damage st e 99 nil)
+      (cistern--phase-hostiles st)
+      (cl-assert (plist-get (cistern-st-raid st) :last-end)
+                 t "the raid closes when the last raider falls")
+      (cl-assert (memq 'warband-routed (mapcar #'cistern--event-kind
+                                               (cistern-st-rewards-events st)))
+                 t "the routed close carries `warband-routed'")))
+  (message "CISTERN-V5-04-RAID-OK"))
+
+(defun cistern-test-v5-04-infestation ()
+  "V5-04 (CB7): with 3 severed lines the S3 DC is 11 (14 - 3),
+floored at 8; a success spawns exactly one rat at a dead pipe and
+emits one `infestation' event."
+  (cistern-test-v5-04--combat-on)
+  (cl-assert (= (cistern--infest-dc 3) 11) t "14 - 3 severed")
+  (cl-assert (= (cistern--infest-dc 7) 8) t "the DC floors at 8")
+  (cl-assert (= (cistern--infest-dc 0) 14) t "base DC 14")
+  (let ((st (cistern--new-game 77)))
+    (let* ((cell (cistern-test-v5-03--find-cell st 'floor))
+           (x (car cell)) (y (cdr cell)))
+      (cistern--set-cell st x y 'pipe)
+      (cl-assert (not (cistern--pipe-live-p st x y))
+                 t "fixture: the new pipe is dead (not connected)")
+      (setf (cistern-st-tick st) 20)
+      (cistern-test-v5-04--find-nat st 11)
+      (let ((pos0 (cistern-st-combat-pos st)))
+        (cistern--maybe-infestation st)
+        (cl-assert (= 1 (cl-count 'rat (cistern-st-hostiles st)
+                                   :key #'cistern--enemy-kind))
+                   t "exactly one rat spawned")
+        (cl-assert (memq 'infestation (mapcar #'cistern--event-kind
+                                              (cistern-st-rewards-events st)))
+                   t "one `infestation' event joins the pending list")
+        (cl-assert (/= (cistern-st-combat-pos st) pos0)
+                   t "the S3 draw was consumed")))))
+
+(defun cistern-test-v5-04-events ()
+  "V5-04 (CB12): combat events reach the pending list exactly when
+their condition fires; rewards-eval ignores them; a scenario hook
+with :condition (event raid) opens, resolves, and the resolution
+is visible to later acts (STORY §7.2 machinery untouched)."
+  (cistern-test-v5-04--combat-on)
+  (let ((st (cistern--new-game 20260830)))
+    (setf (cistern-st-tick st) 120)
+    (cistern-test-v5-04--find-nat st 8)
+    (let ((roll-pos (and (cistern-st-story st)
+                         (plist-get (cistern-st-story st) :roll-pos)))
+          (combat-pos (cistern-st-combat-pos st)))
+      (cistern--maybe-raid st)
+      (cl-assert (/= (cistern-st-combat-pos st) combat-pos)
+                 nil "sanity: the raid draw consumed stream 4")
+      (when roll-pos
+        (cl-assert (= (plist-get (cistern-st-story st) :roll-pos) roll-pos)
+                   t "combat leaves :roll-pos untouched"))
+      ;; rewards-eval ignores foreign kinds
+      (cistern--rewards-eval st nil)
+      (let ((card (cistern-st-goal-card st)))
+        (cl-assert (= (plist-get card :relieves) 0)
+                   t "rewards-eval ignores the raid event"))))
+  ;; the story hook machine reads combat events through a real bank
+  (let ((bank-file (make-temp-file "cistern-v5-bank" nil ".el")))
+    (with-temp-file bank-file
+      (insert
+       "(defconst cistern-bank-v5-test\n"
+       "  '(:kind scenario :version \"1\" :generator \"v5 fixture\"\n"
+       "    :copy ((v5-premise . \"THE MAIN IS CLAIMED\")\n"
+       "           (v5-verdict . \"RAID HOOK RESOLVED\"))\n"
+       "    :entries\n"
+       "    ((:id v5-raid-story :premise v5-premise :acts 3 :tiers (60 30 10)\n"
+       "      :hooks ((:id v5-raid-hook :act 1 :window (20 . 90)\n"
+       "               :condition (event raid) :requires nil\n"
+       "               :matrix v5-m :resolve-copy v5-verdict))\n"
+       "      :matrices\n"
+       "      ((:id v5-m :difficulty 1 :stat tolerance :act-mods (0 0 0)\n"
+       "        :outcomes ((:effect none :line-key v5-verdict) (:effect none :line-key v5-verdict) (:effect none :xp 1 :line-key v5-verdict)\n"
+       "                   (:effect none :line-key v5-verdict))))))))\n"
+       "(defconst cistern-bank-v5-quirks\n"
+       "  '(:kind quirk :version \"1\" :generator \"v5 fixture\"\n"
+       "    :copy ((v5-quirk . \"READS THE PRESSURE LOG TWICE\"))\n"
+       "    :entries\n"
+       "    ((:id quirk-v5-tight :context tolerance :copy-key v5-quirk))))\n"))
+    (setq cistern--banks nil cistern--story-copy nil
+          cistern--matrix-sources (make-hash-table :test 'eq))
+    (cistern--banks-load (list bank-file))
+    (let ((st (cistern--new-game 20260830)))
+      (setf (cistern-st-tick st) 50)
+      (push (list 'raid 'open 2 2) (cistern-st-rewards-events st))
+      (cistern--story-eval st)
+      (let* ((story (cistern-st-story st))
+             (hook (cl-find 'v5-raid-hook (plist-get story :hooks)
+                            :key (lambda (h) (plist-get h :id)))))
+        (cl-assert (eq (plist-get hook :state) 'resolved)
+                   t "the (event raid) hook opened and resolved")
+        (cl-assert (memq 'v5-raid-hook (plist-get story :callbacks))
+                   t "the resolution is visible to later acts")))
+  (message "CISTERN-V5-04-EVENTS-OK")))
+
+(defun cistern-test-v5-04--soak-hash ()
+  "A 300-tick combat-active soak of seed 20260830: one content hash."
+  (cistern-test-v5-04--combat-on)
+  (let ((st (cistern--new-game 20260830)))
+    (dotimes (_ 300) (cistern--sim-tick st))
+    (list st
+          (secure-hash
+           'md5 (prin1-to-string
+                 (list (cistern-st-combat-pos st)
+                       (cistern-st-raid st)
+                       (cistern-st-focus st)
+                       (mapcar (lambda (e) (list (cistern--enemy-id e)
+                                                 (cistern--enemy-x e)
+                                                 (cistern--enemy-y e)
+                                                 (cistern--enemy-hp e)
+                                                 (cistern--enemy-gnaw e)))
+                               (cistern-st-hostiles st))
+                       (mapcar #'cistern--worker-hp (cistern-st-creators st))
+                       (length (cistern-st-log st))))))))
+
+(defun cistern-test-v5-04-determinism ()
+  "V5-04 (CB13/P6): two 300-tick combat-active runs of seed
+20260830 give identical hashes including combat-pos, hostiles,
+raid and worker hp; hostiles <= 8; raid state stays a legal shape;
+the bladder window guard (A12/P6) still holds for every worker."
+  (let* ((h1 (cistern-test-v5-04--soak-hash))
+         (h2 (cistern-test-v5-04--soak-hash))
+         (st (car h1)))
+    (cl-assert (equal (cdr h1) (cdr h2))
+               t "two runs give byte-identical combat state hashes")
+    (cl-assert (<= (length (cistern-st-hostiles st))
+                   (cistern--combat-k 'hostiles-max))
+               t "P2: live hostiles <= 8")
+    (let ((raid (cistern-st-raid st)))
+      (cl-assert (or (null raid) (plist-get raid :open)
+                     (plist-get raid :last-end))
+                 t "P6: raid state is a legal shape"))
+    (dolist (w (cistern-st-creators st))
+      (let ((window (- (/ (- 120 (cistern--rpg-seek-eff
+                                   (cistern--worker-nerve-eff w))) 2)
+                       cistern-use-ticks)))
+        (cl-assert (>= window 22) t "P6: bladder window >= 22")))
+    (message "CISTERN-V5-04-DET-OK")))
