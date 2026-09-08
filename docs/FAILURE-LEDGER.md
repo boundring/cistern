@@ -3802,3 +3802,54 @@ the relaunch is on their screen now.
   shortening when a real width between full and dropped is reported.
 - Outcome: suite canonical ALL 140 TESTS PASSED (139 + header). RED
   first; GREEN-BOUNDARY SYNC at the boundary per the standing rule.
+
+## L-112 (2026-09-08, run: v6-wave-1 — GENTLE HALT for Hngh handoff, mid-wave)
+
+- HALT STATE: V6-01 LANDED (d059270), V6-02 LANDED (beb3fff), V6-03
+  NOT STARTED (pending, per clean-boundary rule). Tree clean at
+  beb3fff; suite canonical ALL 140 TESTS PASSED; ledger range this
+  run L-110..L-112. GREEN-BOUNDARY SYNC done: five src files copied
+  to ~/.emacs.d/lisp/ (.elc cleared), no running cistern instance to
+  relaunch (pgrep empty).
+- RECOVERY for the next implementer (V6-03 first, then wave 2):
+  1. V6-03 = size classes + `cistern--sector-themes' + `cistern--new-game
+     (&optional seed size theme)' (W2). Red first in tests/test-v6.el
+     (pattern: cistern-test-v6--root load block + run.el registration).
+  2. BYTE-IDENTITY ANCHORS (captured pre-wave, sha256 of
+     prin1-to-string of (map seed rng rpg-pos toilets tanks)):
+     seed 42 → c75da91421e5a7545593ecb4501d29661aa84889670ac697b8f39fab18f79798
+     seed 1 → 83cc3c517505cea55eb2be5ae2fc9c8b2d6ff7efc2c496248a215acfe22ced55
+     seed 20260830 → e01b8ee933dd6adb24e6c2b15558057126d3f802ea8ff30f5b9a504388aa719e
+     The theme/size knobs MUST NOT add or remove a sim-LCG draw on the
+     standard theme (extras gated on knob > 0, appended after gen-map's
+     existing draws).
+  3. DOC DRIFT to rule on: WORLD W2.2 says "nil → seed 1" but the code
+     default is 20260830 and the binding acceptance is "defaults
+     byte-identical — existing tests stay green unchanged". Pinned
+     reading: nil seed → 20260830 (code is the pinned reading; fix the
+     doc when convenient).
+  4. Theme knob plan (L-110/L-111 contiguous): :rubble-mult (collapsed
+     ×3), :flood-seeds (wet 2, EXACT count — place via set-cell +
+     flood-born so the count is seed-invariant, WO2.2), :cache-bonus
+     (wet 1 / gallery 2), :manifold-bonus (gallery 1), :cross-walls
+     (collapsed 2 = narrower corridors, gallery 0 = fewer walls),
+     :spread-mult (wet = the ONE new domain constant, read at the two
+     cistern-spread-pct sites: cistern--accident + phase-hazards). st
+     gains a `theme' slot (default standard); V6-04 moves it into the
+     level record.
+  5. WO2.1 soak: extend cistern-run-soak to (&optional seed size);
+     600-tick vast ≤ 4× standard wall time; RECORD the measured timing
+     in the ledger (L-099 envelope: no indexes shipped). Owner rule for
+     any GUI probe: ONE launch, hard timeout 20, output to a file.
+  6. C1'/LAY pointers: cistern-view--layout carries :body-cols; render
+     nil-lay default = 200×60 synthetic (batch tests byte-identical);
+     cell-at is (st lay line col); driver cistern--current-lay is the
+     single derivation (refresh + click + resize callback).
+  7. Tooling lessons this run: emacs 31.1 batch cannot `load' relative
+     paths (file-missing despite default-directory — use expand-file-
+     name); for a paren imbalance, `(car (syntax-ppss (point-max)))'
+     gives the net depth instantly and a per-(defun depth walk
+     localizes the short defun — the L-017 check-parens class cost
+     four debug cycles this run when skipped.
+- Next: V6-03 (L-113) → wave 2 order per V6-SPEC §3 (V6-04 → V6-05 →
+  V6-06; V6-07 after V6-04; V6-10+ ecology lane parallel after V6-04).
