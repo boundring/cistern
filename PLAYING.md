@@ -61,13 +61,13 @@ Five fixture types, one catalog. Press `T` to cycle the armed type —
 the header badge names it — then `t` builds the armed type at the
 cursor.
 
-| Type | Cost | Use | Placement |
-|------|------|-----|-----------|
-| long-drop | 10 | 2 ticks, 10 load | anywhere |
-| fall-shaft | 8 | 2 ticks, 8 load | not beside another toilet |
-| high-cistern | 14 | 1 tick, 10 load | against a wall |
-| archive-stall | 12 | 3 ticks, 12 load | against a wall |
-| hermetic-booth | 20 | 2 ticks, 10 load | anywhere |
+| Type | Cost | Use | Suit | Placement |
+|------|------|-----|-----------|----------|
+| long-drop | 10 | 2 ticks, 10 load | GRIT · FLOW | anywhere |
+| fall-shaft | 8 | 2 ticks, 8 load | FLOW · GRIT | not beside another toilet |
+| high-cistern | 14 | 1 tick, 10 load | ARCHIVE · NERVE | against a wall |
+| archive-stall | 12 | 3 ticks, 12 load | NERVE · ARCHIVE | against a wall |
+| hermetic-booth | 20 | 2 ticks, 10 load | NERVE · GRIT | anywhere |
 
 Placement is refused with a named reason. The inspector reports a
 fixture's type and state.
