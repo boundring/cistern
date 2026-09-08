@@ -756,3 +756,174 @@ existing armed-badge pattern; `u'/C-g disarm."
       (cl-assert (= (cistern--worker-x w) rx)
                  t "the worker stood on the rally cell")))
   (message "CISTERN-V5-06-VERBS-OK"))
+
+;; --- V5-07 fixtures: glyphs, faces, copy sweep (CB11, CB14) ----------------------
+
+(defconst cistern-test-v5-07--combat-keys
+  '(combat-raid-open combat-raid-close combat-raid-routed combat-ambush
+    combat-infest combat-gnaw combat-tank-raid combat-injury-limp
+    combat-injury-shaken combat-worker-death combat-leech-grip
+    combat-drive-off combat-sponge combat-guild-arrival combat-guild-fix
+    combat-guild-depart combat-refusal-friendly combat-warband-intel
+    combat-guild-intel combat-inspect-fmt)
+  "COMBAT §4.7 + the inspector row key — all under the (combat . …)
+copy subsection (spec §0 copy-table rule).")
+
+(defun cistern-test-v5-07-copy ()
+  "V5-07 (CB14): every §4.7 string resolves through the (combat . …)
+copy subsection; a grep-level check finds NO combat literal in the
+view or game sources — glyphs and faces come from view tables, copy
+from the one chain."
+  ;; the subsection exists and every key resolves
+  (let ((combat (cdr (assq 'combat cistern--copy))))
+    (cl-assert (and combat (listp combat)) t "the combat subsection exists")
+    (dolist (k cistern-test-v5-07--combat-keys)
+      (cl-assert (stringp (cistern--combat-copy k))
+                 t "%s resolves through the combat subsection" k))
+    ;; the intel strings are the §4.7 verbatim lines
+    (cl-assert (string= (cistern--combat-copy 'combat-warband-intel)
+                        "THE PIPES PREDATE THE SECTOR. SANITATION IS TRESPASS.")
+               t "warband intel verbatim")
+    (cl-assert (string= (cistern--combat-copy 'combat-guild-intel)
+                        "GUILD OF THE OPEN FLANGE — RESTORATIONS AT ONE ALLOY")
+               t "guild intel verbatim"))
+  ;; grep-level: no combat copy VALUE appears in view/game source text
+  (let ((combat (cdr (assq 'combat cistern--copy)))
+        (vsrc (with-temp-buffer
+                (insert-file-contents
+                 (expand-file-name "src/cistern-view.el"
+                                   cistern-test-v5--root))
+                (buffer-string)))
+        (gsrc (with-temp-buffer
+                (insert-file-contents
+                 (expand-file-name "src/cistern-game.el"
+                                   cistern-test-v5--root))
+                (buffer-string))))
+    (dolist (pair combat)
+      (when (stringp (cdr pair))
+        (let ((lit (cdr pair)))
+          (cl-assert (not (string-match-p (regexp-quote lit) vsrc))
+                     t "combat literal in the VIEW: %s" (car pair))
+          (cl-assert (not (string-match-p (regexp-quote lit) gsrc))
+                     t "combat literal in the GAME: %s" (car pair))))))
+  (message "CISTERN-V5-07-COPY-OK"))
+
+(defun cistern-test-v5-07--all-floors (st)
+  "Every floor cell, coordinate order."
+  (let ((out nil) (i 0))
+    (while (< i (length (cistern-st-map st)))
+      (when (eq (aref (cistern-st-map st) i) 'floor)
+        (push (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st))) out))
+      (setq i (1+ i)))
+    (nreverse out)))
+
+(defun cistern-test-v5-07-surfaces ()
+  "V5-07: the six glyphs render floor-only through the worker
+z-order path with goblin/pest faces; the inspector's enemy row
+reuses the existing row pattern; the base inspector is
+byte-identical with no hostiles (S1)."
+  (cistern-test-v5-04--combat-on)
+  (let ((st (cistern--new-game 61)))
+    (let* ((occ (cistern--occupied-cells st nil))
+           (floor-cell (cl-find-if
+                        (lambda (c) (not (gethash c occ)))
+                        (cistern-test-v5-07--all-floors st)))
+           (fx (car floor-cell)) (fy (cdr floor-cell)))
+      ;; every kind spawns and renders its glyph with the right face
+      (cistern--spawn-enemy st 'warband 'warband fx fy)
+      (cistern--spawn-enemy st 'guild 'fixer (1+ fx) fy)
+      (cistern--spawn-enemy st 'fauna 'rat (1+ fx) (1+ fy))
+      (cistern--spawn-enemy st 'fauna 'crab fx (1+ fy))
+      (cistern--spawn-enemy st 'fauna 'leech (1+ fx) (+ 2 fy))
+      (cistern--spawn-enemy st 'fauna 'sponge fx (+ 2 fy))
+      (let* ((render (substring-no-properties (cistern-view--render st)))
+             (rows (split-string render "\n")))
+        (dolist (g '("g" "G" "r" "c" "e" "s"))
+          (cl-assert (cl-some (lambda (row) (string-match-p g row)) rows)
+                     t "glyph %s renders" g))
+        ;; faces ride the render through the goblin/pest roles
+        (let ((prop (cistern-view--render st)))
+          (cl-assert (text-property-any
+                      0 (length prop) 'face 'cistern-goblin prop)
+                     t "goblin face applied")
+          (cl-assert (text-property-any
+                      0 (length prop) 'face 'cistern-pest prop)
+                     t "pest face applied")))
+      ;; z-order: a worker on the enemy's cell renders the worker
+      (let ((w (nth 0 (cistern-st-creators st))))
+        (setf (cistern--worker-x w) fx)
+        (setf (cistern--worker-y w) fy)
+        (let* ((render (substring-no-properties (cistern-view--render st)))
+               (rows (split-string render "\n"))
+               (row (+ fy (cistern-view--header-block-height st))))
+          (cl-assert (eq (aref (nth row rows) fx)
+                         (string-to-char (aref cistern--worker-glyphs 0)))
+                     t "the worker wins the co-located cell")))
+      ;; the inspector names the enemy via the copy table
+      (setf (cistern-st-cursor st) (cons (1+ fx) fy))
+      (let ((insp (cistern-view--inspector st)))
+        (cl-assert (string-match-p "g2" insp)
+                   t "the enemy row names the id")
+        (cl-assert (string-match-p
+                    (regexp-quote (cistern--combat-copy 'combat-guild-intel))
+                    (cistern-view--render st))
+                   t "the guild row renders the intel copy"))
+      ;; S1: with the cursor moved off, the inspector is the base row
+      (setf (cistern-st-cursor st) (cons 0 0))
+      (cl-assert (string-match-p "WALL" (cistern-view--inspector st))
+                 t "S1: the base inspector is untouched")))
+  (message "CISTERN-V5-07-SURFACES-OK"))
+
+(defun cistern-test-v5-07-glyph-probe ()
+  "V5-07 (CB11): the six combat glyphs g G r c e s pass the L-076
+gui probe (font-at advance == cell width) on a graphic display —
+skipped gracefully in batch like `cistern-test-gui-cell-width'."
+  (if (not (display-graphic-p))
+      (message "cistern-test-v5-07-glyph-probe: SKIPPED (no display)")
+    (cistern-test-v5-04--combat-on)
+    (let* ((st (cistern--new-game 61))
+           (buf (get-buffer-create " *cistern-v5-gui-probe*"))
+           (frm (make-frame '((width . 110) (height . 42))))
+           (win (frame-selected-window frm))
+           bad)
+      (unwind-protect
+          (progn
+            ;; all six kinds live on the map
+            (let* ((cell (cistern-test-v5-03--find-cell st 'floor))
+                   (fx (car cell)) (fy (cdr cell)))
+              (cistern--spawn-enemy st 'warband 'warband fx fy)
+              (cistern--spawn-enemy st 'guild 'fixer (1+ fx) fy)
+              (cistern--spawn-enemy st 'fauna 'rat (1+ fx) (1+ fy))
+              (cistern--spawn-enemy st 'fauna 'crab fx (1+ fy))
+              (cistern--spawn-enemy st 'fauna 'leech (1+ fx) (+ 2 fy))
+              (cistern--spawn-enemy st 'fauna 'sponge fx (+ 2 fy)))
+            (set-window-buffer win buf)
+            (with-current-buffer buf
+              (cistern-mode)
+              (let ((inhibit-read-only t))
+                (erase-buffer)
+                (insert (cistern-view--render st))
+                (goto-char (point-max))
+                (insert "\ngGrces")
+                (goto-char (point-min))))
+            (sit-for 0.2 t)
+            (let ((cellw (with-selected-frame frm (default-font-width)))
+                  (seen (make-hash-table :test 'eql)))
+              (with-current-buffer buf
+                (goto-char (point-min))
+                (while (< (point) (point-max))
+                  (let ((ch (following-char)))
+                    (unless (or (memq ch '(?  ?\n)) (gethash ch seen))
+                      (puthash ch t seen)
+                      (let* ((f (font-at (point) win))
+                             (adv (aref (font-info (font-xlfd-name f) frm) 10)))
+                        (unless (eql adv cellw)
+                          (push (cons ch adv) bad)))))
+                  (forward-char 1)))
+              (cl-assert (not bad) t
+                         "combat glyphs off one-cell width: %S" bad)
+              (message "cistern-test-v5-07-glyph-probe: %d unique glyphs all %dpx"
+                       (hash-table-count seen) cellw)))
+        (delete-frame frm)
+        (kill-buffer buf))))
+  (message "CISTERN-V5-07-PROBE-OK"))

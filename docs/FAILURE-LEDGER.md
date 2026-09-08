@@ -3384,3 +3384,28 @@ the relaunch is on their screen now.
   canonical 118.  Wave 1 complete: V5-01..V5-07 minus V5-07 (glyphs/
   faces/copy sweep) which remains for the next turn per the owner's
   pacing directive.
+
+---
+
+## L-101 (2026-09-08, run: wave1-violent-base — V5-07 surfaces, wave 1 close)
+
+- The (combat . ...) copy subsection landed per spec §0 (hand copy under
+  named subsections; wave 2 adds social/comedy identically).  The
+  call-site refactor missed FIVE sites: four multiline
+  `(cdr (assq 'combat-X\n cistern--copy))` in domain and one in the GAME
+  layer (cmd-focus) — single-line regexes do not cross newlines; the
+  suite caught the game one as a deadpan "nil" log line where the
+  refusal verdict belonged.  Lesson (extends L-099): repo-wide
+  lookupsite rewrites need `\s+`-tolerant regexes AND a per-layer grep
+  for the old pattern before declaring the cutover done.
+- V5-07 surfaces: enemy glyph table in the VIEW (g G r c e s, all ASCII,
+  L-076 route — CB11 probe registered and batch-skipped like
+  cistern-test-gui-cell-width); two S2-derived faces (cistern-goblin
+  alert-magenta role 330/0.7, cistern-pest standard-olive 90/0.5 — no
+  literals); enemies render through the map-rows z-order below workers
+  (cursor > worker > enemy > particle > cell), floor-only by
+  construction; the inspector enemy row reuses the existing row pattern
+  with the worker stat segment shape (combat-inspect-fmt key); S1 holds
+  — base inspector byte-identical with no hostiles.
+- Outcome: V5-07 GREEN.  WAVE 1 COMPLETE (V5-01..V5-07).  Suite
+  canonical 121/121.

@@ -61,6 +61,12 @@ auto-run) makes 4.  Never two independent numbers."
 (defface cistern-manifold '((t :weight bold)) "Manifold — free pipe anchor.")
 (defface cistern-cache '((t)) "Cache — walkable alloy bonus.")
 (defface cistern-event '((t)) "Event — incoming countdown marker.")
+;; V5-07 (COMBAT §1/§5.4): two enemy faces via the S2 roles — the
+;; dossier form is universal, the faces split hostile/fauna-guild
+(defface cistern-goblin '((t :weight bold))
+  "Goblins — warband hostiles and the guild fixer alike.")
+(defface cistern-pest '((t :weight bold))
+  "Fauna hostiles: rat, crab, leech, sponge.")
 
 ;; ---------------------------------------------------------------------------
 ;; Theme-contrast palette (V4-03, SURFACE S2.1/S2.2).  PURE MATH: the
@@ -94,7 +100,10 @@ auto-run) makes 4.  Never two independent numbers."
     (flood . (190 0.6 emphatic))
     (manifold . (30 0.8 emphatic))
     (cache . (50 0.6 standard))
-    (event . (60 0.6 standard)))
+    (event . (60 0.6 standard))
+    ;; V5-07: hostile goblins alert-magenta, fauna standard-olive
+    (goblin . (330 0.7 alert))
+    (pest . (90 0.5 standard)))
   "Face/role → (HUE SAT CLASS); CLASS ∈ recessive/standard
 \(target 4.5:1) or emphatic/alert (7.0:1).")
 
@@ -412,6 +421,24 @@ can never be listed twice."
                         (cistern-st-creators st)))
          (base
           (cond
+           ;; V5-07 (COMBAT §8 S1): the enemy row reuses the existing
+           ;; row pattern — same stat segment the worker rows carry,
+           ;; copy through the combat subsection (no literals here)
+           ((cistern--enemy-at st x y)
+            (let* ((e (cistern--enemy-at st x y))
+                   (kind (upcase (symbol-name (cistern--enemy-kind e))))
+                   (role (if (eq (cistern--enemy-faction e) 'guild)
+                             (cistern--combat-copy 'combat-guild-intel)
+                           (cistern--combat-copy 'combat-warband-intel)))
+                   (stats (cistern--enemy-stats e))
+                   (max (+ (cdr (assq (cistern--enemy-kind e)
+                                      cistern--enemy-hp-base))
+                           (cistern--rpg-mod (nth 1 stats))))
+                   (def (cistern--enemy-def e))
+                   (atk (cistern--enemy-atk e)))
+              (format (cistern--combat-copy 'combat-inspect-fmt)
+                      (cistern--enemy-id e) kind role
+                      (cistern--enemy-hp e) max def atk)))
            ((eq kind 'toilet)
             ;; V4-12 (RPG §1.2): the toilet inspector names its type
             (let* ((s (cistern--toilet-state st x y))
@@ -565,14 +592,22 @@ Q11 from the domain table."
                    (cistern-st-creators st)))
                ;; particle loses to cursor AND worker (D5: cursor >
                ;; worker > particle > cell)
+               ;; V5-07 (COMBAT §5.4): enemies render through the same
+               ;; z-order path, BELOW workers (cursor > worker > enemy
+               ;; > particle > cell), floor-only by construction —
+               ;; hostiles only ever stand on passable cells
+               (e (and (not cur) (not w) (cistern--enemy-at st x y)))
                (ov (and (not cur) (not w)
+                        (not e)
                         (cdr (assoc (cons x y) overlay))))
                (cg (cistern-view--cell-glyph st x y))
                (glyph (cond (w (cistern--worker-glyph st w))
+                            (e (car (cistern-view--enemy-entry e)))
                             (ov (car ov))
                             (t (car cg))))
                (base-face (cond (w (if (> (cistern--worker-sick w) 0)
                                        'cistern-worker-sick 'cistern-worker))
+                               (e (cistern-view--enemy-face e))
                                 (ov (cdr ov))
                                 (t (cdr cg))))
                (face (if cur (list 'cistern-cursor base-face) base-face)))
@@ -581,6 +616,24 @@ Q11 from the domain table."
                              glyph 'face face)))))
       (setq out (concat out "\n")))
     out))
+
+;; V5-07 (COMBAT §1 table): the enemy glyph table — kind → (GLYPH .
+;; FACE-SYMBOL), all ASCII (L-076: every glyph routes through the gui
+;; probe, CB11), distinct from the tile table, the particle palette,
+;; and the Greek worker set
+(defconst cistern-view--enemy-table
+  '((warband . ("g" . cistern-goblin)) (fixer . ("G" . cistern-goblin))
+    (rat . ("r" . cistern-pest)) (crab . ("c" . cistern-pest))
+    (leech . ("e" . cistern-pest)) (sponge . ("s" . cistern-pest)))
+  "COMBAT §1 bestiary glyphs and their faces (S2 roles below
+carry the goblin/pest hues — the faces are derived, never
+literal-colored).")
+
+(defun cistern-view--enemy-entry (e)
+  (cdr (assq (cistern--enemy-kind e) cistern-view--enemy-table)))
+
+(defun cistern-view--enemy-face (e)
+  (cdr (cistern-view--enemy-entry e)))
 
 (defun cistern-view--tutorial-line (st)
   ;; R2-Q11 (c): suppressed while over — the death frame is the

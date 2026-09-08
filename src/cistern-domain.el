@@ -416,7 +416,7 @@ pinned call order and assigned an objective (d20 mod 3 → 0 gnaw /
             ;; objective in IDLE (warband scratch: 0 gnaw/1 steal/2 harass)
             (setf (cistern--enemy-idle e) (% (cistern--combat-d20 st) 3))))))
     (cistern--log-sev st 'error "%s"
-                      (format (cdr (assq 'combat-raid-open cistern--copy)) n))
+                      (format (cistern--combat-copy 'combat-raid-open) n))
     (push (list 'raid 'open (car ev-cell) (cdr ev-cell))
           (cistern-st-rewards-events st)))))
 
@@ -432,11 +432,11 @@ carries `warband-routed' INSTEAD of the raid CLOSED event."
   (if routed
       (progn
         (cistern--log-sev st 'success "%s"
-                          (cdr (assq 'combat-raid-routed cistern--copy)))
+                          (cistern--combat-copy 'combat-raid-routed))
         (push (list 'warband-routed 'routed
                     (cistern-st-w st) (cistern-st-h st))
               (cistern-st-rewards-events st)))
-    (cistern--log st "%s" (cdr (assq 'combat-raid-close cistern--copy)))
+    (cistern--log st "%s" (cistern--combat-copy 'combat-raid-close))
     (push (list 'raid 'closed (cistern-st-w st) (cistern-st-h st))
           (cistern-st-rewards-events st))))
 
@@ -511,7 +511,7 @@ plumbing; success = 2 rats at the pipe + one `ambush' event."
           (when pipe
             (cistern--spawn-near st 'fauna 'rat (car pipe) (cdr pipe) 2)
             (cistern--log st "%s"
-                          (format (cdr (assq 'combat-ambush cistern--copy))
+                          (format (cistern--combat-copy 'combat-ambush)
                                   (car pipe) (cdr pipe)))
             (push (list 'ambush 'ambush (car pipe) (cdr pipe))
                   (cistern-st-rewards-events st))))))))
@@ -572,7 +572,7 @@ success = exactly one rat at a dead pipe + one `infestation' event."
           (when pipe
             (cistern--spawn-near st 'fauna 'rat (car pipe) (cdr pipe) 1)
             (cistern--log st "%s"
-                          (format (cdr (assq 'combat-infest cistern--copy))
+                          (format (cistern--combat-copy 'combat-infest)
                                   (car pipe) (cdr pipe)))
             (push (list 'infestation 'infest (car pipe) (cdr pipe))
                   (cistern-st-rewards-events st))))))))
@@ -594,7 +594,7 @@ d20 ≥ 14, one draw per flood tile reaching 20 ticks of age."
       (cistern--spawn-near st 'fauna 'leech (car cell) (cdr cell) 1))
     (when (>= (cistern--combat-d20 st) (cistern--combat-k 'sponge-dc))
       (cistern--spawn-near st 'fauna 'sponge (car cell) (cdr cell) 1)
-      (cistern--log st "%s" (cdr (assq 'combat-sponge cistern--copy))))))
+      (cistern--log st "%s" (cistern--combat-copy 'combat-sponge)))))
 
 (defun cistern--maybe-guild (st)
   "S6 (COMBAT §4.4): while >= 2 lines are severed and no fixer is
@@ -611,8 +611,7 @@ one `guild-arrival' event."
           (when cell
             (cistern--spawn-enemy st 'guild 'fixer (car cell) (cdr cell))
             (cistern--log st "%s"
-                          (format (cdr (assq 'combat-guild-arrival
-                                             cistern--copy))
+                          (format (cistern--combat-copy 'combat-guild-arrival)
                                   (cistern--combat-k 'guild-fee)))
             (push (list 'guild-arrival 'guild (car cell) (cdr cell))
                   (cistern-st-rewards-events st))))))))
@@ -639,7 +638,7 @@ or 40 idle ticks; with alloy 0 they wait 20 ticks and leave."
             (setf (cistern-st-alloy st)
                   (- (cistern-st-alloy st) (cistern--combat-k 'guild-fee)))
             (cistern--log st "%s"
-                          (format (cdr (assq 'combat-guild-fix cistern--copy))
+                          (format (cistern--combat-copy 'combat-guild-fix)
                                   (car hz) (cdr hz)))))
         (setf (cistern--enemy-gnaw e) 0
               (cistern--enemy-idle e) 0
@@ -673,7 +672,7 @@ or 40 idle ticks; with alloy 0 they wait 20 ticks and leave."
   "LOG-ONLY departure (ruling 3: `guild-depart' is not an event
 kind; nothing reads it).  The fixer retreats to the map edge."
   (setf (cistern--enemy-grip e) 'retreat)
-  (cistern--log st "%s" (cdr (assq 'combat-guild-depart cistern--copy))))
+  (cistern--log st "%s" (cistern--combat-copy 'combat-guild-depart)))
 
 ;; ---------------------------------------------------------------------------
 ;; V5-04 (COMBAT §1.1/§1.2/§3.2): per-hostile behavior and the phase.
@@ -748,7 +747,7 @@ the player re-lays with `p' at the usual cost."
     (cistern--set-cell st x y 'hazard)
     (setf (cistern--enemy-gnaw e) 0)
     (cistern--log st "%s"
-                  (format (cdr (assq 'combat-gnaw cistern--copy)) x y))))
+                  (format (cistern--combat-copy 'combat-gnaw) x y))))
 
 (defun cistern--warband-behavior (st e)
   "Pinned priority (COMBAT §1.1): strike → gnaw → steal → harass.
@@ -782,8 +781,7 @@ accumulator; GNAW the 4-tick pipe timer."
                      (setf (cistern--enemy-drain e)
                            (+ take (cistern--enemy-drain e)))
                      (cistern--log st "%s"
-                                   (format (cdr (assq 'combat-tank-raid
-                                                      cistern--copy))
+                                   (format (cistern--combat-copy 'combat-tank-raid)
                                            (car tk) (cdr tk)
                                            (cistern--enemy-drain e))))
                  (cistern--enemy-step-toward st e (car tk) (cdr tk)))))))
@@ -854,7 +852,7 @@ mechanical, not rolled.  The host's death removes it (§3.4)."
           (when (>= band 2)
             (setf (cistern--enemy-grip e) w)
             (cistern--log st "%s"
-                          (format (cdr (assq 'combat-leech-grip cistern--copy))
+                          (format (cistern--combat-copy 'combat-leech-grip)
                                   (cistern--worker-glyph st w)))))))))
 
 (defun cistern--sponge-behavior (st e)
@@ -876,7 +874,7 @@ the nearest tank with load; splits at 20, cap P2 respected."
             (cistern--spawn-near st 'fauna 'sponge
                                  (cistern--enemy-x e) (cistern--enemy-y e) 1)
             (cistern--log st "%s"
-                          (cdr (assq 'combat-sponge cistern--copy)))))))))
+                          (cistern--combat-copy 'combat-sponge))))))))
 
 (defun cistern--enemy-damage (st e n killer)
   "N damage to hostile E from worker KILLER (COMBAT §3.2): a crab
@@ -888,7 +886,7 @@ grants +1 XP, pushes `goblin-death' (ruling 3) and clears focus."
              (not (cistern--enemy-retreat-p e)))
     (setf (cistern--enemy-grip e) 'retreat)
     (cistern--log st "%s"
-                  (format (cdr (assq 'combat-drive-off cistern--copy))
+                  (format (cistern--combat-copy 'combat-drive-off)
                           (cistern--enemy-x e) (cistern--enemy-y e))))
   (when (<= (cistern--enemy-hp e) 0)
     (setf (cistern-st-hostiles st) (delq e (cistern-st-hostiles st)))
@@ -1324,7 +1322,7 @@ The spawn-index pins identity — the death renames nobody."
           (cl-remove-if (lambda (e) (eq (cistern--enemy-grip e) w))
                         (cistern-st-hostiles st)))
     (cistern--log-sev st 'error "%s"
-                      (format (cdr (assq 'combat-worker-death cistern--copy))
+                      (format (cistern--combat-copy 'combat-worker-death)
                               glyph))
     (push (list 'worker-death glyph) (cistern-st-rewards-events st))))
 
@@ -1339,13 +1337,11 @@ hp ≤ 0 — in the same phase the damage landed."
             (glyph (cistern--worker-glyph st w)))
         (cond ((and (eq now 'shaken) (not (eq prev 'shaken)))
                (cistern--log st "%s"
-                             (format (cdr (assq 'combat-injury-shaken
-                                                cistern--copy))
+                             (format (cistern--combat-copy 'combat-injury-shaken)
                                      glyph)))
               ((and (eq now 'limp) (not (member prev '(limp shaken))))
                (cistern--log st "%s"
-                             (format (cdr (assq 'combat-injury-limp
-                                                cistern--copy))
+                             (format (cistern--combat-copy 'combat-injury-limp)
                                      glyph)))))
       (when (<= (cistern--worker-hp w) 0)
         (cistern--worker-death st w)))))
@@ -2324,6 +2320,11 @@ legal no-op state for tests)."
 ;; register — terse, institutional, deadpan.  The idle pressure line
 ;; is pre-existing view copy and stays byte-identical in
 ;; cistern-view.el.
+(defun cistern--combat-copy (key)
+  "V5-07: one lookup into the (combat . ...) copy subsection
+(spec §0 copy-table rule; wave 2 adds social/comedy the same way)."
+  (cdr (assq key (cdr (assq 'combat cistern--copy)))))
+
 (defconst cistern--copy
   '((milestone . ((big-cistern . "BIG CISTERN ONLINE")
                   (fast-flush . "FAST FLUSH ONLINE")
@@ -2384,26 +2385,32 @@ legal no-op state for tests)."
     (inspector-clear-fmt . "CL.%s")
     ;; V5-03 (COMBAT §4.7): injury ladder + death (the full combat
     ;; subsection lands with V5-07's copy sweep)
-    (combat-injury-limp . "WORKER %s INJURED — LIMP LOGGED — GAIT NORMALIZED ON RELIEF RUNS")
-    (combat-injury-shaken . "WORKER %s SHAKEN — NERVE DEGRADED — WATCH THE THRESHOLD")
-    (combat-worker-death . "WORKER %s LOST — SERVICE RECORD SEALED")
     ;; V5-04 (COMBAT §4.7): raids, ambush, infestation, gnaw, steal,
     ;; leech, drive-off, sponge
-    (combat-raid-open . "RAID — THE INHERITORS CLAIM THE MAIN — %d HOSTILE")
-    (combat-raid-close . "RAID CLOSED — THE INHERITORS WITHDRAW — CLAIM NOT RECOGNIZED")
-    (combat-raid-routed . "THE MAIN HOLDS — INHERITORS ROUTED — THE SECTOR REMAINS SERVED")
-    (combat-ambush . "AMBUSH AT ISOLATED PLUMBING — (%d,%d)")
-    (combat-infest . "INFESTATION — GNAWING LOGGED AT (%d,%d)")
-    (combat-gnaw . "LINE SEVERED BY GNAW AT (%d,%d) — RE-LAY (p)")
-    (combat-tank-raid . "TANK (%d,%d) DRAWN DOWN — %d UNITS CLAIMED")
-    (combat-leech-grip . "VENT-LEECH ATTACHED — WORKER %s — CUT IT OFF")
-    (combat-drive-off . "CLOG-CRAB DRIVEN OFF — (%d,%d)")
-    (combat-sponge . "SPONGE MASS RECLASSIFIED FAUNA — FEEDING LOGGED AS NATURAL")
     ;; V5-05 (COMBAT §4.7): the guild family + the focus refusal
-    (combat-guild-arrival . "GUILD OF THE OPEN FLANGE ON SITE — RESTORATIONS AT %d ALLOY")
-    (combat-guild-fix . "GUILD RESTORATION COMPLETE AT (%d,%d)")
-    (combat-guild-depart . "GUILD DEPARTS — WORK ORDER CLOSED")
-    (combat-refusal-friendly . "GUILD STANDING — NO HOSTILE ACTION AGAINST CHARTERED ENGINEERS")
+    ;; V5-07: the (combat . ...) subsection — COMBAT §4.7 verbatim
+    (combat . (
+    (combat-injury-limp . "WORKER %s INJURED — LIMP LOGGED — GAIT NORMALIZED ON RELIEF RUNS")
+      (combat-injury-shaken . "WORKER %s SHAKEN — NERVE DEGRADED — WATCH THE THRESHOLD")
+      (combat-worker-death . "WORKER %s LOST — SERVICE RECORD SEALED")
+      (combat-raid-open . "RAID — THE INHERITORS CLAIM THE MAIN — %d HOSTILE")
+      (combat-raid-close . "RAID CLOSED — THE INHERITORS WITHDRAW — CLAIM NOT RECOGNIZED")
+      (combat-raid-routed . "THE MAIN HOLDS — INHERITORS ROUTED — THE SECTOR REMAINS SERVED")
+      (combat-ambush . "AMBUSH AT ISOLATED PLUMBING — (%d,%d)")
+      (combat-infest . "INFESTATION — GNAWING LOGGED AT (%d,%d)")
+      (combat-gnaw . "LINE SEVERED BY GNAW AT (%d,%d) — RE-LAY (p)")
+      (combat-tank-raid . "TANK (%d,%d) DRAWN DOWN — %d UNITS CLAIMED")
+      (combat-leech-grip . "VENT-LEECH ATTACHED — WORKER %s — CUT IT OFF")
+      (combat-drive-off . "CLOG-CRAB DRIVEN OFF — (%d,%d)")
+      (combat-sponge . "SPONGE MASS RECLASSIFIED FAUNA — FEEDING LOGGED AS NATURAL")
+      (combat-guild-arrival . "GUILD OF THE OPEN FLANGE ON SITE — RESTORATIONS AT %d ALLOY")
+      (combat-guild-fix . "GUILD RESTORATION COMPLETE AT (%d,%d)")
+      (combat-guild-depart . "GUILD DEPARTS — WORK ORDER CLOSED")
+      (combat-refusal-friendly . "GUILD STANDING — NO HOSTILE ACTION AGAINST CHARTERED ENGINEERS")
+      (combat-warband-intel . "THE PIPES PREDATE THE SECTOR. SANITATION IS TRESPASS.")
+      (combat-guild-intel . "GUILD OF THE OPEN FLANGE — RESTORATIONS AT ONE ALLOY")
+      (combat-inspect-fmt . "%s %s — %s · HP %d/%d · DEF %d · ATK %+d")
+      ))
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
     (capacity-none . "NO WIRED TOILET ON THE GRID — LAY PIPE (p)")
     (teach-arrows . "C-n/C-p/C-f/C-b MOVE TOO")
@@ -2448,6 +2455,13 @@ section first, then bank :copy sections in load order (§4.4).")
   '((1 . (0 . 119)) (2 . (120 . 239)) (3 . (240 . 99999)))
   "STORY §3.5 act windows (v4 pin): Act I 0-119, Act II 120-239,
 Act III 240+ (unbounded).")
+
+(defun cistern--enemy-at (st x y)
+  "V5-07 view query: the hostile standing at (X,Y), or nil."
+  (cl-find-if (lambda (e)
+                (and (= x (cistern--enemy-x e))
+                     (= y (cistern--enemy-y e))))
+              (cistern-st-hostiles st)))
 
 (defun cistern--story-tick-act (tick)
   "The act whose window TICK falls in (STORY §3.5) — derived

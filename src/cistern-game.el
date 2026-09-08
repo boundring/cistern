@@ -1118,7 +1118,7 @@ lands, nil on refusal or empty cell."
      ((null e) nil)
      ((eq (cistern--enemy-faction e) 'guild)
       (cistern--log st "%s"
-                    (cdr (assq 'combat-refusal-friendly cistern--copy)))
+                    (cistern--combat-copy 'combat-refusal-friendly))
       nil)
      (t
       (setf (cistern-st-focus st) (cistern--enemy-id e))
