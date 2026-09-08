@@ -115,7 +115,15 @@
      (comedy-letter-2 . "A PREDECESSOR'S LETTER — 'THE SOUTH MANIFOLD LIES'")
      (comedy-letter-3 . "A PREDECESSOR'S LETTER — 'DO NOT NAME THE PIPES'")
      (comedy-drill . "UNSCHEDULED SAFETY DRILL — PLEASE CONTINUE")
-     (comedy-drills-tally . "%d UNSCHEDULED DRILLS THIS ACT"))
+     (comedy-drills-tally . "%d UNSCHEDULED DRILLS THIS ACT")
+     (comedy-thought-1 . "AUDITED FOUR TIMES, NEVER THANKED.")
+     (comedy-thought-2 . "THE PIPES REMEMBER. I DO NOT.")
+     (comedy-thought-3 . "THE STRUCTURE FILES EVERYTHING. EVEN THIS.")
+     (comedy-thought-4 . "ANOTHER SHIFT. THE TANKS ARE PATIENT.")
+     (comedy-thought-5 . "I FILED A COMPLAINT AGAINST THE FLOOR.")
+     (comedy-thought-6 . "SECTOR 7: WHERE CAREERS GO TO DRAIN.")
+     (comedy-thought-7 . "THE MANIFOLD AND I HAVE AN UNDERSTANDING.")
+     (comedy-thought-8 . "NOBODY READS FORM 7-R. I SUBMITTED ANYWAY."))
     :entries
     ((:id pipe-complaint :when (pipes-long) :weight 10 :loud nil
       :cooldown 200 :draws (cast 1 pipe 1) :thread nil

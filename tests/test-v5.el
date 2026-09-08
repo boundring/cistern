@@ -1669,3 +1669,159 @@ face renders; copy widths hold."
           (cl-assert (facep 'cistern-comedy)
                      t "C10: the comedy face exists")))))
   (message "CISTERN-V5-16-OK"))
+
+;; --- W3-2 fixtures: V5-17 comedy hooks, V5-18 determinism close-out -------------
+
+(defun cistern-test-v5-17-hooks ()
+  "V5-17 (C7/C8): romance-stage priority slots fire on the next
+calm tick (stage >= 2 only); the dry channel pushes one comedic
+private thought per 60 ticks via the social helper; never for a
+CRITICAL-mood worker; a raid open suppresses both."
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    ;; the dry channel: push a comedic private thought
+    (setf (cistern-st-tick st) 100)
+    (let ((c (cistern-st-comedy st)))
+      (plist-put c :last-dry 40)
+      ;; force non-suppressed
+      (plist-put c :anchors nil))
+    (let ((before (cistern-st-social-pos st))
+          (before-comedy (plist-get (cistern-st-comedy st) :pos)))
+      (cistern--comedy-eval st nil)
+      (cl-assert (/= (plist-get (cistern-st-comedy st) :pos) before-comedy)
+                 t "C8: the dry channel draws from stream 6")
+      (cl-assert (= (cistern-st-social-pos st) before)
+                 t "C8: the thought-push-key does NOT advance social-pos"))
+    ;; the thought landed in α's ledger
+    (let ((found nil))
+      (dolist (w (cistern-st-creators st))
+        (let* ((id (cistern--worker-glyph st w))
+               (ledger (plist-get (gethash id (cistern-st-personas st))
+                                  :ledger)))
+          (when (and ledger (eq (nth 1 (car ledger)) 'private))
+            (cl-assert (cistern--story-copy-key (nth 2 (car ledger)))
+                       t "C8: the dry thought resolves")
+            (setq found t))))
+      (cl-assert found t "C8: a dry thought landed as private")))
+  ;; the dry channel: never for a CRITICAL-mood worker
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-bladder w) 115)
+      (setf (cistern--worker-sick w) 5)
+      (setf (cistern-st-tick st) 100)
+      (let ((c (cistern-st-comedy st)))
+        (plist-put c :last-dry 40)
+        (plist-put c :anchors nil))
+      (let ((ledger-before
+             (plist-get (gethash (cistern--worker-glyph st w)
+                                 (cistern-st-personas st))
+                        :ledger)))
+        (cistern--comedy-eval st nil)
+        (let ((ledger-after
+               (plist-get (gethash (cistern--worker-glyph st w)
+                                   (cistern-st-personas st))
+                          :ledger)))
+          (cl-assert (equal ledger-before ledger-after)
+                     t "C8: no dry thought for a CRITICAL worker")))))
+  ;; the romance priority slot: stage >= 2 arms a beat on the next
+  ;; calm tick, superseding the budget without moving :last-beat-tick
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (setf (cistern-st-tick st) 50)
+    (plist-put (cistern-st-comedy st) :last-beat-tick 49)
+    (plist-put (cistern-st-comedy st) :romance-slot t)
+    (let ((last0 (plist-get (cistern-st-comedy st) :last-beat-tick)))
+      (cistern--comedy-eval st nil)
+      (cl-assert (/= 0 (plist-get (cistern-st-comedy st) :last-beat-tick))
+                 t "C7: the romance slot fires a beat")
+      (cl-assert (null (plist-get (cistern-st-comedy st) :romance-slot))
+                 t "C7: the slot clears after firing")))
+  ;; the contrast rule: a raid open suppresses the romance slot too
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (setf (cistern-st-raid st) (list :open 1))
+    (setf (cistern-st-tick st) 50)
+    (plist-put (cistern-st-comedy st) :romance-slot t)
+    (cistern--comedy-eval st nil)
+    (cl-assert (plist-get (cistern-st-comedy st) :romance-slot)
+               t "C7: the romance slot holds during a raid"))
+  (message "CISTERN-V5-17-OK"))
+
+(defun cistern-test-v5-18-determinism ()
+  "V5-18 (C9/C12): stream hygiene — comedy-eval moves only
+comedy-pos; two seed-20260830 soaks byte-identical incl. comedy
+state; different seed -> different comedy-pos; no comedy intent
+within 40 ticks after a violent anchor."
+  ;; stream hygiene: comedy-eval moves only comedy-pos
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (setf (cistern-st-auto-run st) t)
+    (setf (cistern-st-tick st) 750)
+    (plist-put (cistern-st-comedy st) :last-beat-tick 0)
+    (let ((rng (cistern-st-rng st)) (prng (cistern-st-particle-rng st))
+          (rpg (cistern-st-rpg-pos st)) (cb (cistern-st-combat-pos st))
+          (soc (cistern-st-social-pos st)))
+      (cistern--comedy-eval st nil)
+      (cl-assert (= (cistern-st-rng st) rng) t "C9: sim LCG untouched")
+      (cl-assert (= (cistern-st-particle-rng st) prng)
+                 t "C9: particle stream untouched")
+      (cl-assert (= (cistern-st-rpg-pos st) rpg) t "C9: RPG untouched")
+      (cl-assert (= (cistern-st-combat-pos st) cb) t "C9: combat untouched")
+      (cl-assert (= (cistern-st-social-pos st) soc) t "C9: social untouched")))
+  ;; C9: two 300-tick soaks byte-identical incl. comedy-pos
+  (let* ((h1 (cistern-test-v5-18--soak))
+         (h2 (cistern-test-v5-18--soak)))
+    (cl-assert (string= (cadr h1) (cadr h2))
+               t "C9: two runs byte-identical"))
+  ;; different seed -> different comedy-pos
+  (let ((st1 (cistern--new-game 20260830))
+        (st2 (cistern--new-game 99999)))
+    (cl-assert (/= (plist-get (cistern-st-comedy st1) :pos)
+                   (plist-get (cistern-st-comedy st2) :pos))
+               t "C9: different seeds -> different comedy-pos"))
+  ;; C12: no comedy intent within 40 ticks after a violent anchor
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    ;; force a worker-death anchor at tick 100
+    (dotimes (_ 100) (cistern--do-tick st))
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-hp w) 1)
+      (cistern--worker-damage st w 10))
+    (let ((anchor-tick (cistern-st-tick st))
+          (comedy-count 0))
+      (dotimes (_ 39)
+        (cistern--do-tick st)
+        (dolist (i (cdr (cistern-st-rewards-outcome st)))
+          (when (and (consp i) (eq (plist-get i :face) 'comedy))
+            (setq comedy-count (1+ comedy-count)))))
+      (cl-assert (= comedy-count 0)
+                 t "C12: no comedy within the anchor cooldown")))
+  (message "CISTERN-V5-18-OK"))
+
+(defun cistern-test-v5-18--soak ()
+  "A 300-tick bank-loaded soak of seed 20260830 with comedy active."
+  (cistern-test-v5--load-social-banks)
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v5--root)))
+  (let ((st (cistern--new-game 20260830)))
+    (dotimes (_ 300) (cistern--do-tick st))
+    (list st
+          (secure-hash
+           'md5 (prin1-to-string
+                 (list (cistern-st-comedy st)
+                       (cistern-st-combat-pos st)
+                       (cistern-st-raid st)))))))

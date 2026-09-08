@@ -154,7 +154,9 @@
     cistern-test-v5-13-tracker
     cistern-test-v5-14-whimsey
     cistern-test-v5-15-selection
-    cistern-test-v5-16-delivery))
+    cistern-test-v5-16-delivery
+    cistern-test-v5-17-hooks
+    cistern-test-v5-18-determinism))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

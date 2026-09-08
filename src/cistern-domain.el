@@ -713,6 +713,18 @@ copy-keys (fail-first on a missing entry)."
                  :copy-key)
       (error "UNRESOLVED QUIRK ID %S" id)))
 
+(defun cistern--social-thought-push-key (st id key)
+  "V5-17 (COMEDY §3.2): the dry-channel variant of the thought-push
+helper — takes a COPY-KEY directly instead of doing a class-based
+bank lookup.  The ledger cap 3 FIFO is enforced HERE."
+  (let* ((p (gethash id (cistern-st-personas st)))
+         (ledger (cons (list (cistern-st-tick st) 'private key)
+                       (plist-get p :ledger))))
+    (puthash id (plist-put p :ledger
+                           (if (> (length ledger) 3)
+                               (butlast ledger) ledger))
+             (cistern-st-personas st))))
+
 (defun cistern--social-persona-id-at (st x y)
   "V5-12 view query: the persona-eligible entity id at (X,Y) —
 worker glyph, hostile g<N> id, fixture or tank key — or nil."
@@ -767,6 +779,9 @@ copy chain; the VIEW may not, per the r5/v4-16 layer pins)."
 
 (defconst cistern--comedy-calm 40
   "COMEDY §1.2: the violence-contrast cooldown after an anchor.")
+
+(defconst cistern--comedy-dry-gap 60
+  "COMEDY §3.2: one comedic private thought per 60 ticks.")
 
 (defconst cistern--comedy-footprints
   '(complaint-count accent-ttl aesthetic-p rival-ttl place-names

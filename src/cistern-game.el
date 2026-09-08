@@ -1413,6 +1413,43 @@ existing intent shapes.  Returns the intent list."
                             (cistern-st-toilets st))))
                (cistern-st-toilets st))
       (cistern--comedy-anchors-scan st)
+      ;; V5-17 (COMEDY §3): romance-stage priority slots — stage >= 2
+      ;; transitions arm a beat on the next calm tick; the dry channel
+      ;; pushes one comedic private thought per 60 ticks.  The contrast
+      ;; rule: a raid open suppresses both.
+      (let* ((tk (cistern-st-tick st))
+             (evs (cistern-st-rewards-events st)))
+        (dolist (ev evs)
+          (when (and (consp ev) (eq (car ev) :social)
+                     (eq (cadr ev) 'romance-stage)
+                     (>= (or (plist-get (cddr ev) :stage) 0) 2))
+            (plist-put c :romance-slot t)))
+        ;; the dry channel: one comedic private thought per 60 ticks,
+        ;; never for a CRITICAL-mood worker, via SOCIAL's pinned helper
+        (when (and (>= (- tk (or (plist-get c :last-dry)
+                                 (- cistern--comedy-dry-gap 60)))
+                         cistern--comedy-dry-gap)
+                   (not (cistern--comedy-suppressed-p st)))
+          (let* ((workers (cl-remove-if
+                           (lambda (w)
+                             (eq (cistern--social-mood
+                                  st (cistern--worker-glyph st w))
+                                 'CRITICAL))
+                           (cistern-st-creators st))))
+            (when workers
+              (let* ((pick (nth (cistern--comedy-draw
+                                 st (length workers))
+                                workers))
+                     (th-keys '(comedy-thought-1 comedy-thought-2
+                                comedy-thought-3 comedy-thought-4
+                                comedy-thought-5 comedy-thought-6
+                                comedy-thought-7 comedy-thought-8))
+                     (key (nth (cistern--comedy-draw
+                                st (length th-keys))
+                               th-keys)))
+                (cistern--social-thought-push-key
+                 st (cistern--worker-glyph st pick) key)
+                (plist-put c :last-dry tk))))))
       (let* ((tick (cistern-st-tick st))
              (since (- tick (plist-get c :last-beat-tick)))
              (budget (cistern--comedy-budget st))
@@ -1430,7 +1467,14 @@ existing intent shapes.  Returns the intent list."
           (let ((due (plist-get c :due-p))
                 (spont (and (not (cistern-st-auto-run st))
                             (= 0 (cistern--comedy-draw st 90)))))
-            (when (or due spont)
+            (when (or due spont
+                      ;; V5-17: the romance priority slot fires on the
+                      ;; next calm tick, superseding the budget without
+                      ;; moving :last-beat-tick (the slot clears here)
+                      (progn
+                        (when (plist-get c :romance-slot)
+                          (plist-put c :romance-slot nil)
+                          t)))
               (setq intents (cistern--comedy-select st story-intents))))))))
     intents))
 

@@ -3513,3 +3513,32 @@ the relaunch is on their screen now.
 - Outcome: V5-13 GREEN, V5-14 GREEN, V5-15 GREEN, V5-16 GREEN.  Suite
   canonical 130/130.  GREEN-SYNC: the five src files synced to
   ~/.emacs.d/lisp/ at the boundary per the standing rule.
+
+## L-105 (2026-09-08, run: wave3-batch-2 — V5-17 comedy hooks, V5-18 determinism close-out)
+
+- Death state: the prior W3-2 run died mid-turn (retry budget
+  exhausted on upstream connectivity) with the full W3-2 slice
+  uncommitted (5 files, +228) and ONE suite fail: V5-17 C8 "a dry
+  thought landed as private".
+- C8 root cause: `cistern--comedy-eval`'s dry channel called the
+  CLASS-based `cistern--social-thought-push` with class `'private` —
+  a class with no thought bank, so the helper's bank lookup produced
+  key nil and pushed NOTHING to the persona ledger.  The dedicated
+  dry-channel variant `cistern--social-thought-push-key` (already
+  landed in cistern-domain.el) exists precisely to take the comedy
+  copy key directly.  One-line fix: call the -key helper with the
+  stream-6-selected `comedy-thought-N` key.  No doc/test conflict:
+  the test implements §6 C8 verbatim (≤ 1 per 60 ticks, social
+  helper only, never CRITICAL, private-only); §3.2's quirk-preference
+  clause is inert for now — the example bank's comedy-thought-1..8
+  carry no quirk-tagged variants.
+- V5-18 close-out confirmed in the canonical suite run: C9 stream
+  hygiene (comedy-eval moves only comedy-pos; sim LCG, particle, rpg,
+  combat, social positions untouched), byte-identical 300-tick
+  twin-soak hashes, distinct seeds -> distinct comedy-pos; C12 zero
+  comedy intents in the 40-tick violent-anchor cooldown.  C9's
+  comedy-never-advances-sim-LCG/particle/story-streams assertion is
+  the registered soak's standing guard.
+- Outcome: V5-17 GREEN, V5-18 GREEN.  Suite canonical ALL 132 TESTS
+  PASSED (full soak incl. C7/C8/C9/C12).  GREEN-SYNC at the boundary
+  per the standing rule.
