@@ -47,6 +47,15 @@ batch suite loads the driver from src/ with no bank beside it)."
 ;; the input adapter (L-015 pin 1: inward dependency).
 (defvar cistern--st nil)
 
+(defun cistern--current-lay (st)
+  "V6-01 (W1.1): derive LAY from the LIVE window — the one
+derivation the renderer and the click handler share (A-WO1.2
+single source; the layout itself is `cistern-view--layout')."
+  (cistern-view--layout (window-body-width) (window-body-height)
+                        (cistern-st-w st) (cistern-st-h st)
+                        (cistern-st-cursor st)
+                        (and (cistern-view--header-badges st) t)))
+
 (defun cistern--refresh ()
   "Driver-owned buffer mutation (D4): erase and insert the view's
 pure render.  Every state-mutating command ends here."
@@ -60,7 +69,8 @@ pure render.  Every state-mutating command ends here."
   (cistern--apply-palette)
   (let ((inhibit-read-only t))
     (erase-buffer)
-    (insert (cistern-view--render cistern--st))
+    (insert (cistern-view--render cistern--st
+                                  (cistern--current-lay cistern--st)))
     (goto-char (point-min))))
 
 (defvar cistern-mode-map
@@ -126,7 +136,22 @@ pure render.  Every state-mutating command ends here."
   ;; hook registration rides init so it lands exactly when the game
   ;; goes live (add-hook is idempotent).
   (cistern--apply-palette (selected-frame))
-  (add-hook 'enable-theme-functions #'cistern--theme-refresh))
+  (add-hook 'enable-theme-functions #'cistern--theme-refresh)
+  ;; V6-01 (W1.3): resize re-derives LAY and re-renders (idempotent).
+  (add-hook 'window-size-change-functions #'cistern--window-resized))
+
+(defun cistern--window-resized (_frame)
+  "V6-01 (W1.3): resize re-derives LAY and re-renders — nothing
+is stored, so nothing can go stale.  Deferred through a zero
+timer: buffer mutation inside `window-size-change-functions' runs
+under redisplay and is not safe."
+  (run-with-timer 0 nil #'cistern--resize-refresh))
+
+(defun cistern--resize-refresh ()
+  (when (and cistern--st (buffer-live-p (get-buffer "*cistern*")))
+    (with-current-buffer "*cistern*"
+      (when (derived-mode-p 'cistern-mode)
+        (cistern--refresh)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Theme-contrast application (V4-04, SURFACE S2.3).  The game frame
@@ -386,11 +411,14 @@ order; the badge names the selection."
 via the pure view geometry, then call the input adapter (unarmed =
 cursor move, no tick; armed = place at the cell + one tick)."
   (interactive "@e")
-  (let ((xy (save-excursion
-              (goto-char (posn-point (event-start event)))
-              (cistern-view--cell-at
-               cistern--st (line-number-at-pos (point))
-               (current-column)))))
+  ;; V6-01: the SAME LAY derivation the renderer just used — resize
+  ;; and click remap are one computation, never stored drift.
+  (let* ((lay (cistern--current-lay cistern--st))
+         (xy (save-excursion
+               (goto-char (posn-point (event-start event)))
+               (cistern-view--cell-at
+                cistern--st lay (line-number-at-pos (point))
+                (current-column)))))
     (when xy
       ;; R2-Q06: an ARMED click is a placement (drains the hint); an
       ;; unarmed click is aiming (preserves it)

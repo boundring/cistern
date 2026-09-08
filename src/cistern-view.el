@@ -25,6 +25,40 @@ auto-run) makes 4.  Never two independent numbers."
      (if (or (cistern-st-armed-verb st) (cistern-st-auto-run st)) 1 0)))
 
 ;; ---------------------------------------------------------------------------
+;; V6-01 (W1.1/W1.2): the LAY layout object — THE single source for
+;; header block height, map viewport origin, and click mapping (C1').
+;; Both consumers (render, cell-at) read ONLY LAY; no layout state is
+;; stored anywhere (R2-Q02 generalized): every refresh and every
+;; click re-derives, so resize and remap are the same computation.
+
+(defun cistern-view--layout (body-cols body-lines map-w map-h
+                                       &optional cursor badge-p)
+  "Pure V6 layout: derive LAY from BODY-COLS×BODY-LINES window
+measurements and a MAP-W×MAP-H map.  CURSOR (X . Y) centers the
+clamped camera (W1.2; nil → (0 . 0)); BADGE-P adds the reserved
+badge row — the spec's 4-tuple sketch cannot derive :cam or the
+badge variant without them (L-110), so they ride as trailing
+optionals; batch tests pass synthetic integers."
+  (let* ((cursor (or cursor '(0 . 0)))
+         (header-lines (+ 3 (if badge-p 1 0)))
+         ;; C1' bounds: the header always renders in full; the map
+         ;; viewport absorbs whatever the window offers — never
+         ;; clipped below the 34×16 classic sector (W1.1).
+         (cols (min map-w (max 34 body-cols)))
+         (lines (min map-h (max 16 (- body-lines header-lines))))
+         (cam (cons (clamp 0 (- (car cursor) (/ cols 2)) (- map-w cols))
+                    (clamp 0 (- (cdr cursor) (/ lines 2)) (- map-h lines)))))
+    (list :map-origin (cons (1+ header-lines) 0)
+          :map-cols cols :map-lines lines :cam cam
+          :header-lines header-lines
+          :legend-rows (length (split-string
+                                (cistern-view--legend-line) "\n" t))
+          :help-row (let ((rows (cistern-view--help-rows)))
+                      (and (<= (length (nth 0 rows)) body-cols)
+                           (<= (length (nth 1 rows)) body-cols)))
+          :body-cols body-cols)))
+
+;; ---------------------------------------------------------------------------
 ;; Faces (ported from legacy :604-621; pipe gains connection faces).
 
 (defface cistern-wall '((t)) "CISTERN walls.")
@@ -394,6 +428,12 @@ armed and auto-run coexist here.  Empty string when idle (no row)."
           cistern-cost-demolish cistern-cost-decon
           (cdr (assq 'help-arm cistern--copy))))
 
+(defun cistern-view--help-rows ()
+  "R2-Q01: the help's two deliberate rows, split.  `cistern-view--layout'
+reads their widths (:help-row); the render re-assembles them, so
+both consumers share one help string."
+  (split-string (cistern-view--help-line) "\n"))
+
 (defun cistern-view--legend-line ()
   "Q12: GENERATED from the tile table — a kind with :dead-glyph
 lists the dead glyph (its base glyph never renders), so one glyph
@@ -623,11 +663,19 @@ Q11 from the domain table."
                            cistern-tank-cap))))
         (t "LINES NOMINAL — THE STRUCTURE DOES NOT CARE"))))
 
-(defun cistern-view--map-rows (st &optional overlay)
-  (let ((out ""))
-    (dotimes (y (cistern-st-h st))
-      (dotimes (x (cistern-st-w st))
-        (let* ((cur (equal (cons x y) (cistern-st-cursor st)))
+(defun cistern-view--map-rows (st lay &optional overlay)
+  "V6-01: the LAY camera window of the map — exactly
+:map-cols × :map-lines glyphs of the viewport, cells offset by :cam."
+  (let* ((cam (plist-get lay :cam))
+         (x0 (car cam)) (y0 (cdr cam))
+         (cols (plist-get lay :map-cols))
+         (lines (plist-get lay :map-lines))
+         (out ""))
+    (dotimes (ry lines)
+      (let ((y (+ y0 ry)))
+      (dotimes (rx cols)
+        (let* ((x (+ x0 rx))
+               (cur (equal (cons x y) (cistern-st-cursor st)))
                (w (cl-find-if
                    (lambda (w)
                      (and (= (cistern--worker-x w) x)
@@ -657,6 +705,7 @@ Q11 from the domain table."
           (setq out (concat out
                             (propertize
                              glyph 'face face)))))
+        )
       (setq out (concat out "\n")))
     out))
 
@@ -763,11 +812,18 @@ chronological."
     (mapcar (lambda (i) (nth i window))
             (sort (append major-idx rest-idx) #'<))))
 
-(defun cistern-view--render (st)
+(defun cistern-view--render (st &optional lay)
   "Pure projection of ST into a propertized string.  No buffer
 mutation, no side effects (D4) — the driver owns inserting it.
-Layout contract: exactly `cistern-view--header-lines' header
-lines precede the map rows."
+Layout contract (V6-01): every derived geometry number comes from
+the LAY object — the driver derives it from the live window, batch
+tests pass one in; without LAY a wide synthetic window is derived
+(nothing elides, output byte-identical to the v5 whole-map render)."
+  (unless lay
+    (setq lay (cistern-view--layout 200 60 (cistern-st-w st)
+                                    (cistern-st-h st)
+                                    (cistern-st-cursor st)
+                                    (and (cistern-view--header-badges st) t))))
   (let* (;; the rewards use case is read exactly ONCE per render (§3.6)
          (celebration (cistern-view--celebration-overlay st))
          (overlay (car celebration))
@@ -800,9 +856,14 @@ lines precede the map rows."
        (propertize (concat (cistern-view--header-badges st) "\n")
                    'face 'cistern-dim))
      ;; R2-Q01: the help is two dim rows; the wrapped legend renders
-     ;; below the map — the pre-map block stays header-lines tall
-     (propertize (cistern-view--help-line) 'face 'cistern-dim)
-     (cistern-view--map-rows st overlay)
+     ;; below the map — the pre-map block stays header-lines tall.
+     ;; V6-01: a too-narrow window elides row B's CONTENT to keep the
+     ;; block height fixed (W1.4) — the reserved row renders dim-blank.
+     (if (plist-get lay :help-row)
+         (propertize (cistern-view--help-line) 'face 'cistern-dim)
+       (propertize (concat (car (cistern-view--help-rows)) "\n\n")
+                   'face 'cistern-dim))
+     (cistern-view--map-rows st lay overlay)
      (propertize (concat banner "\n") 'face 'cistern-header)
      (propertize (concat (cistern-view--inspector st) "\n")
                  'face 'cistern-dim)
@@ -825,15 +886,21 @@ lines precede the map rows."
 ;; ---------------------------------------------------------------------------
 ;; Buffer geometry (Pair 2 slice; shares the header-lines constant).
 
-(defun cistern-view--cell-at (st line col)
+(defun cistern-view--cell-at (st lay line col)
   "Pure buffer geometry: 1-based buffer LINE and 0-based COL →
-(X . Y) grid cell; nil outside the map (clicks on header/log lines
-are ignored by the driver).  Used by the driver's mouse handler;
-batch-tested."
-  (let ((x col)
-        (y (- line 1 (cistern-view--header-block-height st))))
+(X . Y) grid cell, read ONLY from LAY — origin and camera (C1':
+one layout object, two consumers); nil outside the rendered
+viewport (clicks on header/log lines are ignored by the driver).
+Used by the driver's mouse handler; batch-tested."
+  (let* ((origin (plist-get lay :map-origin))
+         (cam (plist-get lay :cam))
+         (x (+ col (car cam)))
+         (y (+ (- line (car origin)) (cdr cam))))
     (when (and (>= x 0) (< x (cistern-st-w st))
-               (>= y 0) (< y (cistern-st-h st)))
+               (>= y 0) (< y (cistern-st-h st))
+               (>= line (car origin))
+               (< (- line (car origin)) (plist-get lay :map-lines))
+               (>= col 0) (< col (plist-get lay :map-cols)))
       (cons x y))))
 
 (provide 'cistern-view)

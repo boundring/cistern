@@ -3741,3 +3741,37 @@ the relaunch is on their screen now.
   canonical ALL 136 TESTS PASSED (132 + 4 new: log-delivery,
   faction-mock, idle-proximity, star-crossed).  GREEN-BOUNDARY SYNC
   at the boundary per the standing rule.
+
+## L-110 (2026-09-08, run: v6-wave-1 — V6-01 LAY layout object + camera + click geometry)
+
+- RED captured: 2/139 FAILED (void-function cistern-view--layout); GUI
+  probe registered batch-skipped (L-076 pattern). GREEN: layout object in
+  cistern-view.el; driver `cistern--current-lay' is the one derivation
+  shared by refresh + click (A-WO1.2 asserted by source grep);
+  `cistern-view--cell-at' now (st lay line col) reading ONLY LAY;
+  map-rows viewport-windowed; window-size-change callback re-derives and
+  re-renders (deferred through a zero timer — buffer mutation inside
+  `window-size-change-functions' runs under redisplay and is not safe).
+- SIGNATURE RECONCILIATION (pinned): the spec's 4-tuple
+  `(body-cols body-lines map-w map-h)' cannot derive :cam (needs the
+  cursor) or the badge variant (WO1.1 parenthetical needs badge-p) —
+  they ride as trailing optionals; the four pinned window/map
+  measurements stay first and synthetic. LAY also carries :body-cols so
+  the render's content builders (V6-02 elision) consume the same width.
+- NIL-LAY RENDER DEFAULT: `cistern-view--render' without LAY derives a
+  200×60 synthetic window — nothing elides, output byte-identical to
+  the v5 whole-map render. Keeps the ~40 existing (render st) test call
+  sites green unchanged; the driver always passes the live-window LAY.
+- BLOCK HEIGHT STAYS FIXED: help elision (W1.4) swaps row CONTENT
+  (dim-blank reserved row), never the 3+badge row count — :header-lines
+  stays truthful and geometry never shifts under a badge or a narrow
+  window; :help-row/:legend-rows are truthful counts the render consumes.
+- WO1.4 GUI probe: one launch, timeout 20, log-to-file (owner rule) —
+  PASS: three resizes each re-rendered byte-identical to the freshly
+  derived LAY render; synthetic clicks remapped at every size.
+- TOOL NOTE (emacs 31.1 batch): relative-path `load' fails with
+  file-missing even when default-directory holds the file (locate-file
+  resolves it; expand-file-name absolute loads fine) — use absolute
+  loads in one-off batch probes.
+- Outcome: suite canonical ALL 139 TESTS PASSED (136 + 3: layout,
+  roundtrip, gui). GREEN-BOUNDARY SYNC.

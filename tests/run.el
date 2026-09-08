@@ -160,7 +160,10 @@
     cistern-test-v5-19-star-crossed
     cistern-test-v5-17-hooks
     cistern-test-v5-log-delivery
-    cistern-test-v5-18-determinism))
+    cistern-test-v5-18-determinism
+    cistern-test-v6-01-layout
+    cistern-test-v6-01-roundtrip
+    cistern-test-v6-01-gui))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

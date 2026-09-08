@@ -146,7 +146,10 @@ the hook renders nothing (byte-identical)."
 
     ;; geometry regression: header-lines unchanged (R1 pins cell-at)
     (let ((st (cistern--new-game 42)))
-      (cl-assert (equal (cistern-view--cell-at st 4 0) '(0 . 0))
+      (cl-assert (equal (cistern-view--cell-at
+                         st (cistern-view--layout 200 60
+                             (cistern-st-w st) (cistern-st-h st)) 4 0)
+                 '(0 . 0))
                  t "cell-at geometry unchanged by the banner row")))
 )
 

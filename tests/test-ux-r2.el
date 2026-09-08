@@ -71,7 +71,10 @@ first cell is unchanged."
     ;; cold: strip + two help rows = 3; the map starts at line 4
     (cl-assert (= (cistern-view--header-block-height st) 3)
                t "cold block height is 3")
-    (cl-assert (equal (cistern-view--cell-at st 4 0) '(0 . 0))
+    (cl-assert (equal (cistern-view--cell-at
+                       st (cistern-view--layout 200 60
+                           (cistern-st-w st) (cistern-st-h st)) 4 0)
+               '(0 . 0))
                t "cold: map's first cell at line 4")
     ;; armed: the badge row is line 2, the map starts at line 5
     (cistern--cmd-arm-verb st 'pipe)
@@ -93,7 +96,10 @@ first cell is unchanged."
         (cl-assert (<= (length row) 95)
                    t "badge-live row over 95 cols")))
     ;; THE geometry probe: cell-at of the map's first cell, badge live
-    (cl-assert (equal (cistern-view--cell-at st 5 0) '(0 . 0))
+    (cl-assert (equal (cistern-view--cell-at
+                       st (cistern-view--layout 200 60
+                           (cistern-st-w st) (cistern-st-h st) nil t) 5 0)
+               '(0 . 0))
                t "badge live: map's first cell at line 5 — clicks land")
     ;; the condemn append is short
     (setf (cistern-st-over st) "SECTOR CONDEMNED — CONTAMINATION LIMIT")
