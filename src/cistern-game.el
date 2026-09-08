@@ -283,8 +283,12 @@ predicate.  Returns the final state; signals on an unmet expect."
        (cond ((>= rep 80) 2) ((>= rep 50) 1) (t 0))))))
 
 (defun cistern--story-tick-act (tick)
-  "The act whose window TICK falls in (STORY §3.5)."
-  (cond ((< tick 120) 1) ((< tick 240) 2) (t 3)))
+  "The act whose window TICK falls in (STORY §3.5) — derived
+from the pinned `cistern--story-act-ticks' spans, not a second
+copy of the windows."
+  (let ((act 1))
+    (dolist (a cistern--story-act-ticks act)
+      (when (>= tick (car (cdr a))) (setq act (car a))))))
 
 (defun cistern--story-condition-p (st h events)
   "Does hook H's :condition hold this tick (STORY §7.1/§7.5)?
@@ -326,6 +330,24 @@ the -fallback standalone variant."
             (intern (concat (symbol-name key) "-fallback"))))
           (t (cistern--story-copy-key key)))))
 
+(defun cistern--story-pick-floor (st)
+  "One stream-2 draw picks the unoccupied floor cell a story
+effect lands on (STORY §6.4); :roll-pos advances only when a
+floor exists.  Returns the (X . Y) cell or nil."
+  (let ((floors nil) (i 0))
+    (while (< i (length (cistern-st-map st)))
+      (when (eq (aref (cistern-st-map st) i) 'floor)
+        (push (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st)))
+              floors))
+      (cl-incf i))
+    (when floors
+      (let* ((p (cistern--stream-next
+                 (plist-get (cistern-st-story st) :roll-pos)))
+             (cell (nth (% (ash p -6) (length floors))
+                        (nreverse floors))))
+        (plist-put (cistern-st-story st) :roll-pos p)
+        cell))))
+
 (defun cistern--story-apply-effect (st outcome cell)
   "STORY §6.4: commit-first application of the sim-visible
 effects.  Returns presentation intents (popup), possibly nil."
@@ -333,19 +355,9 @@ effects.  Returns presentation intents (popup), possibly nil."
         (arg (plist-get outcome :arg)))
     (pcase effect
       ('hazard-spawn
-       (let* ((floors nil) (i 0))
-         (while (< i (length (cistern-st-map st)))
-           (when (eq (aref (cistern-st-map st) i) 'floor)
-             (push (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st)))
-                   floors))
-           (cl-incf i))
-         (setq floors (nreverse floors))
-         (when floors
-           (let* ((p (cistern--stream-next
-                      (plist-get (cistern-st-story st) :roll-pos)))
-                  (cell2 (nth (% (ash p -6) (length floors)) floors)))
-             (plist-put (cistern-st-story st) :roll-pos p)
-             (cistern--add-hazard st (car cell2) (cdr cell2))))))
+       (let ((cell2 (cistern--story-pick-floor st)))
+         (when cell2
+           (cistern--add-hazard st (car cell2) (cdr cell2)))))
       ('tank-load-delta
        (let ((tk nil) (ks nil))
          (maphash (lambda (k _v) (push k ks))
@@ -368,21 +380,11 @@ effects.  Returns presentation intents (popup), possibly nil."
       ('alloy-grant
        (setf (cistern-st-alloy st) (+ (cistern-st-alloy st) (or arg 0))))
       ('tile-place
-       ;; V4-22 (S3.1): the story beat lands an ! event tile — the arg
-       ;; names the resolution kind; the cell is stream-2-picked floor
-       (let* ((floors nil) (i 0))
-         (while (< i (length (cistern-st-map st)))
-           (when (eq (aref (cistern-st-map st) i) 'floor)
-             (push (cons (% i (cistern-st-w st)) (/ i (cistern-st-w st)))
-                   floors))
-           (cl-incf i))
-         (setq floors (nreverse floors))
-         (when floors
-           (let* ((p (cistern--stream-next
-                      (plist-get (cistern-st-story st) :roll-pos)))
-                  (cell2 (nth (% (ash p -6) (length floors)) floors)))
-             (plist-put (cistern-st-story st) :roll-pos p)
-             (cistern--add-event-tile st (car cell2) (cdr cell2))))))
+       ;; V4-22 (S3.1): the story beat lands an ! event tile — the
+       ;; cell is stream-2-picked floor
+       (let ((cell2 (cistern--story-pick-floor st)))
+         (when cell2
+           (cistern--add-event-tile st (car cell2) (cdr cell2)))))
       ('popup
        (cistern--field-spawn st cell (cons 0 -1) 3
                              (or (and (stringp arg) arg) "NOTED")
@@ -397,8 +399,7 @@ events, drains nothing; advances the hook state machine
 act rollover; applies effects commit-first; returns (st . intents)
 with at most ONE story banner."
   (let ((story (cistern-st-story st))
-        (intents nil)
-        (banners 0))
+        (intents nil))
     (when story
       (let* ((tick (cistern-st-tick st))
              (tick-act (cistern--story-tick-act tick))
@@ -442,9 +443,7 @@ with at most ONE story banner."
                        (cistern--story-condition-p st h events))
               (plist-put h :state 'open)
               ;; §7.5: tier draw, then roll — pinned order, stream 2
-              (let* ((drift (nth (1- act) cistern--story-tier-drift))
-                     (tiers (plist-get (plist-get story :scenario) :tiers))
-                     (rare (+ (nth 2 tiers) drift))
+              (let* ((tiers (plist-get (plist-get story :scenario) :tiers))
                      (tdraw (cistern--story-draw st 100))
                      (tier (cond ((< tdraw (nth 0 tiers)) 'common)
                                  ((< tdraw (+ (nth 0 tiers) (nth 1 tiers)))
@@ -459,8 +458,7 @@ with at most ONE story banner."
                      (roll (cistern--story-draw st 20))
                      (stat (cistern--story-stat st (plist-get m :stat)))
                      (margin (+ roll stat (- diff)))
-                     (band (cond ((<= margin -5) 0) ((<= margin -1) 1)
-                                 ((<= margin 4) 2) (t 3)))
+                     (band (cistern--margin-band margin))
                      ;; V4-19: one shared hash serves both sources
                      (outcome (cistern--matrix-effect
                                (plist-get m :id) band))
@@ -487,18 +485,17 @@ with at most ONE story banner."
                       (push (list :layer 'log :text oline :face face)
                             intents))))))))
         ;; §8.3: the premise banner announces once at Act I's first
-        ;; rendered tick; ≤1 story banner per tick
+        ;; rendered tick — :announced makes it once per game, so the
+        ;; banner budget holds by construction
         (when (and (null (plist-get story :announced)) (> tick 0))
           (plist-put story :announced t)
-          (when (< banners 1)
-            (setq banners (1+ banners))
-            (push (list :layer 'banner
-                        :text (concat (cistern--story-copy-key
-                                       (plist-get (plist-get story
-                                                            :scenario)
-                                                  :premise))
-                                      "\n"))
-                  intents)))
+          (push (list :layer 'banner
+                      :text (concat (cistern--story-copy-key
+                                     (plist-get (plist-get story
+                                                          :scenario)
+                                                :premise))
+                                    "\n"))
+                intents))
         (plist-put story :intents (nreverse intents))))
     (cons st intents)))
 
@@ -633,10 +630,7 @@ nothing; emits only faced log intents (info severity)."
                      (pending (list rootline))
                      (node root)
                      (rolls 0))
-                (princ (format "DBGW0 branch=%S\\n" (plist-get node :branch)))
-                (princ (format "DBGW1 node=%S br=%S\\n" node (plist-get node :branch)))
                 (while (plist-get node :branch)
-                  (princ (format "DBGW1-iter br=%S\\n" (plist-get node :branch)))
                   (let* ((br (plist-get node :branch))
                          (stat (or (cdr (assq (plist-get br :stat)
                                               branch-stats))
@@ -644,8 +638,7 @@ nothing; emits only faced log intents (info severity)."
                          (roll (cistern--story-draw st 20))
                          (margin (+ roll stat
                                     (- (plist-get br :difficulty))))
-                         (band (cond ((<= margin -5) 0) ((<= margin -1) 1)
-                                     ((<= margin 4) 2) (t 3)))
+                         (band (cistern--margin-band margin))
                          (next (nth band (plist-get br :next)))
                          (nnode (cl-find next
                                          (plist-get cistern--banks
@@ -653,8 +646,6 @@ nothing; emits only faced log intents (info severity)."
                                          :key (lambda (x)
                                                 (plist-get x :id)))))
                     (setq rolls (1+ rolls))
-                    (princ (format "DBGW2 roll=%S band=%S nnode=%S\\n" roll band (and nnode (plist-get nnode :id))))
-                    (princ (format "DBGW3 pending=%S\\n" pending))
                     (setq node nnode)
                     (when node
                       (push (cistern--story-fill
@@ -701,8 +692,9 @@ call exists at the use-case layer."
     (let ((story-out (cistern--story-eval st)))
       (let ((dlg-out (cistern--dialogue-eval st)))
         ;; per-tick rewards evaluation (L-027 wiring): runs ONCE per
-        ;; tick, after the sim phases and before the tutorial advance;
-        ;; stores outcome+intents in state for the view to read
+        ;; tick, after the sim phases (the tutorial advance runs
+        ;; first, R2-Q11); stores outcome+intents in state for the
+        ;; view to read
         (cistern--rewards-eval st nil)
         ;; the story's + dialogue's intents append to the stored
         ;; intent list — one stored slot, one render read, zero new
@@ -721,15 +713,18 @@ consumption fills :score/:unlocks/:celebrate per tick;
 surface exists — card state is read from the goal card itself).")
 
 (defun cistern--rewards-eval (st raw-events)
-  "Rewards use-case (R5): (state, tick EVENTS) → (updated state,
-outcome, presentation intents) as a 3-list.  Consumes the events
-emitted since the last read — ST's pending list (drained here)
-plus RAW-EVENTS — mechanic by mechanic per REWARDS-DESIGN: M1
-dust (3–5 sparkles into the field, drawn from the child stream,
-never the sim LCG), M3 goal-card evaluation + MapCompleted, M9
-ceremony fill, M4 reputation, M5 relieve-pay + popups, M7 faced
-log intents, M8 milestone ladder.  Stores (outcome . intents) in
-state for the view to read (L-027); the view never calls this."
+  "Rewards use-case (R5): consumes the events emitted since the
+last read — ST's pending list (drained here; rewards-eval stays
+the SOLE drainer, L-027) plus RAW-EVENTS — mechanic by mechanic
+per REWARDS-DESIGN: M1 dust (child stream, never the sim LCG),
+M3 goal-card evaluation + MapCompleted, M9 ceremony fill, M4
+reputation, M5 relieve-pay + popups, M7 faced log intents, M8
+milestone ladder.
+Stores (outcome . intents) in state for the view to read (L-027);
+do-tick appends the story-eval and dialogue-eval intents to the
+stored list before the view's next read (V4-SPEC §1.1).  Returns
+the (ST OUTCOME INTENTS) 3-list for tests; the view never calls
+this."
   (let ((intents nil)
         (celebrate nil)
         (ceremony-p nil)
@@ -1392,6 +1387,11 @@ network when population demands it (cistern.el:1083-1137; the
       (dotimes (_ 600)
         (unless (cistern-st-over st)
           (let ((purged nil))
+            ;; L-012#2 recorded exception (L-011-cmd-build style):
+            ;; this maphash iterates cistern-st-tanks unsorted —
+            ;; deterministic only under the seed-1 soak's fixed tank
+            ;; insertion history.  Sort the keys if a future soak-
+            ;; touching change makes the trajectory load-order-fragile.
             (maphash (lambda (k v)
                        (when (and (not purged)
                                   (>= (plist-get v :load) 40))

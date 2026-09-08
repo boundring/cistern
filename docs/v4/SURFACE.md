@@ -239,7 +239,7 @@ tile or marker appearing can never shift a wall row.
 | `rubble` | `▚` | 259A | nil | nil | t | map-gen debris fields: impassable texture that shapes routing and firebreaks; `d` clears to floor (cost 2, same demolish verb) | `▚ rubble — impassable (d clears)` |
 | `flood` | `░` | 2591 | nil | nil | nil | breach may flood adjacent floor; impassable while wet, decays like hazard (`decay-pct` roll) but **never counts toward the contam limit** — it steals ticks, not health; `c` dries it | `░ flood — dries or decon (c)` |
 | `manifold` | `╬` | 256C | nil | nil | t | map-gen anchor: any pipe orthogonally adjacent to a manifold is **live with unlimited headroom** (no tank needed, no purge income). Procgen places 0–2; severed-pressure logic treats manifold-adjacent pipes as backed | `╬ manifold — free pipe anchor` |
-| `cache` | `?` | 003F (ASCII) | t | nil | nil | story-event outcome: first worker to walk over it banks an alloy bonus (popup at the act, S3), tile becomes floor, logs `'success` | `? cache — worker picks up` |
+| `cache` | `?` | 003F (ASCII) | t | nil | nil | story-event outcome: first worker to walk over it banks a +3 alloy bonus (popup at the act, S3), tile becomes floor, logs `'success` | `? cache — worker picks up` |
 | `event` | `!` | 0021 | t | nil | nil | story-event *countdown marker*: stands 3 ticks on the cell where an event will land (see S5.5), then resolves to `cache` / `flood` / `rubble`; each standing tick logs nothing (silent — S2 voice), the resolution logs | `! event incoming` |
 
 `cache` (`?` U+003F) and `event` (`!` U+0021) are both trivially in-range and

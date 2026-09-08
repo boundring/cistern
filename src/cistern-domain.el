@@ -152,15 +152,12 @@ own sequence."
 
 (defconst cistern--rpg-stat-names '(FLOW GRIT NERVE ARCHIVE))
 
-(defun cistern--rpg-advance (pos)
-  (% (+ (* pos 1103515245) 12345) 2147483648))
-
 (defun cistern--rpg-d6-pos (pos)
-  (let ((p (cistern--rpg-advance pos)))
+  (let ((p (cistern--stream-next pos)))
     (cons (1+ (% (ash p -6) 6)) p)))
 
 (defun cistern--rpg-d20-pos (pos)
-  (let ((p (cistern--rpg-advance pos)))
+  (let ((p (cistern--stream-next pos)))
     (cons (1+ (% (ash p -6) 20)) p)))
 
 (defun cistern--rpg-d6 (st)
@@ -338,14 +335,19 @@ fail-first (A9)."
   (or (gethash (cons matrix-id band) cistern--matrix-hash)
       (error "UNKNOWN MATRIX %S" matrix-id)))
 
+(defun cistern--margin-band (margin)
+  "STORY §6.2 band mapping, one ruling for every d20 consumer:
+margin ≤ −5 → 0, −4..−1 → 1, 0..+4 → 2, ≥ +5 → 3."
+  (cond ((<= margin -5) 0) ((<= margin -1) 1)
+        ((<= margin 4) 2) (t 3)))
+
 (defun cistern--rpg-band (st dc mod)
   "One d20 check band (RPG §3.3): stat = clamp(mod, −2, +2),
 D&D banding, nat-20 promotes to band 3 / nat-1 demotes to band 0."
   (let* ((r (cistern--rpg-d20-pos (cistern-st-rpg-pos st)))
          (roll (car r))
          (margin (+ roll (clamp -2 mod 2) (- dc)))
-         (band (cond ((<= margin -5) 0) ((<= margin -1) 1)
-                     ((<= margin 4) 2) (t 3))))
+         (band (cistern--margin-band margin)))
     (setf (cistern-st-rpg-pos st) (cdr r))
     (cond ((= roll 20) 3) ((= roll 1) 0) (t band))))
 

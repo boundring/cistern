@@ -1435,7 +1435,6 @@ no banner and no drain."
         (let ((err (condition-case e
                        (progn (cistern--banks-load (list file)) nil)
                      (error (format "%S" (cadr e))))))
-          (princ (format "DBG err=%S file=%S\n" err (with-temp-buffer (insert-file-contents file) (buffer-substring 1 200))))
           (cl-assert (and err (string-match-p (cdr spec) err))
                      t "%s not caught (err=%S)" (cdr spec) err)))))
   ;; D3: depth-4 chain (root-n1-n2-n3-n4) — hand-written one-line
@@ -1480,7 +1479,6 @@ no banner and no drain."
       (let* ((before (plist-get story :roll-pos))
              (dlg-out (cistern--dialogue-eval st))
              (intents (cdr dlg-out)))
-        (princ (format "DBGD n=%S faces=%S\\n" (length intents) (mapcar (lambda (i) (plist-get i :face)) intents)))
         (cl-assert (= (length intents) 1) t "open tick line count")
         (cl-assert (eq (plist-get (car intents) :face) 'info)
                    t "dialogue face not info")

@@ -3122,3 +3122,97 @@ the relaunch is on their screen now.
   the verifier gate is ready.
 
 ---
+
+## L-094 (2026-09-07, run: review-v4 — v4 phase-closing review)
+
+- Attempt: the six-item HANDBRIEF phase-closing checklist over
+  a61b207..c17ad2f (23/23 directives).  Small fixes committed in
+  the closing commit: five leftover DBGW* `princ` debug lines
+  removed from `cistern--dialogue-eval` and two DBG lines from
+  tests/test-v4.el; `cistern--rpg-advance` deleted (identical twin
+  of `cistern--stream-next` — one LCG primitive now serves both
+  stream families); the thrice-duplicated margin→band cond
+  consolidated into `cistern--margin-band` (rpg-band, story-eval,
+  dialogue-eval); the twice-duplicated story floor-scan extracted
+  as `cistern--story-pick-floor`; `cistern--story-tick-act` now
+  derives from the pinned `cistern--story-act-ticks` table instead
+  of a second hardcoded copy of the act windows; the vacuous
+  banner-budget guard removed (:announced already makes the
+  premise banner once-per-game); rewards-eval docstring refreshed
+  to the third-generation contract (sole drainer, stored 2-list,
+  story+dialogue intent append); the stale "before the tutorial
+  advance" do-tick comment corrected; the L-012#2 soak maphash
+  exception recorded in place (see below); SURFACE S3.2's cache
+  row now pins the bonus amount (+3 — `cistern--cache-alloy` was
+  an undocumented pin).  Ledger audit L-077..L-093: the single
+  explicit "Change for next attempt" (L-077, commit-per-green) was
+  held throughout; the paren-disease lessons (L-085/L-088) were
+  applied by L-090's programmatic fixture emission and L-093's
+  check-parens rule; L-091's V4-19 follow-up landed in L-092.  No
+  dropped items.  Copy table: no orphaned keys (desc-*/teach-*
+  resolve dynamically).  Item 1 (dependency conformance): clean —
+  story/dialogue evals call domain primitives (stream-next,
+  matrix-effect, worker-glyph, severed/backup queries) and
+  re-implement nothing; no narrative symbol touches `cistern--rand`
+  or the particle stream.  Item 7 (balance): couplings verified
+  against RPG-LAYER §1/§5.4 end-to-end (NERVE worst case: mod −4 →
+  seek_eff clamp(50, 80, 68) = 68 → window (120−68)/2 − 4 = 22,
+  exactly the documented tight bound; GRIT/FLOW clamps match the
+  §1 table verbatim); story beats are event-gated (no fixed
+  cadence) and dialogue is cooldown-60/once-per-act against the
+  migrant-every-40 clock — no unreasonable stacking.  Suite after
+  fixes: ALL 107 TESTS PASSED (batch); cistern-run-soak re-run
+  green (soak path now drives story-eval/dialogue-eval as no-ops
+  with banks unloaded — trajectory unchanged).
+- Structural findings (NOT fixed in passing; each lists its owning
+  phase):
+  1. **Event tiles never resolve to the pinned kind.**  SURFACE
+     S3.2 pins the `!` tile standing 3 ticks "then resolves to
+     `cache` / `flood` / `rubble` … the resolution logs"; V4-SPEC
+     V4-22 acceptance says "resolution lands the pinned kind".
+     `cistern--phase-events` expires tiles silently to FLOOR and
+     the tile-place effect drops its `:arg` (the resolution kind)
+     — `cistern--add-event-tile` takes no kind.  The batch-3b test
+     pins the deviation, so code+test moved together off the docs.
+     Owning phase: first narrative-surface pass (V4-22 owner).
+  2. **Story hook tier selection ignores the per-act drift.**
+     STORY §7.5: "cumulative weights (60/30/10 act I, drifting per
+     §7.4)" — for hooks and `:events` alike.  Story-eval draws from
+     100 with fixed 60/90 thresholds (the computed `rare` weight
+     was dead code, removed in this review); only the dialogue path
+     implements drift (draw from 100+drift).  Owning phase: wave-2
+     follow-up (V4-16).
+  3. **Story/dialogue d20 rolls are 0-based against the pinned
+     formula.**  STORY §6.2 pins `roll = 1 + (mod (ash pos -6) 20)`;
+     `cistern--story-draw` returns `(mod (ash pos -6) n)` and both
+     story and dialogue branch rolls land 0..19 — every margin is
+     one lower than the doc's reading.  Fixtures pin the current
+     sequences; doc and code must move as ONE decision.  Owning
+     phase: wave-2/3 narrative owner (V4-16/V4-21).
+  4. **Dialogue tree-selection draw fires every tick, not once per
+     cooldown window.**  V4-SPEC §2.4: "once per its cooldown
+     window, one stream-2 draw"; dialogue-eval draws unconditionally
+     each tick while no conversation is pending, consuming stream 2
+     even when no tree is eligible.  Owning phase: wave-3 (V4-21).
+  5. **`cistern--story-tier-face` has no production consumer.**
+     Defined and test-pinned as V4-21's "rarity tiers surfaced"
+     (L-093), but story hook lines render band-based success/error
+     faces and dialogue lines are pinned `info` (§2.6) — the tier
+     mapping is dead in src.  Either wire story line faces to the
+     recorded `:tier` or retire the mapping.  Owning phase: wave-3
+     residual (V4-21/V4-22).
+- Carried items resolved this review:
+  - **L-012#2 (soak maphash)**: the owner ARRIVED in v4 — the soak
+    drives `cistern--do-tick`, whose body gained story-eval and
+    dialogue-eval (no-ops while banks are unloaded, so the seed-1
+    trajectory is unchanged).  Per the carried instruction the
+    exception is now recorded in place at the maphash (sort-the-
+    keys note), L-011-cmd-build style; the purge pick itself is
+    untouched.
+  - **L-033#2 (multi-char popup glyph renders in one cell)**:
+    v4 did not touch popup rendering — relieve-pay "+N",
+    CLEARANCE UP, and the story `popup` effect all reuse the same
+    single-cell field-spawn grammar.  Still carried; owning phase
+    remains the post-playtest presentation pass.
+
+---
