@@ -1764,6 +1764,29 @@ use, so the accrual had never run live (L-109)."
                    t "row 11: the fond-proximity thought filed"))))
   (message "CISTERN-V5-19-IDLE-PROXIMITY-OK"))
 
+(defun cistern-test-v5-19-faction-mock ()
+  "V5 last round (L-108 #3, row 9): the warband objection is heard
+speech.  A cross-faction stage-1 transition fires faction-mock
+events (cistern--social-friction); social-eval's row-9 handler
+renders the FILED OBJECTIONS copy — the social-objection key,
+previously an orphaned key — budget-capped like any mutter."
+  (cistern-test-v5--load-social-banks)
+  (let* ((st (cistern--new-game 20260830))
+         (alpha (cistern--worker-glyph st (nth 0 (cistern-st-creators st))))
+         (g (cistern--spawn-enemy st 'warband 'warband 10 10))
+         (gid (cistern--enemy-id g))
+         (key (cistern--romance-pair-key alpha gid)))
+    (cistern--spawn-enemy st 'warband 'warband 12 12)
+    (cistern--romance-file st alpha gid)
+    (cistern--romance-advance st key)
+    (cistern--social-eval st)
+    (cl-assert (cl-some (lambda (e)
+                          (string-match-p "OBJECTS TO .*'s LIAISON"
+                                          (car e)))
+                        (cistern-st-log st))
+               t "row 9: the objection is heard speech"))
+  (message "CISTERN-V5-19-FACTION-MOCK-OK"))
+
 ;; --- W3-2 fixtures: V5-17 comedy hooks, V5-18 determinism close-out -------------
 
 (defun cistern-test-v5-17-hooks ()

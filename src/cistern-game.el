@@ -1294,6 +1294,26 @@ set the persona flag with no text and no draw (ttl 1 tick)."
                             1)
                     (deliver (cistern--worker-glyph st w)
                              'worker 'loss)))))
+             ((eq kind 'faction-mock)
+              ;; row 9: the objection is heard speech — the FILED
+              ;; OBJECTIONS copy via the muttered channel, budget-
+              ;; capped like any mutter (L-109: the key was orphaned)
+              (let ((obj (cl-find-if
+                          (lambda (e)
+                            (and (= (cistern--enemy-x e) (nth 2 ev))
+                                 (= (cistern--enemy-y e) (nth 3 ev))))
+                          (cistern-st-hostiles st))))
+                (when (and obj
+                           (< mutters cistern--social-mutter-cap)
+                           (< made cistern--social-thought-cap)
+                           (not (member (cistern--enemy-id obj) seen))
+                           (gethash (cistern--enemy-id obj)
+                                    (cistern-st-personas st)))
+                  (push (cistern--enemy-id obj) seen)
+                  (setq made (1+ made) mutters (1+ mutters))
+                  (cistern--log-sev st 'info "%s"
+                    (format (cistern--social-copy 'social-objection)
+                            (cistern--enemy-id obj) (nth 4 ev))))))
              ((eq kind 'idle-proximity)
               ;; row 11: the fond-proximity thought (private channel)
               (deliver (nth 2 ev) 'worker 'fond-proximity)))))
