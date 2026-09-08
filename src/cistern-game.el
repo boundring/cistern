@@ -1075,6 +1075,26 @@ mutation, mirroring `cistern--cmd-arm-verb'."
   (setf (cistern-st-armed-verb st) nil)
   st)
 
+(defun cistern--cmd-focus (st x y)
+  "V5-05 (COMBAT §3.5/§4.5): the FOCUS designation on the hostile
+at (X,Y) — the auto-defense targets it first.  A guild entity
+REFUSES with `combat-refusal-friendly' (the R7 verdict style):
+no state change, NO draw consumed.  Returns t when the focus
+lands, nil on refusal or empty cell."
+  (let ((e (cl-find-if (lambda (e)
+                         (and (= x (cistern--enemy-x e))
+                              (= y (cistern--enemy-y e))))
+                       (cistern-st-hostiles st))))
+    (cond
+     ((null e) nil)
+     ((eq (cistern--enemy-faction e) 'guild)
+      (cistern--log st "%s"
+                    (cdr (assq 'combat-refusal-friendly cistern--copy)))
+      nil)
+     (t
+      (setf (cistern-st-focus st) (cistern--enemy-id e))
+      t))))
+
 (defun cistern--cmd-consume-hint (st)
   "Drain ST's transient cursor hint (Q17): the driver calls this
 after each render cycle, so a posted hint is visible for exactly

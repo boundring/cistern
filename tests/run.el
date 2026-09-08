@@ -139,7 +139,10 @@
     cistern-test-v5-04-raid
     cistern-test-v5-04-infestation
     cistern-test-v5-04-events
-    cistern-test-v5-04-determinism))
+    cistern-test-v5-04-determinism
+    cistern-test-v5-05-guild
+    cistern-test-v5-05-guardrail
+    cistern-test-v5-06-verbs))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

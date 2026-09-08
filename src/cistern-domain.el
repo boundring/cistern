@@ -372,7 +372,11 @@ faction `guild' (§3.5 guard-rail).  nil when nothing qualifies."
     (raid-span . 40) (ambush-dc . 13) (ambush-dist . 6)
     (infest-every . 20) (infest-base-dc . 14) (infest-min-dc . 8)
     (leech-dc . 12) (sponge-dc . 14) (leech-interval . 4)
-    (sponge-split . 20) (hostiles-max . 8))
+    (sponge-split . 20) (hostiles-max . 8)
+    ;; V5-05 (COMBAT §1.3/§4.4): the guild loop
+    (guild-dc . 12) (guild-every . 40) (guild-fee . 1)
+    (guild-restore . 2) (guild-max . 3) (guild-idle-max . 40)
+    (guild-broke-wait . 20))
   "COMBAT §2/§5.3: spawn DCs, cadences, spans and caps in ONE block
 (the §3.5 DC-block pattern).")
 
@@ -591,6 +595,85 @@ d20 ≥ 14, one draw per flood tile reaching 20 ticks of age."
     (when (>= (cistern--combat-d20 st) (cistern--combat-k 'sponge-dc))
       (cistern--spawn-near st 'fauna 'sponge (car cell) (cdr cell) 1)
       (cistern--log st "%s" (cdr (assq 'combat-sponge cistern--copy))))))
+
+(defun cistern--maybe-guild (st)
+  "S6 (COMBAT §4.4): while >= 2 lines are severed and no fixer is
+present, one draw per 40 ticks; success = 1 fixer at the map edge +
+one `guild-arrival' event."
+  (let ((tick (cistern-st-tick st)))
+    (when (and (> tick 0) (= 0 (% tick (cistern--combat-k 'guild-every)))
+               (>= (cistern--severed-count st) 2)
+               (not (cl-some (lambda (e)
+                               (eq (cistern--enemy-kind e) 'fixer))
+                             (cistern-st-hostiles st))))
+      (when (>= (cistern--combat-d20 st) (cistern--combat-k 'guild-dc))
+        (let ((cell (cistern--edge-spawn-cell st)))
+          (when cell
+            (cistern--spawn-enemy st 'guild 'fixer (car cell) (cdr cell))
+            (cistern--log st "%s"
+                          (format (cdr (assq 'combat-guild-arrival
+                                             cistern--copy))
+                                  (cistern--combat-k 'guild-fee)))
+            (push (list 'guild-arrival 'guild (car cell) (cdr cell))
+                  (cistern-st-rewards-events st))))))))
+
+(defun cistern--guild-behavior (st e)
+  "GUILD OF THE OPEN FLANGE (COMBAT §1.3): walk to the nearest
+dead pipe — the gnaw-made hazard, the pipe's remains (L-100) — 2
+certified ticks restore it to `pipe' for a fixed 1-alloy fee
+(cheaper than the player's re-lay; S4 untouched otherwise).
+GNAW is the restoration timer, DRAIN the restoration count, IDLE
+the ticks-since-productive counter.  Leaves after 3 restorations
+or 40 idle ticks; with alloy 0 they wait 20 ticks and leave."
+  (let ((x (cistern--enemy-x e)) (y (cistern--enemy-y e)))
+    (cond
+     ((> (cistern--enemy-gnaw e) 0) ; mid-restoration
+      (setf (cistern--enemy-gnaw e) (1+ (cistern--enemy-gnaw e)))
+      (when (>= (cistern--enemy-gnaw e) (cistern--combat-k 'guild-restore))
+        (let* ((hz (cistern--nearest-map-cell
+                    st (lambda (s px py)
+                         (eq (cistern--cell s px py) 'hazard))
+                    x y)))
+          (when hz
+            (cistern--set-cell st (car hz) (cdr hz) 'pipe)
+            (setf (cistern-st-alloy st)
+                  (- (cistern-st-alloy st) (cistern--combat-k 'guild-fee)))
+            (cistern--log st "%s"
+                          (format (cdr (assq 'combat-guild-fix cistern--copy))
+                                  (car hz) (cdr hz)))))
+        (setf (cistern--enemy-gnaw e) 0
+              (cistern--enemy-idle e) 0
+              (cistern--enemy-drain e) (1+ (cistern--enemy-drain e)))
+        (when (>= (cistern--enemy-drain e) (cistern--combat-k 'guild-max))
+          (cistern--guild-depart st e))))
+     (t
+      (let ((hz (cistern--nearest-map-cell
+                 st (lambda (s px py)
+                      (eq (cistern--cell s px py) 'hazard))
+                 x y)))
+        (cond
+         ;; no work at all: idle toward 40
+         ((null hz)
+          (setf (cistern--enemy-idle e) (1+ (cistern--enemy-idle e)))
+          (when (>= (cistern--enemy-idle e) (cistern--combat-k 'guild-idle-max))
+            (cistern--guild-depart st e)))
+         ;; work exists but the fee can't be paid: wait 20
+         ((< (cistern-st-alloy st) (cistern--combat-k 'guild-fee))
+          (setf (cistern--enemy-idle e) (1+ (cistern--enemy-idle e)))
+          (when (>= (cistern--enemy-idle e)
+                    (cistern--combat-k 'guild-broke-wait))
+            (cistern--guild-depart st e)))
+         ;; adjacent: begin the certified restoration
+         ((= 1 (+ (abs (- (car hz) x)) (abs (- (cdr hz) y))))
+          (setf (cistern--enemy-gnaw e) 1))
+         ;; otherwise walk toward it
+         (t (cistern--enemy-step-toward st e (car hz) (cdr hz)))))))))
+
+(defun cistern--guild-depart (st e)
+  "LOG-ONLY departure (ruling 3: `guild-depart' is not an event
+kind; nothing reads it).  The fixer retreats to the map edge."
+  (setf (cistern--enemy-grip e) 'retreat)
+  (cistern--log st "%s" (cdr (assq 'combat-guild-depart cistern--copy))))
 
 ;; ---------------------------------------------------------------------------
 ;; V5-04 (COMBAT §1.1/§1.2/§3.2): per-hostile behavior and the phase.
@@ -850,6 +933,7 @@ rewards-eval stays the sole drainer (L-027)."
   (cistern--maybe-ambush st)
   (cistern--maybe-infestation st)
   (cistern--maybe-flood-fauna st)
+  (cistern--maybe-guild st)
   ;; per hostile, in list (spawn) order
   (dolist (e (copy-sequence (cistern-st-hostiles st)))
     (cond ((cistern--enemy-retreat-p e) (cistern--retreat-step st e))
@@ -859,7 +943,9 @@ rewards-eval stays the sole drainer (L-027)."
           ((eq (cistern--enemy-kind e) 'crab) (cistern--crab-behavior st e))
           ((eq (cistern--enemy-kind e) 'leech) (cistern--leech-behavior st e))
           ((eq (cistern--enemy-kind e) 'sponge)
-           (cistern--sponge-behavior st e))))
+           (cistern--sponge-behavior st e))
+          ((eq (cistern--enemy-kind e) 'fixer)
+           (cistern--guild-behavior st e))))
   (cistern--auto-defense st)
   ;; every raider killed/driven off before the cap → the routed close
   (when (and (cistern-st-raid st)
@@ -2298,6 +2384,11 @@ legal no-op state for tests)."
     (combat-leech-grip . "VENT-LEECH ATTACHED — WORKER %s — CUT IT OFF")
     (combat-drive-off . "CLOG-CRAB DRIVEN OFF — (%d,%d)")
     (combat-sponge . "SPONGE MASS RECLASSIFIED FAUNA — FEEDING LOGGED AS NATURAL")
+    ;; V5-05 (COMBAT §4.7): the guild family + the focus refusal
+    (combat-guild-arrival . "GUILD OF THE OPEN FLANGE ON SITE — RESTORATIONS AT %d ALLOY")
+    (combat-guild-fix . "GUILD RESTORATION COMPLETE AT (%d,%d)")
+    (combat-guild-depart . "GUILD DEPARTS — WORK ORDER CLOSED")
+    (combat-refusal-friendly . "GUILD STANDING — NO HOSTILE ACTION AGAINST CHARTERED ENGINEERS")
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
     (capacity-none . "NO WIRED TOILET ON THE GRID — LAY PIPE (p)")
     (teach-arrows . "C-n/C-p/C-f/C-b MOVE TOO")

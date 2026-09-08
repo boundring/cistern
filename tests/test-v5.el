@@ -536,3 +536,220 @@ the bladder window guard (A12/P6) still holds for every worker."
                        cistern-use-ticks)))
         (cl-assert (>= window 22) t "P6: bladder window >= 22")))
     (message "CISTERN-V5-04-DET-OK")))
+
+;; --- V5-05 fixtures: guild fixer loop + guard-rail (CB8, CB5) --------------------
+
+(defun cistern-test-v5-05-guild ()
+  "V5-05 (CB8): a fixer restores a dead pipe (the gnaw-made
+hazard — the pipe's remains, L-100) in 2 ticks, deducts exactly 1
+alloy, repeats <= 3 times, then departs; with alloy 0 they wait 20
+ticks and leave.  `guild-depart' is LOG-ONLY (ruling 3)."
+  (cistern-test-v5-04--combat-on)
+  ;; fixture: one live pipe cell converted to hazard (a completed gnaw)
+  (let* ((st (cistern--new-game 20260830))
+         (pipe (cl-find-if
+                (lambda (p) (cistern--pipe-live-p st (car p) (cdr p)))
+                (cistern-test-v5-05--live-pipes st)))
+         (hx (car pipe)) (hy (cdr pipe))
+         (fixer (cistern--spawn-enemy st 'guild 'fixer hx (1+ hy))))
+    (cistern--set-cell st hx hy 'hazard)
+    (cl-assert (eq (cistern--cell st hx hy) 'hazard)
+               t "fixture: the gnawed pipe is dead (hazard)")
+    (let ((alloy0 (cistern-st-alloy st)) (hp0 (cistern--enemy-hp fixer)))
+      ;; 2 ticks: certified restoration, no roll
+      (cistern--phase-hostiles st)
+      (cistern--phase-hostiles st)
+      (cl-assert (eq (cistern--cell st hx hy) 'pipe)
+                 t "the pipe returns to live state after 2 ticks")
+      (cl-assert (cistern--pipe-live-p st hx hy)
+                 t "the restored pipe is on a live path again")
+      (cl-assert (= (cistern-st-alloy st) (1- alloy0))
+                 t "exactly 1 alloy deducted")
+      (cl-assert (= (cistern--enemy-hp fixer) hp0)
+                 t "the guild is never damaged by its own work")
+      ;; repeat: 2 more restorations then departure after the 3rd
+      (cistern--set-cell st hx hy 'hazard)
+      (cistern--phase-hostiles st) (cistern--phase-hostiles st)
+      (cl-assert (= (cistern--enemy-drain fixer) 2)
+                 t "second restoration counted")
+      (cistern--set-cell st hx hy 'hazard)
+      (cistern--phase-hostiles st) (cistern--phase-hostiles st)
+      (cl-assert (= (cistern--enemy-drain fixer) 3)
+                 t "third restoration counted")
+      (cl-assert (eq (cistern--enemy-grip fixer) 'retreat)
+                 t "the fixer departs after 3 restorations")
+      ;; retreat walks it off the map
+      (dotimes (_ 40) (cistern--phase-hostiles st))
+      (cl-assert (not (memq fixer (cistern-st-hostiles st)))
+                 t "the fixer despawns at the map edge")))
+  ;; alloy 0: the fixer waits 20 ticks then leaves (no free work)
+  (let* ((st (cistern--new-game 20260830))
+         (pipe (car (cistern-test-v5-05--live-pipes st)))
+         (fixer (cistern--spawn-enemy st 'guild 'fixer
+                                      (car pipe) (1+ (cdr pipe)))))
+    (cistern--set-cell st (car pipe) (cdr pipe) 'hazard)
+    (setf (cistern-st-alloy st) 0)
+    (dotimes (_ 20) (cistern--phase-hostiles st))
+    (cl-assert (eq (cistern--enemy-grip fixer) 'retreat)
+               t "alloy 0: wait 20 ticks, leave")
+    (dotimes (_ 60) (cistern--phase-hostiles st))
+    (cl-assert (not (cl-some (lambda (e) (eq (cistern--enemy-kind e) 'fixer))
+                             (cistern-st-hostiles st)))
+               t "the broke fixer retreats off the map"))
+  ;; guild-depart is log-only: no `guild-depart' event kind exists
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--maybe-guild st)
+    (setf (cistern-st-tick st) 40)
+    (cl-assert (not (memq 'guild-depart (mapcar #'cistern--event-kind
+                                                (cistern-st-rewards-events st))))
+               t "guild-depart stays log-only (ruling 3)"))
+  (message "CISTERN-V5-05-GUILD-OK"))
+
+(defun cistern-test-v5-05--live-pipes (st)
+  "All live pipe cells, coordinate order."
+  (let ((out nil) (i 0))
+    (while (< i (length (cistern-st-map st)))
+      (let ((x (% i (cistern-st-w st))) (y (/ i (cistern-st-w st))))
+        (when (cistern--pipe-live-p st x y) (push (cons x y) out)))
+      (setq i (1+ i)))
+    (sort out (lambda (a b)
+                (or (< (car a) (car b))
+                    (and (= (car a) (car b)) (< (cdr a) (cdr b))))))))
+
+(defun cistern-test-v5-05-guardrail ()
+  "V5-05 (CB5): with a guild fixer AND a hostile adjacent, the
+worker auto-defense strikes the HOSTILE; `cistern--cmd-focus' on
+the fixer refuses via `combat-refusal-friendly' and consumes NO
+stream draw; no verb sequence reduces a guild entity's hp."
+  (cistern-test-v5-04--combat-on)
+  (let ((st (cistern--new-game 41)))
+    (cistern--spawn-enemy st 'guild 'fixer 5 5)
+    (cistern--spawn-enemy st 'warband 'warband 3 5)
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 4) (setf (cistern--worker-y w) 5)
+      (setf (cistern--worker-using w) nil)
+      ;; force a hit: point combat-pos at a nat-20 draw
+      (cistern-test-v5-04--find-nat st 20)
+      (let ((fixer (nth 0 (cistern-st-hostiles st)))
+            (warband (nth 1 (cistern-st-hostiles st)))
+            (hp-f (cistern--enemy-hp (nth 0 (cistern-st-hostiles st))))
+            (hp-w (cistern--enemy-hp (nth 1 (cistern-st-hostiles st)))))
+        (cistern--auto-defense st)
+        (cl-assert (< (cistern--enemy-hp warband) hp-w)
+                   t "the worker strikes the hostile")
+        (cl-assert (= (cistern--enemy-hp fixer) hp-f)
+                   t "the guild entity keeps its hp"))
+      ;; the refusal: focus on the fixer's cell
+      (let ((before (cistern-st-combat-pos st))
+            (loglen (length (cistern-st-log st))))
+        (cistern--cmd-focus st 5 5)
+        (cl-assert (null (cistern-st-focus st))
+                   t "a guild entity cannot be focused")
+        (cl-assert (= (cistern-st-combat-pos st) before)
+                   t "a refused verb consumes no stream draw")
+        (cl-assert (> (length (cistern-st-log st)) loglen)
+                   t "the refusal names the charter")
+        (cl-assert (cl-some (lambda (entry)
+                              (string-match-p "CHARTERED" (car entry)))
+                            (cistern-st-log st))
+                   t "combat-refusal-friendly copy in the log"))
+      ;; and a legit focus still works
+      (cistern--cmd-focus st 3 5)
+      (cl-assert (equal (cistern-st-focus st) "g2")
+                 t "focus on the hostile lands")))
+  (message "CISTERN-V5-05-GUARDRAIL-OK"))
+
+;; --- V5-06 fixtures: FOCUS / RALLY on the armed-verb pattern (CB9) ---------------
+
+(defun cistern-test-v5-06-verbs ()
+  "V5-06 (CB9): `f' arms FOCUS (click enemy → focus = its id,
+defenders prefer it, guild refusal per V5-05); `h` arms RALLY
+(click floor → non-seated workers' journeys there, seated/using
+workers exempt, arrival resumes seek-work); both ride the
+existing armed-badge pattern; `u'/C-g disarm."
+  (cistern-test-v5-04--combat-on)
+  (load (expand-file-name "src/cistern-view.el" cistern-test-v5--root))
+  ;; FOCUS: arm -> click the enemy -> focus set, armed cleared
+  (let ((st (cistern--new-game 41)))
+    (cistern--spawn-enemy st 'warband 'warband 6 5)
+    (cistern--cmd-arm-verb st 'focus)
+    (cl-assert (eq (cistern-st-armed-verb st) 'focus)
+               t "`f' arms the FOCUS verb")
+    (cistern--cmd-click st 6 5)
+    (cl-assert (equal (cistern-st-focus st) "g1")
+               t "the click focuses the hostile")
+    (cl-assert (null (cistern-st-armed-verb st))
+               t "a landed focus disarms")
+    ;; defenders prefer it: two adjacents, focus the farther one
+    (cistern--spawn-enemy st 'warband 'warband 5 5)
+    (cistern--cmd-arm-verb st 'focus)
+    (cistern--cmd-click st 6 5)
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 4) (setf (cistern--worker-y w) 5)
+      (let ((tgt (cistern--combat-target st w)))
+        (cl-assert (equal (cistern--enemy-id tgt) "g1")
+                   t "defenders prefer the focus target")))
+    ;; guild refusal keeps the verb armed (R7 verdict style)
+    (cistern--spawn-enemy st 'guild 'fixer 7 5)
+    (cistern--cmd-arm-verb st 'focus)
+    (cistern--cmd-click st 7 5)
+    (cl-assert (null (cistern-st-focus st))
+               t "the guild cannot be focused")
+    (cl-assert (eq (cistern-st-armed-verb st) 'focus)
+               t "a refusal leaves the verb armed")
+    ;; the badge: ARMED: FOCUS through the existing badge row
+    (let ((badges (cistern-view--header-badges st)))
+      (cl-assert (and badges (string-match-p "ARMED: FOCUS" badges))
+                 t "the armed badge composes FOCUS (ruling 4)"))
+    ;; u / C-g disarm
+    (cistern--cmd-disarm st)
+    (cl-assert (null (cistern-st-armed-verb st))
+               t "u/C-g disarms"))
+  ;; RALLY: arm -> click floor -> non-seated journeys, seated exempt
+  (let ((st (cistern--new-game 43)))
+    (let* ((floor-cell (cistern-test-v5-03--find-cell st 'floor))
+           (rx (car floor-cell)) (ry (cdr floor-cell))
+           (free (nth 0 (cistern-st-creators st)))
+           (seated (nth 1 (cistern-st-creators st))))
+      ;; seat the second worker mid-use: exempt from the rally
+      (setf (cistern--worker-using seated) t)
+      (setf (cistern--worker-toilet seated) '(11 9))
+      (cistern--cmd-arm-verb st 'rally)
+      (cistern--cmd-click st rx ry)
+      (cl-assert (equal (cistern--worker-journey free) (cons rx ry))
+                 t "the free worker's journey points at the rally cell")
+      (cl-assert (null (cistern--worker-journey seated))
+                 t "the seated worker is exempt")
+      (cl-assert (null (cistern-st-armed-verb st))
+                 t "a landed rally disarms")
+      ;; the badge composes RALLY while armed
+      (cistern--cmd-arm-verb st 'rally)
+      (let ((badges (cistern-view--header-badges st)))
+        (cl-assert (and badges (string-match-p "ARMED: RALLY" badges))
+                   t "the armed badge composes RALLY"))
+      (cistern--cmd-disarm st)
+      ;; the walk: the rallied worker steps toward the cell each tick
+      ;; and resumes seek-work on arrival
+      (let ((x0 (cistern--worker-x free)) (y0 (cistern--worker-y free)))
+        (cistern--sim-tick st)
+        (cl-assert (or (/= (cistern--worker-x free) x0)
+                       (/= (cistern--worker-y free) y0))
+                   t "the rallied worker walks")
+        (cl-assert (not (cistern--worker-using free))
+                   t "rally does not seat the worker"))))
+  ;; arrival: the journey clears and the worker resumes seek-work
+  (let ((st (cistern--new-game 47)))
+    (let* ((floor-cell (cistern-test-v5-03--find-cell st 'floor))
+           (rx (car floor-cell)) (ry (cdr floor-cell))
+           (w (nth 0 (cistern-st-creators st))))
+      ;; adjacent to the rally cell: arrival in one step
+      (setf (cistern--worker-x w) (1+ rx))
+      (setf (cistern--worker-y w) ry)
+      (setf (cistern--worker-journey w) (cons rx ry))
+      (setf (cistern-st-tick st) 1)
+      (cistern--phase-creators st)
+      (cl-assert (null (cistern--worker-journey w))
+                 t "arrival clears the rally journey")
+      (cl-assert (= (cistern--worker-x w) rx)
+                 t "the worker stood on the rally cell")))
+  (message "CISTERN-V5-06-VERBS-OK"))
