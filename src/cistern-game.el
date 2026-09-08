@@ -138,7 +138,12 @@ phantom-plumbing invariant, load-bearing)."
                       cistern-cost-demolish refund)
       ;; V5-10 (SOCIAL §1.4 row 7): the destruction as a located event
       (push (list 'destroyed 'destroyed x y)
-            (cistern-st-rewards-events st)))))))
+            (cistern-st-rewards-events st))
+      ;; V5-11 (SOCIAL §2.6): a demolished fixture/tank ceases as a
+      ;; romance endpoint
+      (when (memq kind '(toilet tank))
+        (cistern--romance-end
+         st (list (if (eq kind 'toilet) :toilet :tank) x y))))))))
 
 (defun cistern--tutorial-steps (&optional table)
   "Tutorial mechanism holder: table of (PROMPT . PREDICATE) steps,
@@ -689,6 +694,9 @@ call exists at the use-case layer."
     ;; V4-16/§2 (§1 pinned ordering): story-eval completes ALL its
     ;; draws, then dialogue-eval draws, then rewards-eval
     (let ((story-out (cistern--story-eval st)))
+      ;; V5-12 (SOCIAL §4.2): social-eval slots between story-eval and
+      ;; dialogue-eval — the §1 pinned chain
+      (cistern--social-eval st)
       (let ((dlg-out (cistern--dialogue-eval st)))
         ;; per-tick rewards evaluation (L-027 wiring): runs ONCE per
         ;; tick, after the sim phases (the tutorial advance runs
@@ -1294,6 +1302,49 @@ set the persona flag with no text and no draw (ttl 1 tick)."
                                6))
                   (deliver (cistern--enemy-id e)
                            'goblin 'guild-mourning))))))))))
+
+;; ---------------------------------------------------------------------------
+;; V5-12 (SOCIAL §4.2): social-eval — ONE call per tick, pinned
+;; story-eval -> social-eval -> dialogue-eval.  Urge application +
+;; clearing, romance proximity/gates, the thought pass.
+
+(defun cistern--social-eval (st)
+  "V5-12: the social evaluation slot.  Order: last tick's urges
+apply and clear (ttl 1 tick), the romance graph accrues proximity
+and resolves gates, the thought pass reads the pending events.
+Social-disabled runs (banks absent) are byte-identical sims
+(SOCIAL §4.3)."
+  (when (cistern-st-personas st)
+    (let ((urges nil))
+      (maphash (lambda (id p)
+                 (when (plist-get p :urge)
+                   (setq urges (cons (cons id p) urges))))
+               (cistern-st-personas st))
+      (dolist (pair urges)
+        (let ((id (car pair)))
+          (cond
+           ((and (stringp id) (not (string-match-p "g[0-9]+" id)))
+            ;; worker urge: ONE extra idle step, only with NO journey
+            ;; (pathing and seating stay unreachable, §1.5)
+            (let ((w (cl-find-if
+                      (lambda (w) (equal (cistern--worker-glyph st w) id))
+                      (cistern-st-creators st))))
+              (when (and w (null (cistern--worker-journey w)))
+                (cistern--shuffle st w))))
+           ((and (stringp id) (string-match-p "g[0-9]+" id))
+            ;; goblin urge: one constant-velocity particle, no draw
+            (let ((e (cl-find id (cistern-st-hostiles st)
+                              :key #'cistern--enemy-id :test #'equal)))
+              (when e
+                (cistern--field-spawn
+                 st (cons (cistern--enemy-x e) (cistern--enemy-y e))
+                 (cons 0 -1) 1 "!" 'info 'sparkle))))))
+        (let ((p (cdr pair)))
+          (puthash id (plist-put p :urge nil) (cistern-st-personas st)))))
+    ;; the romance graph: proximity + shared events + gates
+    (cistern--romance-proximity-tick st)
+    ;; the thought pass (trigger table, channels, budgets)
+    (cistern--social-thoughts st)))
 
 (defun cistern--cmd-consume-hint (st)
   "Drain ST's transient cursor hint (Q17): the driver calls this

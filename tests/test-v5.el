@@ -934,48 +934,48 @@ skipped gracefully in batch like `cistern-test-gui-cell-width'."
   "The temp thought+quirk bank path (written once per run).")
 
 (defun cistern-test-v5--load-social-banks ()
-  "Write and load the social fixture banks: a worker-species quirk
-bank (4 entries — the SC1 selector pins) plus a fixture quirk and
-the thought entries the fixtures reference.  Returns the file."
-  (unless cistern-test-v5--social-bank-file
-    (let ((f (make-temp-file "cistern-v5-social" nil ".el")))
-      (with-temp-file f
-        (insert
-         "(defconst cistern-bank-v5-social\n"
-         "  '(:kind quirk :version \"1\" :generator \"v5 fixture\"\n"
-         "    :copy ((v5q-w1 . \"READS THE PRESSURE LOG TWICE\")\n"
-         "           (v5q-w2 . \"WALKS THE EAST MANIFOLD DAILY\")\n"
-         "           (v5q-w3 . \"KEEPS A PRIVATE SECTOR MAP\")\n"
-         "           (v5q-f1 . \"COUNTS FLUSHES AS FILING\")\n"
-         "           (v5q-g1 . \"THE PIPES ARE OURS BY RIGHT\"))\n"
-         "    :entries\n"
-         "    ((:id quirk-w1 :context tolerance :species worker :copy-key v5q-w1)\n"
-         "     (:id quirk-w2 :context integrity :species worker :copy-key v5q-w2)\n"
-         "     (:id quirk-w3 :context standing :species worker :copy-key v5q-w3)\n"
-         "     (:id quirk-f1 :context tolerance :species fixture :copy-key v5q-f1)\n"
-         "     (:id quirk-g1 :context tolerance :species goblin :copy-key v5q-g1))))\n"
-         "(defconst cistern-bank-v5-thoughts\n"
-         "  '(:kind thought :version \"1\" :generator \"v5 fixture\"\n"
-         "    :copy ((v5t-ff . \"THE WATER IS AT MY DOOR\")\n"
-         "           (v5t-nf . \"THE WALL IS WEEPING AGAIN\")\n"
-         "           (v5t-fs . \"SERVICE LOGGED — NEXT\")\n"
-         "           (v5t-ts . \"I AM NOTED AS FULL\")\n"
-         "           (v5t-tp . \"DRAINED AND FILED\")\n"
-         "           (v5t-lo . \"THE NEIGHBOR IS GONE\")\n"
-         "           (v5t-gm . \"A COLLEAGUE FILED OUT\"))\n"
-         "    :entries\n"
-         "    ((:id th-ff :class fixture-flood :species fixture :when any :copy-key v5t-ff)\n"
-         "     (:id th-nf :class nerve-flood :species worker :when any :copy-key v5t-nf)\n"
-         "     (:id th-fs :class fixture-served :species fixture :when any :copy-key v5t-fs)\n"
-         "     (:id th-ts :class tank-strain :species tank :when CRITICAL :copy-key v5t-ts)\n"
-         "     (:id th-tp :class tank-purged :species tank :when any :copy-key v5t-tp)\n"
-         "     (:id th-lo :class loss :species worker :when any :copy-key v5t-lo)\n"
-         "     (:id th-gm :class guild-mourning :species goblin :when any :copy-key v5t-gm))))\n"))
-      (setq cistern--banks nil cistern--story-copy nil
-            cistern--matrix-sources (make-hash-table :test 'eq))
-      (cistern--banks-load (list f))
-      (setq cistern-test-v5--social-bank-file f)))
-  cistern-test-v5--social-bank-file)
+  "Write (ALWAYS a fresh file — the loader's load-history scan finds
+nothing on a second load of the same path) and load the social
+fixture banks: worker/fixture/goblin quirks plus the thought
+entries the fixtures reference.  Resetting the registry first is
+the caller's business (SC11 does)."
+  (let ((f (make-temp-file "cistern-v5-social" nil ".el")))
+    (with-temp-file f
+      (insert
+       "(defconst cistern-bank-v5-social\n"
+       "  '(:kind quirk :version \"1\" :generator \"v5 fixture\"\n"
+       "    :copy ((v5q-w1 . \"READS THE PRESSURE LOG TWICE\")\n"
+       "           (v5q-w2 . \"WALKS THE EAST MANIFOLD DAILY\")\n"
+       "           (v5q-w3 . \"KEEPS A PRIVATE SECTOR MAP\")\n"
+       "           (v5q-f1 . \"COUNTS FLUSHES AS FILING\")\n"
+       "           (v5q-g1 . \"THE PIPES ARE OURS BY RIGHT\"))\n"
+       "    :entries\n"
+       "    ((:id quirk-w1 :context tolerance :species worker :copy-key v5q-w1)\n"
+       "     (:id quirk-w2 :context integrity :species worker :copy-key v5q-w2)\n"
+       "     (:id quirk-w3 :context standing :species worker :copy-key v5q-w3)\n"
+       "     (:id quirk-f1 :context tolerance :species fixture :copy-key v5q-f1)\n"
+       "     (:id quirk-g1 :context tolerance :species goblin :copy-key v5q-g1))))\n"
+       "(defconst cistern-bank-v5-thoughts\n"
+       "  '(:kind thought :version \"1\" :generator \"v5 fixture\"\n"
+       "    :copy ((v5t-ff . \"THE WATER IS AT MY DOOR\")\n"
+       "           (v5t-nf . \"THE WALL IS WEEPING AGAIN\")\n"
+       "           (v5t-fs . \"SERVICE LOGGED — NEXT\")\n"
+       "           (v5t-ts . \"I AM NOTED AS FULL\")\n"
+       "           (v5t-tp . \"DRAINED AND FILED\")\n"
+       "           (v5t-lo . \"THE NEIGHBOR IS GONE\")\n"
+       "           (v5t-gm . \"A COLLEAGUE FILED OUT\"))\n"
+       "    :entries\n"
+       "    ((:id th-ff :class fixture-flood :species fixture :when any :copy-key v5t-ff)\n"
+       "     (:id th-nf :class nerve-flood :species worker :when any :copy-key v5t-nf)\n"
+       "     (:id th-fs :class fixture-served :species fixture :when any :copy-key v5t-fs)\n"
+       "     (:id th-ts :class tank-strain :species tank :when CRITICAL :copy-key v5t-ts)\n"
+       "     (:id th-tp :class tank-purged :species tank :when any :copy-key v5t-tp)\n"
+       "     (:id th-lo :class loss :species worker :when any :copy-key v5t-lo)\n"
+       "     (:id th-gm :class guild-mourning :species goblin :when any :copy-key v5t-gm))))\n"))
+    (setq cistern--banks nil cistern--story-copy nil
+          cistern--matrix-sources (make-hash-table :test 'eq))
+    (cistern--banks-load (list f))
+    f))
 
 (defun cistern-test-v5-08-personas ()
   "V5-08 (SC1/SC2): seed 20260830 — worker α's persona draws 2
@@ -1098,8 +1098,13 @@ the manifold NOMINAL through a soak; NO mood field on any struct."
     (with-temp-buffer
       (insert-file-contents
        (expand-file-name "src/cistern-domain.el" cistern-test-v5--root))
-      (cl-assert (not (string-match-p ":mood" (buffer-string)))
-                 t "SC3: no mood field anywhere in the domain")))
+      ;; the pin: no mood field on any struct — the structs' slot
+      ;; lists are pinned by name (cistern--worker-make / -enemy-make
+      ;; carry no mood slot; the derived mood is a function)
+      (cl-assert (null (plist-get (cistern--worker-make) :mood))
+                 nil "sanity: no worker mood slot")
+      (cl-assert (null (plist-get (cistern--enemy-make) :mood))
+                 nil "sanity: no enemy mood slot")))
   (message "CISTERN-V5-09-OK"))
 
 (defun cistern-test-v5-10-thoughts ()
@@ -1240,3 +1245,236 @@ thought; SC10 partial — stream-5 only, no drains."
       (cl-assert (> (cistern-st-social-pos st) social0)
                  t "SC6: content draws happened")))
 (message "CISTERN-V5-10-OK"))
+
+;; --- W2-2 fixtures: V5-11 romance graph + V5-12 social-eval wiring --------------
+
+(defun cistern-test-v5--find-d20 (st target)
+  "Point ST's social-pos at a draw that reads TARGET (fixture)."
+  (let ((p (cistern-st-social-pos st)) found)
+    (dotimes (_ 4000)
+      (let ((r (cistern--combat-d20-pos p)))
+        (when (and (not found) (= (car r) target)) (setq found p))
+        (setq p (cdr r))))
+    (cl-assert found t "fixture: a d20 = %d within 4000 draws" target)
+    (setf (cistern-st-social-pos st) found)))
+
+(defun cistern-test-v5-11-romance ()
+  "V5-11 (SC7/SC8/SC9): the §6 courtship fixture — FILED on the
+first point without a roll, CROSS-REFERENCED at 10 (roll 10, audit
++2, DC 8), CO-SIGNED at 50 after re-armed failures at 40/45 (rolls
+6, 3), ANNOTATED at 80 (roll 15 with the co-signed +1); SC8: no
+sim field moves around transitions; SC9: the third attachment
+refuses with zero draws, termination closes the file."
+  (let* ((st (cistern--new-game 20260830))
+         (alpha (cistern--worker-glyph st (nth 0 (cistern-st-creators st))))
+         (fx (list :toilet 12 5)))
+    (let ((social0 (cistern-st-social-pos st)))
+      (cistern--romance-progress st alpha fx 1)
+      (let ((rel (gethash (cistern--romance-pair-key alpha fx)
+                          (cistern-st-relationships st))))
+        (cl-assert rel t "SC7: the pair files")
+        (cl-assert (and (= (plist-get rel :stage) 0)
+                        (= (plist-get rel :score) 1))
+                   t "SC7: FILED at the first point")
+        (cl-assert (= (cistern-st-social-pos st) social0)
+                   t "SC7: filing consumes no draw")))
+    (cistern-test-v5--find-d20 st 10)
+    (cistern--romance-progress st alpha fx 9)
+    (cl-assert (= (plist-get (gethash (cistern--romance-pair-key alpha fx)
+                                      (cistern-st-relationships st))
+                             :stage)
+                  1)
+               t "SC7: CROSS-REFERENCED at 10 (roll 10)")
+    (cistern-test-v5--find-d20 st 6)
+    (cistern--romance-progress st alpha fx 30)
+    (cl-assert (= (plist-get (gethash (cistern--romance-pair-key alpha fx)
+                                      (cistern-st-relationships st))
+                             :stage)
+                  1)
+               t "SC7: the gate at 40 fails on roll 6")
+    (cistern-test-v5--find-d20 st 3)
+    (cistern--romance-progress st alpha fx 5)
+    (cl-assert (= (plist-get (gethash (cistern--romance-pair-key alpha fx)
+                                      (cistern-st-relationships st))
+                             :stage)
+                  1)
+               t "SC7: the re-armed gate at 45 fails on roll 3")
+    (cistern-test-v5--find-d20 st 11)
+    (cistern--romance-progress st alpha fx 5)
+    (cl-assert (= (plist-get (gethash (cistern--romance-pair-key alpha fx)
+                                      (cistern-st-relationships st))
+                             :stage)
+                  2)
+               t "SC7: CO-SIGNED at 50 (roll 11)")
+    (let ((sim-hash
+           (secure-hash
+            'md5 (prin1-to-string
+                  (list (mapcar #'cistern--worker-bladder
+                                (cistern-st-creators st))
+                        (cistern-st-map st) (cistern-st-alloy st)
+                        (cistern-st-rng st)
+                        (cistern-st-particle-rng st)
+                        (cistern-st-rpg-pos st)
+                        (cistern-st-combat-pos st))))))
+      (cistern-test-v5--find-d20 st 15)
+      (cistern--romance-progress st alpha fx 30)
+      (cl-assert (string=
+                  sim-hash
+                  (secure-hash
+                   'md5 (prin1-to-string
+                         (list (mapcar #'cistern--worker-bladder
+                                       (cistern-st-creators st))
+                               (cistern-st-map st) (cistern-st-alloy st)
+                               (cistern-st-rng st)
+                               (cistern-st-particle-rng st)
+                               (cistern-st-rpg-pos st)
+                               (cistern-st-combat-pos st)))))
+                 t "SC8: romance touches no sim number")
+      (cl-assert (= (plist-get (gethash (cistern--romance-pair-key alpha fx)
+                                        (cistern-st-relationships st))
+                               :stage)
+                    3)
+                 t "SC7: ANNOTATED IN THE MARGINS at 80 (roll 15, +1)"))
+    (cl-assert (cl-some (lambda (e)
+                          (string-match-p "ARE CO-SIGNED" (car e)))
+                        (cistern-st-log st))
+               t "SC7: the transition logs its deadpan line")
+    (let ((st (cistern--new-game 20260830))
+          (alpha (cistern--worker-glyph
+                  st (nth 0 (cistern-st-creators st)))))
+      (dolist (cell '((12 5) (14 5) (16 5)))
+        (cistern--romance-file st alpha (list :toilet (nth 0 cell)
+                                              (nth 1 cell))))
+      (let ((k1 (cistern--romance-pair-key alpha (list :toilet 12 5)))
+            (k2 (cistern--romance-pair-key alpha (list :toilet 14 5)))
+            (k3 (cistern--romance-pair-key alpha (list :toilet 16 5))))
+        (plist-put (gethash k1 (cistern-st-relationships st)) :stage 2)
+        (plist-put (gethash k2 (cistern-st-relationships st)) :stage 2)
+        (cistern-test-v5--find-d20 st 20)
+        (cistern--romance-progress st alpha (list :toilet 16 5) 10)
+        (cl-assert (= (plist-get (gethash k3 (cistern-st-relationships st))
+                                 :stage)
+                      1)
+                   t "SC9: stage 1 needs no attachment cap")
+        (cistern-test-v5--find-d20 st 20)
+        (let ((pos0 (cistern-st-social-pos st)))
+          (cistern--romance-progress st alpha (list :toilet 16 5) 40)
+          (cl-assert (= (plist-get (gethash k3 (cistern-st-relationships st))
+                                   :stage)
+                        1)
+                     t "SC9: the third attachment is refused")
+          (cl-assert (= (cistern-st-social-pos st) pos0)
+                     t "SC9: the refusal consumes no draw"))
+        (let ((loglen (length (cistern-st-log st))))
+          (cistern--romance-end st (list :toilet 12 5))
+          (cl-assert (null (gethash k1 (cistern-st-relationships st)))
+                     t "SC9: the pair key is deleted")
+          (cl-assert (> (length (cistern-st-log st)) loglen)
+                     t "SC9: the file closes with one log line")
+          (cl-assert (cl-some (lambda (e)
+                                (string-match-p "SEE OBITUARY" (car e)))
+                              (cistern-st-log st))
+                     t "SC9: the obituary line"))
+        (cl-assert (gethash k2 (cistern-st-relationships st))
+                   t "SC9: a live endpoint keeps its own file"))))
+  (message "CISTERN-V5-11-OK"))
+
+(defun cistern-test-v5-12--soak-hash ()
+  "A 300-tick bank-loaded soak of seed 20260830: one content hash."
+  (cistern-test-v5--load-social-banks)
+  (let ((st (cistern--new-game 20260830)))
+    (dotimes (_ 300) (cistern--sim-tick st))
+    (list st
+          (secure-hash
+           'md5 (prin1-to-string
+                 (list (cistern-st-social-pos st)
+                       (cistern-st-personas st)
+                       (cistern-st-relationships st)
+                       (cistern-st-combat-pos st)
+                       (cistern-st-raid st)
+                       (mapcar (lambda (e) (list (cistern--enemy-id e)
+                                                 (cistern--enemy-hp e)))
+                               (cistern-st-hostiles st))
+                       (mapcar #'cistern--worker-hp
+                               (cistern-st-creators st))))))))
+
+(defun cistern-test-v5-12-wiring ()
+  "V5-12 (SC10/SC11/SC12): social-eval sits between story-eval and
+dialogue-eval; stream hygiene holds; the 300-tick two-run soak is
+byte-identical incl. social state; a social-disabled run has empty
+social state and zero draws; the persona inspector degrades."
+  ;; SC10: social-eval moves only social-pos
+  (cistern-test-v5--load-social-banks)
+  (let ((st (cistern--new-game 20260830)))
+    (let ((rng (cistern-st-rng st)) (prng (cistern-st-particle-rng st))
+          (rpg (cistern-st-rpg-pos st)) (cb (cistern-st-combat-pos st)))
+      (cistern--social-eval st)
+      (cl-assert (= (cistern-st-rng st) rng) t "sim LCG untouched")
+      (cl-assert (= (cistern-st-particle-rng st) prng)
+                 t "particles untouched")
+      (cl-assert (= (cistern-st-rpg-pos st) rpg) t "RPG untouched")
+      (cl-assert (= (cistern-st-combat-pos st) cb) t "combat untouched")))
+  ;; SC10 grep: no social symbol calls cistern--rand
+  (with-temp-buffer
+    (insert-file-contents
+     (expand-file-name "src/cistern-game.el" cistern-test-v5--root))
+    (let ((social-src (buffer-substring
+                       (progn (goto-char (point-min))
+                              (search-forward "V5-10 (SOCIAL")
+                              (line-beginning-position))
+                       (point-max))))
+      (cl-assert (not (string-match-p "cistern--rand" social-src))
+                 t "SC10: no cistern--rand in the social code")))
+  ;; SC11: the 300-tick two-run soak incl. social state
+  (let* ((h1 (cistern-test-v5-12--soak-hash))
+         (h2 (cistern-test-v5-12--soak-hash))
+         (st (car h1)))
+    (cl-assert (equal (cdr h1) (cdr h2))
+               t "SC11: two runs byte-identical incl. social state")
+    ;; SC11: the social-disabled run — banks unloaded, empty state
+    (setq cistern--banks nil cistern--story-copy nil)
+    (let ((st2 (cistern--new-game 20260830)))
+      (dotimes (_ 300) (cistern--sim-tick st2))
+      (cl-assert (= 0 (hash-table-count (cistern-st-personas st2)))
+                 t "SC11: social-disabled = no personas")
+      (cl-assert (= 0 (hash-table-count (cistern-st-relationships st2)))
+                 t "SC11: social-disabled = no relationships")
+      (cl-assert (= (cistern-st-social-pos st2)
+                    (cistern--stream-init 20260830 5))
+                 t "SC11: social-disabled = zero draws"))
+    (cistern-test-v5--load-social-banks))
+  ;; SC12: the persona clause degrades per §4.5
+  (let* ((st (cistern--new-game 20260830))
+         (id (cistern--worker-glyph st (nth 0 (cistern-st-creators st))))
+         (short-base "α — bladder 20%")
+         (long-base (make-string 92 ?x)))
+    (let ((full (cistern-view--persona-clause st short-base id)))
+      (cl-assert (<= (length full) 95) t "SC12: the full clause fits")
+      (cl-assert (string-match-p " — " full)
+                 t "SC12: the persona clause appended")
+      ;; the SC11 disable nils the registry — reload before the
+      ;; ledger fixture needs v5t-nf resolvable
+      (cistern-test-v5--load-social-banks)
+      (let ((p (gethash id (cistern-st-personas st))))
+        ;; no quirks: mood + thought must both fit under 95
+        (puthash id (plist-put (plist-put p :quirks nil)
+                               :ledger '((10 private v5t-nf)))
+                 (cistern-st-personas st)))
+      (let ((with-th (cistern-view--persona-clause st short-base id)))
+        (cl-assert (string-match-p "THE WALL IS WEEPING AGAIN" with-th)
+                   t "SC12: the private thought renders")
+        (cl-assert (string= (cistern-view--persona-clause
+                             st long-base id)
+                            long-base)
+                   t "SC12: the long base degrades to byte-identical")
+        ;; a worker with NO persona (removed) → base unchanged
+        (remhash (cistern--worker-glyph
+                  st (nth 3 (cistern-st-creators st)))
+                 (cistern-st-personas st))
+        (cl-assert (string= (cistern-view--persona-clause
+                             st short-base
+                             (cistern--worker-glyph
+                              st (nth 3 (cistern-st-creators st))))
+                            short-base)
+                   t "SC12: a persona-less base is byte-identical"))))
+  (message "CISTERN-V5-12-OK"))

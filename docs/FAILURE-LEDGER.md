@@ -3448,3 +3448,37 @@ the relaunch is on their screen now.
   against 'toilet / 'tank symbols and silently fell through to NOMINAL
   (a wrong-answer, not an error — caught by SC3's tank probe).
 - Outcome: V5-08 GREEN, V5-09 GREEN, V5-10 GREEN.  Suite canonical 124.
+
+---
+
+## L-103 (2026-09-08, run: wave2-batch-2 — V5-11 romance graph, V5-12 social-eval wiring)
+
+- SC7/SC9 fixture rulings: the SC7 gate sequence consumes the pinned
+  rolls (10 / 6, 3 / 11 / 15) by POINTING social-pos at each draw —
+  re-armed gates re-consume when the score re-crosses (the doc's §6
+  ledger matches the real stream positions).  SC9's "third attachment
+  refused at gate time" applies at the 1->2 gate: stage 1 is outside
+  the §2.5 cap (cap counts stage-2+ pairs) — the first fixture had the
+  refusal pinned one stage early.
+- §2.6 termination ruling: a CEASED endpoint closes only its own pair
+  keys — other endpoints' live files stay (the SC9 test had assumed a
+  sweep of the whole survivor's book).
+- The SC12 §4.5 degradation means a persona clause MAY not show the
+  thought on a long base row — the fixture uses a short base and a
+  persona with no quirks so mood + thought both fit under 95.
+- Loader lesson (extends L-099/L-101): `cistern--banks-load`'s
+  load-history scan finds no cistern-bank-* symbols on a SECOND load
+  of the same path — the test fixture helper now ALWAYS writes a fresh
+  temp file and resets the registry before loading.  Order-dependence:
+  earlier v4 tests load the example bank into the registry, so social
+  fixtures must FORCE the registry reset (a (null cistern--banks)
+  guard was order-dependent — caught by SC2/SC10/SC12 failing only
+  in-suite).
+- SC3's "no mood field" grep narrowed to the actual pin (struct slots
+  — asserted via the constructors' plists) after the v5-12
+  persona-words query keys (:mood-w) collided with the old substring.
+- Outcome: V5-11 GREEN, V5-12 GREEN.  Suite canonical 126/126.
+  GREEN-SYNC rule fired: the five src files copied to
+  ~/.emacs.d/lisp/, no stale cistern.elc present, no running cistern
+  instance found to relaunch (pgrep empty — the installed copy is
+  current for the next launch).

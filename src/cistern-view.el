@@ -415,6 +415,34 @@ can never be listed twice."
             (substring entries (+ split-at 2))
             "  " (aref cistern--worker-glyphs 0) " worker\n")))
 
+(defun cistern-view--persona-clause (st base id)
+  "V5-12 (SOCIAL §4.5): the persona clause — mood word, first
+quirk word, latest private thought — appended to the base
+inspector row with the PINNED degradation: over 95 cols the
+thought is dropped first, then the quirk word, then the mood
+word; the base inspector without a persona is byte-identical.
+All state reads happen through domain queries (r5/v4-16 pins)."
+  (let* ((words (cistern--social-persona-words st id))
+         (mood (plist-get words :mood-w))
+         (q-word (plist-get words :quirk-word))
+         (th-word (plist-get words :thought-word)))
+    (if (null words) base
+      (let ((full (concat base " — " mood
+                          (if q-word (concat " — " q-word) "")
+                          (if th-word (concat " — " th-word) ""))))
+        (cond ((<= (length full) 95) full)
+              (th-word
+               (let ((l2 (concat base " — " mood
+                                 (if q-word (concat " — " q-word) ""))))
+                 (if (<= (length l2) 95) l2
+                   (let ((l3 (concat base " — " mood)))
+                     (if (<= (length l3) 95) l3 base)))))
+              (q-word
+               (let ((l2 (concat base " — " mood)))
+                 (if (<= (length l2) 95) l2 base)))
+              (t (if (<= (length (concat base " — " mood)) 95)
+                     (concat base " — " mood) base)))))))
+
 (defun cistern-view--inspector (st)
   "One sentence describing whatever the cursor rests on."
   (let* ((x (car (cistern-st-cursor st)))
@@ -518,7 +546,12 @@ can never be listed twice."
            (without-stats (concat head
                                   (if who-with-cl
                                       (concat "  —  " who-with-cl) ""))))
-      (if (<= (length with-stats) 95) with-stats without-stats))))
+      ;; V5-12 (SOCIAL §4.5): the persona clause rides the assembled
+      ;; row, degrading to the byte-identical base over 95 cols
+      (cistern-view--persona-clause
+       st
+       (if (<= (length with-stats) 95) with-stats without-stats)
+       (cistern--social-persona-id-at st x y)))))
 
 (defun cistern-view--pressure-face (st)
   "Q21: colors, not new words — CRITICAL (and SEVERED, the other

@@ -153,7 +153,8 @@ by the view, not here).")
   ;; is the stream-5 position (seed ⊕ 5), pos-in/pos-out like every
   ;; child stream.  Relationships (V5-11) complete the §4.3 list.
   (personas nil)
-  (social-pos 0))
+  (social-pos 0)
+  (relationships nil))
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -371,7 +372,7 @@ manifold: it does not stress, it IS stress)."
                                   cistern--enemy-hp-base))
                        (cistern--rpg-mod (nth 1 (cistern--enemy-stats e)))))
                (pct (/ (* 100.0 (cistern--enemy-hp e)) (max 1 max)))
-               (band (cl-assoc pct cistern--social-goblin-bands #'<)))
+               (band (cl-assoc pct cistern--social-goblin-bands :test #'<)))
           (if band (cdr band) 'NOMINAL)))))
    ((stringp id) ; a worker glyph
     (let ((w (cl-find-if (lambda (w)
@@ -438,6 +439,320 @@ them delivers as a FILE."
     (if (and (eq chan 'mutter)
              (memq species '(fixture tank structure)))
         'file chan)))
+
+;; ---------------------------------------------------------------------------
+;; V5-11 (SOCIAL §2): the romance graph — sorted-pair keys, stages
+;; FILED -> CROSS-REFERENCED -> CO-SIGNED -> ANNOTATED IN THE MARGINS,
+;; gate rolls on stream 5 at crossings only.  NO sim numbers (§2.5).
+
+(defconst cistern--romance-thresholds '(10 40 80)
+  "SOCIAL §2.3: score thresholds for stages 1/2/3.")
+
+(defconst cistern--romance-dcs '(8 12 16)
+  "SOCIAL §2.3: gate DCs for stages 1/2/3.")
+
+(defconst cistern--romance-stage-names
+  '(FILED CROSS-REFERENCED CO-SIGNED "ANNOTATED IN THE MARGINS")
+  "SOCIAL §2.2: the institutional register — the stage names ARE
+the joke; formatted through social-stage-fmt, data not code.")
+
+(defun cistern--romance-species-rank (id)
+  "The census rank of ID (SOCIAL §1.1 total order, ruling 2)."
+  (cond ((and (stringp id) (string-match-p "\\'g[0-9]+\\'" id)) 1)
+        ((stringp id) 0)
+        ((and (consp id) (eq (car id) :toilet)) 3)
+        ((and (consp id) (eq (car id) :tank)) 4)
+        ((and (consp id) (eq (car id) :structure)) 5)
+        (t 6)))
+
+(defun cistern--romance-pair-key (id-a id-b)
+  "The two ids ordered by the census total order (deterministic,
+no canonicalization draws, SOCIAL §2.1)."
+  (if (or (< (cistern--romance-species-rank id-a)
+             (cistern--romance-species-rank id-b))
+          (and (= (cistern--romance-species-rank id-a)
+                  (cistern--romance-species-rank id-b))
+               (string< (prin1-to-string id-a)
+                        (prin1-to-string id-b))))
+      (cons id-a id-b)
+    (cons id-b id-a)))
+
+(defun cistern--social-faction-of (st id)
+  "The combat faction for a hostile id; sector ids are nil."
+  (when (and (stringp id) (string-match-p "g[0-9]+" id))
+    (let ((e (cl-find id (cistern-st-hostiles st)
+                      :key #'cistern--enemy-id :test #'equal)))
+      (and e (cistern--enemy-faction e)))))
+
+(defun cistern--romance-file (st id-a id-b)
+  "FILED (stage 0) on the first score point — no roll (SOCIAL
+§2.3).  Always returns the pair key; records cross-faction."
+  (let ((key (cistern--romance-pair-key id-a id-b)))
+    (unless (gethash key (cistern-st-relationships st))
+      (let ((fa (cistern--social-faction-of st id-a))
+            (fb (cistern--social-faction-of st id-b)))
+        (puthash key (list :stage 0 :score 0 :since (cistern-st-tick st)
+                           :cross-faction (not (eq fa fb))
+                           :re-arm nil)
+                 (cistern-st-relationships st))))
+    key))
+
+(defun cistern--romance-attachments (st id)
+  "How many of ID's pairs stand at stage >= 2 (the §2.5 cap)."
+  (let ((n 0))
+    (maphash (lambda (k v)
+               (when (and (>= (plist-get v :stage) 2)
+                          (or (equal (car k) id) (equal (cdr k) id)))
+                 (setq n (1+ n))))
+             (cistern-st-relationships st))
+    n))
+
+(defun cistern--romance-advance (st key)
+  "Advance the pair one stage (SOCIAL §2.4): the deadpan log line,
+the (:social 'romance-stage ...) push, and romance-stage thoughts
+for both partners."
+  (let* ((rel (gethash key (cistern-st-relationships st)))
+         (stage (1+ (plist-get rel :stage)))
+         (name (if (stringp (nth stage cistern--romance-stage-names))
+                   (nth stage cistern--romance-stage-names)
+                 (symbol-name (nth stage cistern--romance-stage-names))))
+         (a (car key)) (b (cdr key)))
+    (plist-put rel :stage stage)
+    (plist-put rel :re-arm nil)
+    (cistern--log-sev st 'info "%s"
+                      (format (cistern--social-copy 'social-stage-fmt)
+                              (cistern--social-display-id a)
+                              (cistern--social-display-id b)
+                              name
+                              (if (= stage 1) "PROXIMITY ON RECORD"
+                                (if (= stage 2) "THE PAIR FILES JOINTLY"
+                                  "THE MARGINS ARE ANNOTATED"))))
+    (push (list :social 'romance-stage :pair key :stage stage)
+          (cistern-st-rewards-events st))
+    (cistern--social-thought-push st a 'romance-stage)
+    (cistern--social-thought-push st b 'romance-stage)
+    (when (and (plist-get rel :cross-faction) (>= stage 1))
+      (cistern--social-friction st key))))
+
+(defun cistern--social-display-id (id)
+  "The rendered form of an entity id."
+  (cond ((and (consp id) (eq (car id) :toilet))
+         (format "FIXTURE (%d,%d)" (nth 1 id) (nth 2 id)))
+        ((and (consp id) (eq (car id) :tank))
+         (format "TANK (%d,%d)" (nth 1 id) (nth 2 id)))
+        ((and (consp id) (eq (car id) :structure))
+         (format "STRUCTURE (%d,%d)" (nth 1 id) (nth 2 id)))
+        (t (prin1-to-string id))))
+
+(defun cistern--social-thought-push (st id class)
+  "The ONE domain thought-push helper (SOCIAL §4.7): appends a
+private thought for the persona, ledger cap 3 FIFO enforced HERE —
+comedy (wave 3) cannot exceed the budget by construction."
+  (let* ((p (gethash id (cistern-st-personas st)))
+         (bank (cistern--social-thought-bank class
+                                             (plist-get p :species)
+                                             'any))
+         (key (when bank
+                (plist-get (nth (cistern--social-select st (length bank))
+                                bank)
+                           :copy-key))))
+    (when key
+      (let ((ledger (cons (list (cistern-st-tick st) 'private key)
+                          (plist-get p :ledger))))
+        (puthash id (plist-put p :ledger
+                               (if (> (length ledger) 3)
+                                   (butlast ledger) ledger))
+                 (cistern-st-personas st))))))
+
+(defun cistern--social-friction (st key)
+  "SOCIAL §3.2: on a cross-faction stage >= 1 transition, every
+warband goblin within Chebyshev 6 of the goblin endpoint files an
+OBJECTION through the faction-mock row — capped by §1.6 budgets.
+The Guild of the Open Flange does not judge."
+  (let* ((rel (gethash key (cistern-st-relationships st)))
+         (a (car key)) (b (cdr key))
+         (g-id (if (cistern--social-faction-of st a) a
+                 (if (cistern--social-faction-of st b) b nil)))
+         (other (if (equal g-id a) b a))
+         (g (and g-id (cl-find g-id (cistern-st-hostiles st)
+                               :key #'cistern--enemy-id :test #'equal))))
+    (when g
+      (dolist (e (cistern-st-hostiles st))
+        (when (and (eq (cistern--enemy-faction e) 'warband)
+                   (gethash (cistern--enemy-id e)
+                            (cistern-st-personas st))
+                   (<= (max (abs (- (cistern--enemy-x e)
+                                    (cistern--enemy-x g)))
+                            (abs (- (cistern--enemy-y e)
+                                    (cistern--enemy-y g))))
+                       6))
+          (push (list 'faction-mock 'mock
+                      (cistern--enemy-x e) (cistern--enemy-y e)
+                      (cistern--social-display-id other))
+                (cistern-st-rewards-events st)))))))
+
+(defun cistern--romance-end (st id)
+  "SOCIAL §2.6: when an endpoint ceases, delete its pair keys; a
+stage >= 2 file closes with one social-stage-close log line and a
+loss thought to the survivor.  No ghost state."
+  (let ((dead nil))
+    (maphash (lambda (k v)
+               (when (or (equal (car k) id) (equal (cdr k) id))
+                 (push (list k v) dead)))
+             (cistern-st-relationships st))
+    (dolist (pair dead)
+      (let* ((key (car pair)) (rel (cadr pair))
+             (survivor (if (equal (car key) id) (cdr key) (car key))))
+        (remhash key (cistern-st-relationships st))
+        (when (>= (plist-get rel :stage) 2)
+          (cistern--log-sev st 'info "%s"
+                            (format (cistern--social-copy
+                                     'social-stage-close)
+                                    (cistern--social-display-id (car key))
+                                    (cistern--social-display-id (cdr key))))
+          (cistern--social-thought-push st survivor 'loss))))))
+
+(defun cistern--romance-progress (st id-a id-b delta)
+  "Add DELTA score to the pair (filing it on the first point) and
+resolve gate crossings — one d20 per crossing on stream 5, band >=
+2 advances, <= 1 re-arms at score + 5 (SOCIAL §2.3).  Audit-mod: a
+worker partner's ARCHIVE mod; non-worker pairs file blind; a
+CO-SIGNED pair gains +1 on later gates.  A third stage-2+
+attachment is refused WITHOUT a draw (§2.5)."
+  (let* ((key (cistern--romance-file st id-a id-b))
+         (rel (gethash key (cistern-st-relationships st)))
+         (stage (plist-get rel :stage)))
+    (when rel
+      (let* ((score (+ (plist-get rel :score) delta))
+             (worker-id (if (stringp id-a) id-a
+                          (if (stringp id-b) id-b nil)))
+             (audit (if worker-id
+                        (let ((w (cl-find-if
+                                  (lambda (w)
+                                    (equal (cistern--worker-glyph st w)
+                                           worker-id))
+                                  (cistern-st-creators st))))
+                          (if w (cistern--rpg-stat-mod w 3) 0))
+                      0)))
+        (plist-put rel :score score)
+        (when (< stage 3)
+          (let ((threshold (nth stage cistern--romance-thresholds))
+                (re-arm (plist-get rel :re-arm)))
+            (when (and (>= score threshold)
+                       (or (null re-arm) (>= score re-arm)))
+              (if (and (>= (+ stage 1) 2)
+                       (or (>= (cistern--romance-attachments st id-a) 2)
+                           (>= (cistern--romance-attachments st id-b) 2)))
+                  (plist-put rel :re-arm (+ score 5))
+                (let* ((roll (1+ (cistern--social-select st 20)))
+                       (bonus (+ audit (if (>= stage 2) 1 0)))
+                       (dc (nth stage cistern--romance-dcs))
+                       (band (cistern--margin-band (+ roll bonus (- dc)))))
+                  (if (>= band 2)
+                      (cistern--romance-advance st key)
+                    (plist-put rel :re-arm (+ score 5))))))))))
+    key))
+
+(defun cistern--romance-position (st id)
+  "The map position of an entity id, or nil (off-map)."
+  (cond ((and (stringp id) (string-match-p "g[0-9]+" id))
+         (let ((e (cl-find id (cistern-st-hostiles st)
+                           :key #'cistern--enemy-id :test #'equal)))
+           (and e (cons (cistern--enemy-x e) (cistern--enemy-y e)))))
+        ((stringp id)
+         (let ((w (cl-find-if (lambda (w)
+                                (equal (cistern--worker-glyph st w) id))
+                              (cistern-st-creators st))))
+           (and w (cons (cistern--worker-x w) (cistern--worker-y w)))))
+        ((and (consp id) (memq (car id) '(:toilet :tank :structure)))
+         (cons (nth 1 id) (nth 2 id)))
+        (t nil)))
+
+(defun cistern--romance-proximity-tick (st)
+  "V5-11/§4.2: the per-tick romance accrual — +1 score per pair
+with both endpoints on the map within Chebyshev 2, +2 for shared
+located events this tick (both within 3), gates resolving on
+crossings only.  Iterates the relationships hash — pairs exist
+once filed; no scan over non-proximate pairs (§2.5)."
+  (let ((pairs nil))
+    (maphash (lambda (k v) (push (cons k v) pairs))
+             (cistern-st-relationships st))
+    (dolist (pair pairs)
+      (let* ((key (car pair)) (rel (cdr pair))
+             (pa (cistern--romance-position st (car key)))
+             (pb (cistern--romance-position st (cdr key))))
+        (when (and pa pb)
+          (let ((delta 0))
+            (when (<= (max (abs (- (car pa) (car pb)))
+                           (abs (- (cdr pa) (cdr pb))))
+                      2)
+              (setq delta (+ delta 1)))
+            (dolist (ev (cistern-st-rewards-events st))
+              (let ((kind (cistern--event-kind ev)))
+                (when (memq kind '(breach relief purge destroyed))
+                  (let* ((ex (nth 2 ev)) (ey (nth 3 ev)))
+                    (when (and (<= (max (abs (- (car pa) ex))
+                                        (abs (- (cdr pa) ey)))
+                                   3)
+                               (<= (max (abs (- (car pb) ex))
+                                        (abs (- (cdr pb) ey)))
+                                   3))
+                      (setq delta (+ delta 2))))))))
+          (when (> delta 0)
+            (cistern--romance-progress st (car key) (cdr key)
+                                       delta)))))))
+
+(defun cistern--social-quirk-copy-key (id)
+  "V5-12: the copy-key of quirk entry ID from the loaded quirk
+bank — personas store quirk IDS; the copy chain is keyed by
+copy-keys (fail-first on a missing entry)."
+  (or (plist-get (cl-find id (plist-get cistern--banks :quirks)
+                         :key (lambda (q) (plist-get q :id))
+                         :test #'equal)
+                 :copy-key)
+      (error "UNRESOLVED QUIRK ID %S" id)))
+
+(defun cistern--social-persona-id-at (st x y)
+  "V5-12 view query: the persona-eligible entity id at (X,Y) —
+worker glyph, hostile g<N> id, fixture or tank key — or nil."
+  (or (let ((w (cl-find-if (lambda (w)
+                             (and (= x (cistern--worker-x w))
+                                  (= y (cistern--worker-y w))))
+                           (cistern-st-creators st))))
+        (and w (cistern--worker-glyph st w)))
+      (let ((e (cistern--enemy-at st x y)))
+        (and e (cistern--enemy-id e)))
+      (and (gethash (cons x y) (cistern-st-toilets st))
+           (list :toilet x y))
+      (and (gethash (cons x y) (cistern-st-tanks st))
+           (list :tank x y))))
+
+(defun cistern--social-persona-words (st id)
+  "V5-12: the persona clause words for ID — (:mood-w W :quirk-word W
+:thought W), copy resolution included (the domain may read the
+copy chain; the VIEW may not, per the r5/v4-16 layer pins)."
+  (let ((p (gethash id (cistern-st-personas st))))
+    (when p
+      (let ((quirk (car (plist-get p :quirks))))
+        (list :mood-w (symbol-name (cistern--social-mood st id))
+              :quirk-word (when quirk
+                            (cistern--story-copy-key
+                             (cistern--social-quirk-copy-key quirk)))
+              :thought-word
+              (let ((th (car (plist-get p :ledger))))
+                (when th
+                  ;; §4.5: the word is the thought CLASS — recovered
+                  ;; from the thought bank by the ledger's copy-key
+                  (let* ((entry (cl-find (nth 2 th)
+                                         (plist-get cistern--banks
+                                                    :thoughts)
+                                         :key (lambda (e)
+                                                (plist-get e :copy-key))
+                                         :test #'equal))
+                         (class (and entry (plist-get entry :class))))
+                    (format "%s: \"%s\""
+                            (upcase (symbol-name class))
+                            (cistern--story-copy-key (nth 2 th)))))))))))
 
 (defun cistern--combat-roll-stat (st)
   "4d6 drop lowest, summed — one stat score (3-18), from stream 4.
@@ -1507,7 +1822,9 @@ The spawn-index pins identity — the death renames nobody."
     (cistern--log-sev st 'error "%s"
                       (format (cistern--combat-copy 'combat-worker-death)
                               glyph))
-    (push (list 'worker-death glyph) (cistern-st-rewards-events st))))
+    (push (list 'worker-death glyph) (cistern-st-rewards-events st))
+    ;; V5-11 (SOCIAL §2.6): the dead endpoint's files close
+    (cistern--romance-end st w)))
 
 (defun cistern--worker-damage (st w n)
   "Subtract N hp from worker W (COMBAT §3.3), log the injury-state
@@ -2437,6 +2754,7 @@ event-tiles phase keeps its post-hazards slot)."
       (dolist (w (cdr workers))
         (cistern--social-spawn-persona
          st (cistern--worker-glyph st w) 'worker)))
+    (setf (cistern-st-relationships st) (make-hash-table :test #'equal))
     st))
 
 (defun cistern--story-generate (st)
@@ -2623,7 +2941,10 @@ legal no-op state for tests)."
     ;; in V5-11's romance graph
     (social . (
       (social-mutter-fmt . "WORKER %s MUTTERS — %s")
-      (social-file-fmt . "%s FILES A %s")))
+      (social-file-fmt . "%s FILES A %s")
+      (social-stage-fmt . "%s AND %s ARE %s — %s")
+      (social-stage-close . "THE FILE OF %s AND %s IS CLOSED — SEE OBITUARY")
+      (social-objection . "GOBLIN %s OBJECTS TO %s's LIAISON — REVIEW DUE")))
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
     (capacity-none . "NO WIRED TOILET ON THE GRID — LAY PIPE (p)")
     (teach-arrows . "C-n/C-p/C-f/C-b MOVE TOO")
@@ -2667,8 +2988,10 @@ validation — the census total order's species.")
 
 (defconst cistern--story-effects
   '(none log-line popup hazard-spawn tank-load-delta alloy-grant
-    beat-open beat-resolve)
-  "STORY §6.4 effects whitelist — closed in v4.")
+    beat-open beat-resolve proximity-nudge)
+  "STORY §6.4 effects whitelist — closed in v4; v5 adds the ONE
+social-side effect proximity-nudge (SOCIAL §4.7: a SOCIAL number,
+never a sim number).")
 
 (defconst cistern--story-act-ticks
   '((1 . (0 . 119)) (2 . (120 . 239)) (3 . (240 . 99999)))
