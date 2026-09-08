@@ -133,7 +133,8 @@
     cistern-test-v3b-rarity-tiers
     cistern-test-v4-23-final-sweep
   ;; v5 wave 1 — the violent base (docs/v5/V5-SPEC.md §3)
-    cistern-test-v5-01-entities))
+    cistern-test-v5-01-entities
+    cistern-test-v5-02-resolution))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

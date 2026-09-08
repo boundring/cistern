@@ -138,7 +138,11 @@ by the view, not here).")
   ;; entity's life; nothing else may collide with it).
   (combat-pos 0)
   (hostiles nil)
-  (hostile-seq 0))
+  (hostile-seq 0)
+  ;; V5-02/§4.5 (COMBAT §5.1): the player's FOCUS designation — an
+  ;; enemy id or nil.  Auto-defense targeting prefers it (§3.2);
+  ;; cleared when the focused enemy dies (V5-06).
+  (focus nil))
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."

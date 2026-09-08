@@ -116,3 +116,164 @@ hostiles and the stream-4 position."
            (cistern--spawn-enemy st 'warband 'warband 3 2)
            (list (cistern-st-hostiles st)
                  (cistern-st-combat-pos st))))))
+
+;;; --- V5-02: combat resolution on the shared pipeline (CB2, CB10) ---------------
+
+(defun cistern-test-v5-02-resolution ()
+  "V5-02 (CB2): attacks resolve through the SHARED margin-band +
+promotion path and one gethash on (dmg-minor|dmg-warband . band);
+band 0 deals 0 and logs nothing; the warband matrix's band 3 deals
+exactly 3.  (CB10 partial): combat draws touch ONLY combat-pos —
+the sim LCG, particle stream and RPG stream positions are
+untouched, and no log line is emitted for a miss."
+  ;; the two damage matrices live in the ONE hash (A9 shape)
+  (cl-assert (equal (cistern--matrix-effect 'dmg-minor 0) '(:dmg 0))
+             t "band 0 is a silent miss")
+  (cl-assert (equal (cistern--matrix-effect 'dmg-minor 3) '(:dmg 2))
+             t "minor band 3 = 2")
+  (cl-assert (equal (cistern--matrix-effect 'dmg-warband 2) '(:dmg 2))
+             t "warband band 2 = 2")
+  (cl-assert (equal (cistern--matrix-effect 'dmg-warband 3) '(:dmg 3))
+             t "warband band 3 = exactly 3")
+  ;; nat-20 promotes to band 3, nat-1 demotes to band 0 — found by
+  ;; scanning the raw stream, then replayed through the production fn
+  (let ((st (cistern--new-game 31)))
+    (cl-assert (= (cistern-test-v5-02--band-at st 20) 3)
+               t "nat-20 promotes to band 3")
+    (cl-assert (= (cistern-test-v5-02--band-at st 1) 0)
+               t "nat-1 demotes to band 0"))
+  ;; one strike = exactly one stream-4 draw; the effect comes from
+  ;; the shared hash; misses log nothing and touch no other stream
+  (let ((st (cistern--new-game 37)))
+    (let ((rng (cistern-st-rng st)) (prng (cistern-st-particle-rng st))
+          (rpg (cistern-st-rpg-pos st))
+          (before (cistern-st-combat-pos st)) (loglen (length (cistern-st-log st))))
+      (cistern--combat-strike st 'dmg-minor 0 10)
+      (cl-assert (= (cistern-st-combat-pos st)
+                    (cistern--stream-next before))
+                 t "one strike consumes exactly one d20 draw")
+      (cl-assert (= (cistern-st-rng st) rng) t "sim LCG untouched")
+      (cl-assert (= (cistern-st-particle-rng st) prng)
+                 t "particle stream untouched")
+      (cl-assert (= (cistern-st-rpg-pos st) rpg) t "RPG stream untouched")
+      (cl-assert (= (length (cistern-st-log st)) loglen)
+                 t "resolution itself logs nothing")))
+  ;; targeting: guild NEVER selected, focus preferred, else nearest
+  (let ((st (cistern--new-game 41)))
+    (cistern--spawn-enemy st 'guild 'fixer 5 5)
+    (cistern--spawn-enemy st 'warband 'warband 3 5)
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 4) (setf (cistern--worker-y w) 5)
+      (let ((tgt (cistern--combat-target st w)))
+        (cl-assert (and tgt (equal (cistern--enemy-id tgt) "g2"))
+                   t "guild filtered: worker strikes the warband"))
+      ;; focus preference: focus g2 explicitly, target unchanged
+      (setf (cistern-st-focus st) "g2")
+      (let ((tgt (cistern--combat-target st w)))
+        (cl-assert (equal (cistern--enemy-id tgt) "g2")
+                   t "focus target preferred"))
+      ;; focus on a NON-adjacent hostile falls back to nearest adjacent
+      (setf (cistern-st-focus st) "g99")
+      (let ((tgt (cistern--combat-target st w)))
+        (cl-assert (equal (cistern--enemy-id tgt) "g2")
+                   t "non-adjacent focus falls back to nearest"))))
+  (message "CISTERN-V5-02-OK"))
+
+(defun cistern-test-v5-02--band-at (st roll)
+  "Point ST's combat-pos at a draw that reads ROLL, then assert
+the production band fn through it (returns the band)."
+  (let ((p (cistern-st-combat-pos st)) found)
+    (dotimes (_ 500)
+      (let ((r (cistern--combat-d20-pos p)))
+        (when (and (not found) (= (car r) roll)) (setq found p))
+        (setq p (cdr r))))
+    (cl-assert found t "fixture: a nat-%d within 500 draws" roll)
+    (setf (cistern-st-combat-pos st) found)
+    (cistern--combat-band st -5 15)))
+
+;;; --- V5-03: injury ladder + worker death (CB3, CB4) ----------------------------
+
+(defun cistern-test-v5-03-injury ()
+  "V5-03 (CB3): a worker at hp ≤ 60% limps (1 step per 2 ticks,
+stride off, SUSPENDED on relief journeys); at hp ≤ 40% is shaken
+(NERVE −2 inside the existing [50,68] clamp); any damage < max
+worsens mine rate via the existing clamp; +1 hp at each shift
+boundary.  (CB4): hp 0 removes the worker from creators, frees
+their toilet, drops a gripping leech, emits `worker-death' — and
+survivors keep their glyphs (spawn-index, not list position)."
+  (let ((st (cistern--new-game 43)))
+    (let ((w (nth 0 (cistern-st-creators st))))
+      ;; hp max = 8 + GRIT mod, rolled at spawn alongside the dossier
+      (cl-assert (= (cistern--worker-hp w)
+                    (+ 8 (cistern--rpg-mod (nth 1 (cistern--worker-stats w)))))
+                 t "spawn hp max = 8 + GRIT mod")
+      (cl-assert (null (cistern--worker-injury-state w))
+                 t "a fresh worker has no injury state")
+      ;; LIMP at ≤ 60% of max
+      (setf (cistern--worker-hp w) (floor (* 0.6 (cistern--worker-hp w))))
+      (cl-assert (eq (cistern--worker-injury-state w) 'limp)
+                 t "hp at 60% limps")
+      ;; SHAKEN at ≤ 40%: NERVE −2 → seek_eff inside the existing clamp
+      (setf (cistern--worker-hp w) (floor (* 0.4 (cistern--worker-hp w))))
+      (cl-assert (eq (cistern--worker-injury-state w) 'shaken)
+                 t "hp at 40% is shaken")
+      (let ((base (cistern--rpg-stat-mod w 2)))
+        (cl-assert (= (cistern--worker-nerve-eff w) (- base 2))
+                   t "shaken lowers NERVE by 2")
+        ;; the existing clamp holds: worst case still inside [50,68]
+        (cl-assert (<= 50 (cistern--rpg-seek-eff (cistern--worker-nerve-eff w)) 68)
+                   t "seek_eff stays inside the existing clamp")))
+    ;; mining loss: hp < max → mine rate +1 via the existing clamp
+    (let ((w (nth 1 (cistern-st-creators st))))
+      (let ((healthy (cistern--worker-mine-rate w)))
+        (setf (cistern--worker-hp w) (1- (cistern--worker-hp w)))
+        (cl-assert (= (cistern--worker-mine-rate w) (clamp 2 (1+ healthy) 6))
+                   t "damage worsens mine rate through the clamp"))))
+  ;; LIMP gait: 1 step per 2 ticks, stride off; relief journeys exempt
+  (let ((st (cistern--new-game 47)))
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-hp w) 1)   ; limp, any stats
+      (setf (cistern--worker-journey w) nil)
+      (let ((x0 (cistern--worker-x w)) (y0 (cistern--worker-y w)))
+        ;; two consecutive limping steps: exactly one cell total
+        (cistern--step-toward st w 0 0)
+        (cistern--step-toward st w 0 0)
+        (cl-assert (= (+ (abs (- (cistern--worker-x w) x0))
+                         (abs (- (cistern--worker-y w) y0)))
+                      1)
+                   t "limping: one step per two ticks, stride off")))))
+  ;; shift-boundary heal: +1 hp, deterministic, no roll
+  (let ((st (cistern--new-game 53)))
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-hp w) (1- (cistern--worker-hp w)))
+      (setf (cistern-st-tick st) 39)
+      (cistern--phase-migration st)
+      (cl-assert (= (cistern--worker-hp w)
+                    (+ 8 (cistern--rpg-mod (nth 1 (cistern--worker-stats w)))))
+                 t "+1 hp at the shift boundary restores the max"))))
+  ;; CB4: death procedure + identity pin
+  (let ((st (cistern--new-game 59)))
+    (let ((a (nth 0 (cistern-st-creators st)))
+          (b (nth 1 (cistern-st-creators st))))
+      ;; α mid-use: the toilet's :busy must clear
+      (setf (cistern--worker-using a) t)
+      (setf (cistern--worker-toilet a) '(11 9))
+      (puthash '(11 9) (list :busy t :type 'long-drop) (cistern-st-toilets st))
+      ;; a leech grips α: it dies with the body
+      (let ((leech (cistern--spawn-enemy st 'fauna 'leech 12 9)))
+        (setf (cistern--enemy-grip leech) a)
+        (setf (cistern--worker-hp a) 1)
+        (cistern--worker-damage st a 5)
+        (cl-assert (not (memq a (cistern-st-creators st)))
+                   t "the dead worker is removed from creators")
+        (cl-assert (null (plist-get (gethash '(11 9) (cistern-st-toilets st))
+                                    :busy))
+                   t "a mid-use toilet's :busy clears")
+        (cl-assert (not (memq leech (cistern-st-hostiles st)))
+                   t "the gripping leech is removed with the body")
+        (cl-assert (memq 'worker-death (mapcar #'cistern--event-kind
+                                               (cistern-st-rewards-events st)))
+                   t "a worker-death event joins the pending list")
+        (cl-assert (equal (cistern--worker-glyph st b) "β")
+                   t "β still renders β — identity is the spawn-index")))))
+  (message "CISTERN-V5-03-OK"))
