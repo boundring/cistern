@@ -671,30 +671,33 @@ existing armed-badge pattern; `u'/C-g disarm."
   (load (expand-file-name "src/cistern-view.el" cistern-test-v5--root))
   ;; FOCUS: arm -> click the enemy -> focus set, armed cleared
   (let ((st (cistern--new-game 41)))
-    (cistern--spawn-enemy st 'warband 'warband 6 5)
+    (cistern--spawn-enemy st 'warband 'warband 3 5)   ; g1
+    (cistern--spawn-enemy st 'warband 'warband 5 5)   ; g2
     (cistern--cmd-arm-verb st 'focus)
     (cl-assert (eq (cistern-st-armed-verb st) 'focus)
                t "`f' arms the FOCUS verb")
-    (cistern--cmd-click st 6 5)
+    (cistern--cmd-click st 3 5)
     (cl-assert (equal (cistern-st-focus st) "g1")
                t "the click focuses the hostile")
     (cl-assert (null (cistern-st-armed-verb st))
                t "a landed focus disarms")
-    ;; defenders prefer it: two adjacents, focus the farther one
-    (cistern--spawn-enemy st 'warband 'warband 5 5)
-    (cistern--cmd-arm-verb st 'focus)
-    (cistern--cmd-click st 6 5)
+    ;; defenders prefer the focus target among adjacents
     (let ((w (nth 0 (cistern-st-creators st))))
       (setf (cistern--worker-x w) 4) (setf (cistern--worker-y w) 5)
       (let ((tgt (cistern--combat-target st w)))
         (cl-assert (equal (cistern--enemy-id tgt) "g1")
                    t "defenders prefer the focus target")))
-    ;; guild refusal keeps the verb armed (R7 verdict style)
-    (cistern--spawn-enemy st 'guild 'fixer 7 5)
+    ;; refocusing the other hostile moves the designation
     (cistern--cmd-arm-verb st 'focus)
-    (cistern--cmd-click st 7 5)
-    (cl-assert (null (cistern-st-focus st))
-               t "the guild cannot be focused")
+    (cistern--cmd-click st 5 5)
+    (cl-assert (equal (cistern-st-focus st) "g2")
+               t "the focus follows the second click")
+    ;; guild refusal keeps the verb armed and changes nothing
+    (cistern--spawn-enemy st 'guild 'fixer 6 5)       ; g3
+    (cistern--cmd-arm-verb st 'focus)
+    (cistern--cmd-click st 6 5)
+    (cl-assert (equal (cistern-st-focus st) "g2")
+               t "a refused focus changes nothing")
     (cl-assert (eq (cistern-st-armed-verb st) 'focus)
                t "a refusal leaves the verb armed")
     ;; the badge: ARMED: FOCUS through the existing badge row

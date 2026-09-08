@@ -2055,6 +2055,21 @@ limit — it steals ticks, not health."
               ;; V5-03: SHAKEN reads NERVE −2
               (cistern--rpg-seek-eff (cistern--worker-nerve-eff w)))
           (cistern--seek-toilet st w))
+         ;; V5-06 (COMBAT §4.5): a rally journey walks first (relief
+         ;; outranks it — the base game's own priority holds); arrival
+         ;; clears the journey and the worker resumes seek-work.  A
+         ;; rally journey points at a FLOOR cell, so the kinds never
+         ;; collide with the walk targets seek-work (ore) and
+         ;; seek-toilet (toilet) set into the same slot.
+         ((and (cistern--worker-journey w)
+               (eq (cistern--cell st (car (cistern--worker-journey w))
+                                (cdr (cistern--worker-journey w)))
+                   'floor))
+          (let ((j (cistern--worker-journey w)))
+            (cistern--step-toward st w (car j) (cdr j))
+            (when (and (= (cistern--worker-x w) (car j))
+                       (= (cistern--worker-y w) (cdr j)))
+              (setf (cistern--worker-journey w) nil))))
          (t (cistern--seek-work st w))))))
 
 (defun cistern--phase-hazards (st)

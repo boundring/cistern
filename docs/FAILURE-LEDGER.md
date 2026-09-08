@@ -3353,3 +3353,34 @@ the relaunch is on their screen now.
   downstream tests with wrong-type-argument.  Fixed: destructure
   (let ((cell (car spots))) (spawn ... (car cell) (cdr cell))).
 - Outcome: V5-04 SRC LANDED, TESTS PENDING.  Suite canonical 111/111.
+
+---
+
+## L-100 (2026-09-08, run: wave1-violent-base — V5-04 tests restored, V5-05, V5-06)
+
+- V5-04 fixtures restored per the L-099 protocol (single programmatic
+  whole-file assembly, one write per fragment, check-parens after every
+  concat).  Red re-verified against 255a3b3 (4/115 void surfaces) before
+  green; suite 115 at the V5-04-tests commit.
+- Contract conflict routed (V5-06): COMBAT §4.5 pins RALLY on the letter
+  `h`, but the R2 tripwire pins hjkl UNBOUND ENTIRELY ("not as movement,
+  not as verbs") — a standing v2 pin.  Resolution: FOCUS keeps `f`
+  (spec), RALLY moves to SHIFT-`H` (adjacent letter, free key).  The
+  use-case layer stays verb-symbol-based ('focus/'rally via the existing
+  arm/click/disarm use-cases); only the driver key differs.  Rejected
+  alternatives: deleting the tripwire (kills a standing pin), rebinding
+  hjkl as verbs (same).  The README dossier (V5-19) must document `f` /
+  `H`, not the §4.5 table's `h`.  Driver-pass emacs aliases note updated
+  accordingly.
+- V5-05 ruling applied: a fixer's "dead pipe" is operationalized as the
+  GNAW-MADE HAZARD cell (the pipe's remains — §1.1: "the pipe is GONE").
+  A severed-remnant pipe cell is not restorable by a fixer: liveness is
+  derived purely from connectivity (pipe-live-p is flood-based and does
+  not even check the cell kind), so the only repair that can make a cell
+  live again is re-laying the broken link — hazard → pipe, exactly what
+  the player's re-lay does, at the guild's 1-alloy fee.  pipe-live-p's
+  kind-agnostic flood is pre-existing v4 behavior, left untouched.
+- Outcome: V5-04 tests GREEN, V5-05 GREEN, V5-06 GREEN.  Suite
+  canonical 118.  Wave 1 complete: V5-01..V5-07 minus V5-07 (glyphs/
+  faces/copy sweep) which remains for the next turn per the owner's
+  pacing directive.

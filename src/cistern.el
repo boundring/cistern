@@ -78,6 +78,12 @@ pure render.  Every state-mutating command ends here."
     (define-key m "d" #'cistern-demolish)
     (define-key m "c" #'cistern-decon)
     (define-key m "x" #'cistern-purge)
+    ;; V5-06 (COMBAT §4.5): the violent base's designations — arm,
+    ;; badge composes, click resolves (no twitch, no stances)
+    (define-key m "f" #'cistern-focus)
+    ;; RALLY rides SHIFT-H: COMBAT §4.5 pins the letter h, but the R2
+    ;; tripwire keeps hjkl unbound entirely (a standing pin wins; L-100)
+    (define-key m "H" #'cistern-rally)
     ;; V4-11 (RPG §2): T cycles the armed fixture type — the
     ;; tutorial skip moves to the power layer (C-t)
     (define-key m "T" #'cistern-cycle-toilet-type)
@@ -422,6 +428,18 @@ no arm-then-fail noise."
   (interactive) (cistern--arm-and-build 'pipe))
 (defun cistern-build-tank ()
   (interactive) (cistern--arm-and-build 'tank))
+
+(defun cistern-focus ()
+  (interactive)
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
+  (cistern--cmd-arm-verb cistern--st 'focus)
+  (cistern--refresh))
+
+(defun cistern-rally ()
+  (interactive)
+  (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
+  (cistern--cmd-arm-verb cistern--st 'rally)
+  (cistern--refresh))
 
 (defun cistern-demolish ()
   (interactive)

@@ -1053,13 +1053,42 @@ place via `cistern--cmd-build' legality at (X,Y); on success clear
 the armed verb and advance exactly one tick; on refusal the state
 is untouched.  The keymap half that arms verbs is Phase 3."
   (let ((verb (cistern-st-armed-verb st)))
-    (if (not (memq verb '(toilet pipe tank)))
+    (cond
+     ;; V5-06 (COMBAT §4.5): the violent base's designations ride the
+     ;; same armed-verb pattern — arm -> badge -> click.  No tick: the
+     ;; player shapes WHERE, the sim does the walking; a refusal keeps
+     ;; the verb armed (R7 verdict style).
+     ((eq verb 'focus)
+      (when (cistern--cmd-focus st x y)
+        (setf (cistern-st-armed-verb st) nil)))
+     ((eq verb 'rally)
+      (when (cistern--cmd-rally st x y)
+        (setf (cistern-st-armed-verb st) nil)))
+     ((not (memq verb '(toilet pipe tank)))
         (setf (cistern-st-cursor st) (cons x y))
+      )
+     (t
       (cistern--cmd-build st verb x y)
       ;; placed ⇔ cmd-build turned the floor cell into the verb kind
       (when (eq (cistern--cell st x y) verb)
         (setf (cistern-st-armed-verb st) nil)
-        (cistern--do-tick st)))))
+        (cistern--do-tick st))))))
+
+(defun cistern--cmd-rally (st x y)
+  "V5-06 (COMBAT §4.5): RALLY to a floor cell — every non-seated
+worker's `journey' is set there; seated/using workers are exempt.
+The walk happens in the creators phase; arrival clears the journey
+and the worker resumes seek-work.  No roll.  Returns t when the
+rally lands, nil (with the standard floor refusal hint) otherwise."
+  (if (not (eq (cistern--cell st x y) 'floor))
+      (progn
+        (setf (cistern-st-hint st)
+              (cdr (assq 'refusal-no-floor cistern--copy)))
+        nil)
+    (dolist (w (cistern-st-creators st))
+      (unless (cistern--worker-using w)
+        (setf (cistern--worker-journey w) (cons x y))))
+    t))
 
 (defun cistern--cmd-arm-verb (st verb)
   "Arm the build VERB in state (R1 keymap half; L-010 pin 4 — the
