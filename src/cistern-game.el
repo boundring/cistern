@@ -1293,7 +1293,10 @@ set the persona flag with no text and no draw (ttl 1 tick)."
                                      (cons ex ey))
                             1)
                     (deliver (cistern--worker-glyph st w)
-                             'worker 'loss))))))))
+                             'worker 'loss)))))
+             ((eq kind 'idle-proximity)
+              ;; row 11: the fond-proximity thought (private channel)
+              (deliver (nth 2 ev) 'worker 'fond-proximity)))))
         ;; row 3: bladder >= 110, self, CRITICAL gate
         (dolist (w (cistern-st-creators st))
           (let ((id (cistern--worker-glyph st w)))

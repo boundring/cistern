@@ -968,6 +968,7 @@ the caller's business (SC11 does)."
        "  '(:kind thought :version \"1\" :generator \"v5 fixture\"\n"
        "    :copy ((v5t-ff . \"THE WATER IS AT MY DOOR\")\n"
        "           (v5t-nf . \"THE WALL IS WEEPING AGAIN\")\n"
+       "           (v5t-fp . \"CLOSE QUARTERS — FILED WITHOUT COMMENT\")\n"
        "           (v5t-fs . \"SERVICE LOGGED — NEXT\")\n"
        "           (v5t-ts . \"I AM NOTED AS FULL\")\n"
        "           (v5t-tp . \"DRAINED AND FILED\")\n"
@@ -975,6 +976,7 @@ the caller's business (SC11 does)."
        "           (v5t-gm . \"A COLLEAGUE FILED OUT\"))\n"
        "    :entries\n"
        "    ((:id th-ff :class fixture-flood :species fixture :when any :copy-key v5t-ff)\n"
+       "     (:id th-fp :class fond-proximity :species worker :when any :copy-key v5t-fp)\n"
        "     (:id th-nf :class nerve-flood :species worker :when any :copy-key v5t-nf)\n"
        "     (:id th-fs :class fixture-served :species fixture :when any :copy-key v5t-fs)\n"
        "     (:id th-ts :class tank-strain :species tank :when CRITICAL :copy-key v5t-ts)\n"
@@ -1736,6 +1738,31 @@ log-tail and the L browser already render."
         (cl-assert (eq (nth 1 hit) 'comedy)
                    t "L-108: the comedy line carries its face"))))
   (message "CISTERN-V5-LOG-DELIVERY-OK"))
+
+;; --- V5 last round: SOCIAL trigger rows 9/11 (L-108 #3) -------------------------
+
+(defun cistern-test-v5-19-idle-proximity ()
+  "V5 last round (L-108 #3, row 11): sustained adjacency within
+Chebyshev 1 for the pinned N ticks fires the worker endpoint's
+fond-proximity thought (NOMINAL gate) via the trigger table; the
+proximity accrual itself runs — the delta let closed before its
+use, so the accrual had never run live (L-109)."
+  (cistern-test-v5--load-social-banks)
+  (let* ((st (cistern--new-game 20260830))
+         (alpha (cistern--worker-glyph st (nth 0 (cistern-st-creators st)))))
+    (cistern--romance-file st alpha (list :toilet 3 3))
+    (let ((w (cl-find alpha (cistern-st-creators st)
+                      :key (lambda (w) (cistern--worker-glyph st w))
+                      :test #'equal)))
+      (setf (cistern--worker-x w) 3)
+      (setf (cistern--worker-y w) 4)
+      (dotimes (_ cistern--social-idle-proximity-ticks)
+        (cistern--social-eval st))
+      (let ((led (plist-get (gethash alpha (cistern-st-personas st))
+                            :ledger)))
+        (cl-assert (cl-some (lambda (e) (eq (nth 2 e) 'v5t-fp)) led)
+                   t "row 11: the fond-proximity thought filed"))))
+  (message "CISTERN-V5-19-IDLE-PROXIMITY-OK"))
 
 ;; --- W3-2 fixtures: V5-17 comedy hooks, V5-18 determinism close-out -------------
 

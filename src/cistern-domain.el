@@ -674,7 +674,12 @@ attachment is refused WITHOUT a draw (§2.5)."
 with both endpoints on the map within Chebyshev 2, +2 for shared
 located events this tick (both within 3), gates resolving on
 crossings only.  Iterates the relationships hash — pairs exist
-once filed; no scan over non-proximate pairs (§2.5)."
+once filed; no scan over non-proximate pairs (§2.5).  Also row 11
+(SOCIAL §1.4): sustained adjacency within Chebyshev 1 for
+`cistern--social-idle-proximity-ticks' fires the worker
+endpoints' fond-proximity thought via the trigger table.  L-109:
+the delta let closed before its use — the accrual had never run
+live (any filed pair with both endpoints positioned crashed)."
   (let ((pairs nil))
     (maphash (lambda (k v) (push (cons k v) pairs))
              (cistern-st-relationships st))
@@ -698,10 +703,33 @@ once filed; no scan over non-proximate pairs (§2.5)."
                                (<= (max (abs (- (car pb) ex))
                                         (abs (- (cdr pb) ey)))
                                    3))
-                      (setq delta (+ delta 2))))))))
-          (when (> delta 0)
-            (cistern--romance-progress st (car key) (cdr key)
-                                       delta)))))))
+                      (setq delta (+ delta 2)))))))
+            (when (> delta 0)
+              (cistern--romance-progress st (car key) (cdr key)
+                                         delta))
+            ;; row 11: the idle-proximity window — resets when the
+            ;; pair separates or the window elapses (no idle chatter)
+            (if (not (<= (max (abs (- (car pa) (car pb)))
+                              (abs (- (cdr pa) (cdr pb))))
+                         1))
+                (plist-put rel :near-ticks 0)
+              (let ((nt (1+ (or (plist-get rel :near-ticks) 0))))
+                (if (< nt cistern--social-idle-proximity-ticks)
+                    (plist-put rel :near-ticks nt)
+                  (plist-put rel :near-ticks 0)
+                  (dolist (wid (list (car key) (cdr key)))
+                    (when (and (stringp wid)
+                               (not (string-match-p "\\`g[0-9]+\\'" wid))
+                               (gethash wid (cistern-st-personas st))
+                               (eq (cistern--social-mood st wid)
+                                   'NOMINAL))
+                      (push (list 'idle-proximity 'near wid)
+                            (cistern-st-rewards-events st)))))))))))))
+
+(defconst cistern--social-idle-proximity-ticks 5
+  "SOCIAL §1.4 row 11: sustained adjacency (Chebyshev 1) ticks
+before the fond-proximity thought fires.  The doc names no N; 5
+pinned — reads as idling nearby, not passing through.")
 
 (defun cistern--social-quirk-copy-key (id)
   "V5-12: the copy-key of quirk entry ID from the loaded quirk
