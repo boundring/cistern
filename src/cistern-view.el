@@ -216,7 +216,8 @@ greys)."
 (defconst cistern-view--palette-faces
   '((success . cistern-toilet) (warning . cistern-tank-high)
     (error . cistern-toilet-down) (info . cistern-dim)
-    (bonus . cistern-tank-ok))
+    (bonus . cistern-tank-ok)
+    (comedy . cistern-comedy))
   "REWARDS-DESIGN palette enums → Emacs faces (plan 02 §3.2).
 Exact colors are Phase 4b; unknown faces pass through so
 hand-built test intents can use Emacs faces directly.")

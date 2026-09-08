@@ -1699,6 +1699,44 @@ face renders; copy widths hold."
                      t "C10: the comedy face exists")))))
   (message "CISTERN-V5-16-OK"))
 
+;; --- V5 last round: LOG-AT-SOURCE delivery (L-108 #1/#2) ------------------------
+
+(defun cistern-test-v5-log-delivery ()
+  "V5 last round (L-108 #1/#2): LOG-AT-SOURCE delivery — do-tick
+appends comedy intents to the stored slot (they were computed then
+dropped) and every :layer 'log intent lands in the domain log ring
+as a faced (LINE SEVERITY TICK) entry, the Q13 shape the faced
+log-tail and the L browser already render."
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (setf (cistern-st-auto-run st) nil)
+    (setf (cistern-st-tick st) 199)
+    (plist-put (cistern-st-comedy st) :last-beat-tick 50)
+    (plist-put (cistern-st-comedy st) :anchors nil)
+    ;; force a THREAD beat: comedy-thread delivers its next line as a
+    ;; (:layer 'log :face 'comedy) intent on the next calm tick — no
+    ;; selection/bank dependence
+    (plist-put (cistern-st-comedy st)
+               :active (list :lines '("THE QUEUE IS THE PROCEDURE")
+                             :remaining 1))
+    (cistern--do-tick st)
+    ;; L-108 #1: the beat's intents ride the stored slot
+    (let ((ci (cl-find-if (lambda (i) (eq (plist-get i :face) 'comedy))
+                          (cdr (cistern-st-rewards-outcome st)))))
+      (cl-assert ci t "L-108: the comedy thread delivered through do-tick")
+      (cl-assert (eq (plist-get ci :layer) 'log)
+                 t "L-108: the beat line is a log intent")
+      ;; L-108 #2: the log ring carries the faced line
+      (let ((hit (cl-find-if (lambda (e)
+                               (equal (car e) (plist-get ci :text)))
+                             (cistern-st-log st))))
+        (cl-assert hit t "L-108: the comedy line landed in the log ring")
+        (cl-assert (eq (nth 1 hit) 'comedy)
+                   t "L-108: the comedy line carries its face"))))
+  (message "CISTERN-V5-LOG-DELIVERY-OK"))
+
 ;; --- W3-2 fixtures: V5-17 comedy hooks, V5-18 determinism close-out -------------
 
 (defun cistern-test-v5-17-hooks ()

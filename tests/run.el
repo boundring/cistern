@@ -156,6 +156,7 @@
     cistern-test-v5-15-selection
     cistern-test-v5-16-delivery
     cistern-test-v5-17-hooks
+    cistern-test-v5-log-delivery
     cistern-test-v5-18-determinism))
 
 (defun cistern-run-all-tests ()

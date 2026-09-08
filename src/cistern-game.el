@@ -716,7 +716,21 @@ call exists at the use-case layer."
               (cons (car (cistern-st-rewards-outcome st))
                     (append (cdr (cistern-st-rewards-outcome st))
                             (cdr story-out)
-                            (cdr dlg-out))))))))
+                            ;; L-108 #1: comedy-out was bound then
+                            ;; dropped — its intents ride the merge
+                            ;; (comedy-eval returns the plain intent
+                            ;; list, no (head . intents) 2-list)
+                            comedy-out
+                            (cdr dlg-out))))
+        ;; L-108 #2 (LOG-AT-SOURCE): every :layer 'log intent lands
+        ;; in the domain log ring as a Q13 (LINE SEVERITY TICK)
+        ;; entry — story verdicts, dialogue lines and comedy beats
+        ;; become reviewable history (the L browser renders them);
+        ;; banner/popup intents keep their own layers
+        (dolist (intent (cdr (cistern-st-rewards-outcome st)))
+          (when (eq (plist-get intent :layer) 'log)
+            (cistern--log-sev st (plist-get intent :face) "%s"
+                              (plist-get intent :text))))))))
 
 (defconst cistern--rewards-default-outcome
   '(:score 0 :objectives nil :unlocks nil :celebrate nil)
