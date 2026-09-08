@@ -10,7 +10,7 @@
 
 (defconst cistern-w 34 "Sector width.")
 (defconst cistern-h 16 "Sector height.")
-(defconst cistern-version "3.0.0-dev"
+(defconst cistern-version "5.0.0-dev"
   "CISTERN version.  Lives in the domain constants block so both
 the view header and the driver help read it inward.")
 (defconst cistern-tank-cap 60 "Tank capacity in waste units.")
