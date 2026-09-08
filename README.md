@@ -77,3 +77,85 @@ migrant cycle pays the whole crew 1. At 12 XP a worker reaches
 CLEARANCE II; at 30, CLEARANCE III. Clearance crosses in the log.
 A fixture suits a worker when it plays to their dominant stat; from
 CLEARANCE II no worker is ever unsuited again.
+
+## §5 REQUISITIONS — THE FIXTURE CATALOG
+
+Five fixture types, one catalog. Press `T` to cycle the armed type —
+the header badge names it — then `t` builds the armed type at the
+cursor.
+
+| Type | Cost | Use | Suit | Placement |
+|------|------|-----|------|-----------|
+| long-drop | 10 | 2 ticks, 10 load | GRIT · FLOW | anywhere |
+| fall-shaft | 8 | 2 ticks, 8 load | FLOW · GRIT | not beside another toilet |
+| high-cistern | 14 | 1 tick, 10 load | ARCHIVE · NERVE | against a wall |
+| archive-stall | 12 | 3 ticks, 12 load | NERVE · ARCHIVE | against a wall |
+| hermetic-booth | 20 | 2 ticks, 10 load | NERVE · GRIT | anywhere |
+
+Requisitions may be declined with a named reason. The inspector
+reports a fixture's type and state.
+
+## §6 TERRAIN AND WILDLIFE
+
+The sector grows its own obstacles:
+
+- **Rubble ▚** — impassable debris. `d` clears it to floor for
+  2 alloy.
+- **Flood ░** — water, not waste. A breach can flood its neighbors;
+  flood never counts toward the contamination limit — it steals
+  ticks, not health. `c` dries a wet cell (3 alloy, the decon price).
+- **Manifold ╬** — a free pipe anchor. Pipe wired to a manifold is
+  live without any tank: unlimited headroom, no purge income. A
+  manifold anchor is never severed.
+- **Cache ?** — walk a worker over it and the sector banks +3 alloy.
+  One pickup, then floor.
+- **Event !** — a story marker stamped on open floor. Passable. It
+  stands three ticks, then it is gone.
+
+The wildlife is catalogued as follows:
+
+- **Rats** — gather where pipe has gone dead. Prevention is cheaper
+  than removal.
+- **Clog-crabs** — occupy fixtures. Any hit drives one off.
+- **Vent-leeches** — attach to workers and must be cut off by hand.
+- **Sponge masses** — fauna. Their feeding is logged as natural.
+- **Warband goblins** — the inheritors. They claim the Structure is
+  theirs. See §7.
+- **Guild goblins** — the Guild of the Open Flange: chartered
+  engineers who restore dead pipe for a fixed fee. They are never
+  valid targets. [chartered engineers out-rank everyone; this is in
+  the charter, which they wrote]
+- **Fixtures, tanks, structures** — these keep personnel files too:
+  quirks, moods, private thoughts. Worker-toilet romances occur and
+  are filed as maintenance line-items.
+
+## §7 THE WARBAND SITUATION
+
+Raids happen. The inheritors arrive in the act II and act III windows
+and hold the main for roughly forty ticks; their objectives are
+gnawing pipe, drawing down tanks, and harassment. Ignored plumbing
+breeds its own fauna regardless.
+
+Two responses are authorized. `f` arms a FOCUS designation — click a
+hostile and the crew's auto-defense targets it first. `H` arms RALLY
+— click a floor cell and every working crew member walks there;
+seated workers are exempt. The crew defends itself otherwise.
+Guild personnel are never valid targets, on standing they will not
+explain twice.
+
+## §8 SECTOR RECORDS
+
+The sector keeps a record. At the first rendered tick a premise
+banner runs across the banner row — what this run is about. The story
+moves in three acts: Act I ticks 0–119, Act II 120–239, Act III from
+240 on. Scenario hooks open inside their act windows and resolve in
+the log: the requirement HELD or BREACHED. A hook still open at an act
+rollover force-misses — the clock does not wait. Some premises amend
+the goal card.
+
+Cumulative relieves unlock milestone notices: BIG CISTERN at 5,
+FAST FLUSH at 15, SELF-CLEAN at 30, AIR FRESHENER at 50, GOLDEN PIPE
+at 100. Reputation moves +1 per relief, −5 per burst, −2 per leak,
+clamped 0–100; goal cards bend with your tier.
+
+THE SECTOR OCCASIONALLY FILES WHIMSEY REPORTS. READ THEM OR DO NOT.
