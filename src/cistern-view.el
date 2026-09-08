@@ -302,8 +302,13 @@ variants only — base glyphs never leave the table."
         ;; dead glyph — it is no longer the floor dot
         (cons (cistern--tile-dead-glyph kind) 'cistern-pipe-dead)))
      ((eq kind 'toilet)
-      (cons glyph (cdr (assq (cistern--toilet-state st x y)
-                             cistern-view--toilet-faces))))
+      ;; V5-10 (SOCIAL §1.5): a fixture's silent urge blinks the busy
+      ;; countdown — a render toggle derived from :urge, state-free
+      (if (and (eq (cistern--toilet-state st x y) 'busy)
+               (cistern--social-urge-p st (list :toilet x y)))
+          (cons glyph 'cistern-event)
+        (cons glyph (cdr (assq (cistern--toilet-state st x y)
+                               cistern-view--toilet-faces)))))
      ((eq kind 'tank)
       (let ((load (cistern--tank-load st x y)))
         (cons glyph

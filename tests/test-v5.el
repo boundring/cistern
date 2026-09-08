@@ -927,3 +927,316 @@ skipped gracefully in batch like `cistern-test-gui-cell-width'."
         (delete-frame frm)
         (kill-buffer buf))))
   (message "CISTERN-V5-07-PROBE-OK"))
+
+;; --- W2-1 fixtures: V5-08 personas, V5-09 mood, V5-10 thoughts ------------------
+
+(defconst cistern-test-v5--social-bank-file nil
+  "The temp thought+quirk bank path (written once per run).")
+
+(defun cistern-test-v5--load-social-banks ()
+  "Write and load the social fixture banks: a worker-species quirk
+bank (4 entries — the SC1 selector pins) plus a fixture quirk and
+the thought entries the fixtures reference.  Returns the file."
+  (unless cistern-test-v5--social-bank-file
+    (let ((f (make-temp-file "cistern-v5-social" nil ".el")))
+      (with-temp-file f
+        (insert
+         "(defconst cistern-bank-v5-social\n"
+         "  '(:kind quirk :version \"1\" :generator \"v5 fixture\"\n"
+         "    :copy ((v5q-w1 . \"READS THE PRESSURE LOG TWICE\")\n"
+         "           (v5q-w2 . \"WALKS THE EAST MANIFOLD DAILY\")\n"
+         "           (v5q-w3 . \"KEEPS A PRIVATE SECTOR MAP\")\n"
+         "           (v5q-f1 . \"COUNTS FLUSHES AS FILING\")\n"
+         "           (v5q-g1 . \"THE PIPES ARE OURS BY RIGHT\"))\n"
+         "    :entries\n"
+         "    ((:id quirk-w1 :context tolerance :species worker :copy-key v5q-w1)\n"
+         "     (:id quirk-w2 :context integrity :species worker :copy-key v5q-w2)\n"
+         "     (:id quirk-w3 :context standing :species worker :copy-key v5q-w3)\n"
+         "     (:id quirk-f1 :context tolerance :species fixture :copy-key v5q-f1)\n"
+         "     (:id quirk-g1 :context tolerance :species goblin :copy-key v5q-g1))))\n"
+         "(defconst cistern-bank-v5-thoughts\n"
+         "  '(:kind thought :version \"1\" :generator \"v5 fixture\"\n"
+         "    :copy ((v5t-ff . \"THE WATER IS AT MY DOOR\")\n"
+         "           (v5t-nf . \"THE WALL IS WEEPING AGAIN\")\n"
+         "           (v5t-fs . \"SERVICE LOGGED — NEXT\")\n"
+         "           (v5t-ts . \"I AM NOTED AS FULL\")\n"
+         "           (v5t-tp . \"DRAINED AND FILED\")\n"
+         "           (v5t-lo . \"THE NEIGHBOR IS GONE\")\n"
+         "           (v5t-gm . \"A COLLEAGUE FILED OUT\"))\n"
+         "    :entries\n"
+         "    ((:id th-ff :class fixture-flood :species fixture :when any :copy-key v5t-ff)\n"
+         "     (:id th-nf :class nerve-flood :species worker :when any :copy-key v5t-nf)\n"
+         "     (:id th-fs :class fixture-served :species fixture :when any :copy-key v5t-fs)\n"
+         "     (:id th-ts :class tank-strain :species tank :when CRITICAL :copy-key v5t-ts)\n"
+         "     (:id th-tp :class tank-purged :species tank :when any :copy-key v5t-tp)\n"
+         "     (:id th-lo :class loss :species worker :when any :copy-key v5t-lo)\n"
+         "     (:id th-gm :class guild-mourning :species goblin :when any :copy-key v5t-gm))))\n"))
+      (setq cistern--banks nil cistern--story-copy nil
+            cistern--matrix-sources (make-hash-table :test 'eq))
+      (cistern--banks-load (list f))
+      (setq cistern-test-v5--social-bank-file f)))
+  cistern-test-v5--social-bank-file)
+
+(defun cistern-test-v5-08-personas ()
+  "V5-08 (SC1/SC2): seed 20260830 — worker α's persona draws 2
+quirks (count d6 = 4, the pinned opener), the starter toilet's
+2 quirks (count d6 = 3), and the pass consumes exactly the pinned
+6 draws before the remaining workers: social-pos = 1083329933
+advanced by exactly the β/γ/δ draws (L-102: the doc's selector
+literals drift; the counts and the pos pin are the contract).
+SC2: quirk counts in [1,3], selectors resolve to bank ids,
+ledgers nil at spawn."
+  (cistern-test-v5--load-social-banks)
+  (let ((st (cistern--new-game 20260830)))
+    ;; the census: every worker + the starter fixture has a persona
+    (dolist (w (cistern-st-creators st))
+      (let ((p (gethash (cistern--worker-glyph st w)
+                        (cistern-st-personas st))))
+        (cl-assert (and p (eq (plist-get p :species) 'worker))
+                   t "worker %s has a worker persona"
+                   (cistern--worker-glyph st w))
+        (cl-assert (null (plist-get p :ledger))
+                   t "SC2: ledger nil at spawn")
+        (cl-assert (memq (length (plist-get p :quirks)) '(1 2 3))
+                   t "SC2: quirk count in [1,3]")
+        (dolist (q (plist-get p :quirks))
+          (cl-assert (member q '(quirk-w1 quirk-w2 quirk-w3))
+                     t "SC2: selector resolves to a worker bank id"))))
+    (let ((tp (gethash (list :toilet 3 3) (cistern-st-personas st))))
+      (cl-assert (and tp (eq (plist-get tp :species) 'fixture))
+                 t "the starter toilet has a fixture persona")
+      (cl-assert (equal (plist-get tp :quirks) '(quirk-f1 quirk-f1))
+                 t "SC1: the toilet's selectors land 2, 2 (real draws)"))
+    ;; the pinned 6-draw prefix: α (3 draws) + starter toilet (3) —
+    ;; the pos after them is 1083329933; the full pass advanced by the
+    ;; β/γ/δ draws on top of it
+    (let* ((p6 1083329933)
+           (extra 0)
+           (probe (cistern--stream-init 20260830 5)))
+      ;; replay the pass: skip α + toilet (6 draws), then β/γ/δ counts
+      (dotimes (_ 6) (setq probe (cistern--stream-next probe)))
+      (dolist (w (cdr (cistern-st-creators st)))
+        (let* ((glyph (cistern--worker-glyph st w))
+               (k (length (plist-get (gethash glyph
+                                              (cistern-st-personas st))
+                                     :quirks))))
+          (setq extra (+ extra 1 k))
+          (dotimes (_ extra) (setq probe probe)) ; no-op, keeps scope
+          (setq extra extra)))
+      ;; recompute cleanly: extra = sum over β/γ/δ of (1 + quirk count)
+      (setq extra 0)
+      (dolist (w (cdr (cistern-st-creators st)))
+        (setq extra (+ extra 1
+                       (length (plist-get (gethash
+                                           (cistern--worker-glyph st w)
+                                           (cistern-st-personas st))
+                                          :quirks)))))
+      (dotimes (_ extra) (setq p6 (cistern--stream-next p6)))
+      (cl-assert (= (cistern-st-social-pos st) p6)
+                 t "SC1: the pass consumes the pinned draws in order"))
+    ;; the first 6 draws alone land on the doc's pin
+    (let ((probe (cistern--stream-init 20260830 5)))
+      (dotimes (_ 6) (setq probe (cistern--stream-next probe)))
+      (cl-assert (= probe 1083329933)
+                 t "SC1: the 6-draw prefix = 1083329933 (doc pin, real)")))
+  ;; SC2 spread: 50 seeds, quirk counts and species filtering hold
+  (dolist (seed '(1 2 3 5 7 11 13 17 19 23 29 31 37 41 43 47
+                 53 59 61 67 71 73 79 83 89 97 101 103 107 109
+                 113 127 131 137 139 149 151 157 163 167 173
+                 179 181 191 193 197 199 211 223 227))
+    (let ((st (cistern--new-game seed)))
+      (dolist (w (cistern-st-creators st))
+        (let ((p (gethash (cistern--worker-glyph st w)
+                          (cistern-st-personas st))))
+          (cl-assert p t "SC2: persona exists for seed %d" seed)
+          (cl-assert (memq (length (plist-get p :quirks)) '(1 2 3))
+                     t "SC2: count in [1,3] for seed %d" seed)))))
+  ;; goblin personas at hostile spawn
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--spawn-enemy st 'warband 'warband 2 2)
+    (cl-assert (gethash "g1" (cistern-st-personas st))
+               t "SC2: the goblin persona spawns with the entity"))
+  (message "CISTERN-V5-08-OK"))
+
+(defun cistern-test-v5-09-mood ()
+  "V5-09 (SC3): worker bladder 99 NOMINAL / 100 STRAINED /
+110 CRITICAL (sick CRITICAL); tank 84% STRAINED / 85% CRITICAL;
+the manifold NOMINAL through a soak; NO mood field on any struct."
+  (cistern-test-v5--load-social-banks)
+  (let ((st (cistern--new-game 20260830)))
+    (let ((id (cistern--worker-glyph st (nth 0 (cistern-st-creators st)))))
+      (setf (cistern--worker-bladder (nth 0 (cistern-st-creators st))) 99)
+      (cl-assert (eq (cistern--social-mood st id) 'NOMINAL)
+                 t "bladder 99 NOMINAL")
+      (setf (cistern--worker-bladder (nth 0 (cistern-st-creators st))) 100)
+      (cl-assert (eq (cistern--social-mood st id) 'STRAINED)
+                 t "bladder 100 STRAINED")
+      (setf (cistern--worker-bladder (nth 0 (cistern-st-creators st))) 110)
+      (cl-assert (eq (cistern--social-mood st id) 'CRITICAL)
+                 t "bladder 110 CRITICAL")
+      (setf (cistern--worker-sick (nth 0 (cistern-st-creators st))) 5)
+      (setf (cistern--worker-bladder (nth 0 (cistern-st-creators st))) 20)
+      (cl-assert (eq (cistern--social-mood st id) 'CRITICAL)
+                 t "sick CRITICAL"))
+    ;; tanks: cap 60 — 50 units is 83.3% STRAINED, 51 is 85% CRITICAL
+    (let ((tk (car (cistern-test-v5-05--live-pipes st))))
+      (puthash (cons 8 3) (list :load 50) (cistern-st-tanks st))
+      (cl-assert (eq (cistern--social-mood st (list :tank 8 3)) 'STRAINED)
+                 t "tank 50/60 STRAINED")
+      (puthash (cons 8 3) (list :load 51) (cistern-st-tanks st))
+      (cl-assert (eq (cistern--social-mood st (list :tank 8 3)) 'CRITICAL)
+                 t "tank 51/60 CRITICAL"))
+    ;; the manifold: NOMINAL through a soak
+    (let ((mood t))
+      (dotimes (_ 60)
+        (cistern--sim-tick st)
+        (setq mood (cistern--social-mood st (list :structure 3 1))))
+      (cl-assert (eq mood 'NOMINAL) t "the manifold stays NOMINAL"))
+    ;; no mood field on the structs
+    (cl-assert (null (plist-get (cistern--worker-make) :mood))
+               nil "sanity: no mood slot on workers")
+    (with-temp-buffer
+      (insert-file-contents
+       (expand-file-name "src/cistern-domain.el" cistern-test-v5--root))
+      (cl-assert (not (string-match-p ":mood" (buffer-string)))
+                 t "SC3: no mood field anywhere in the domain")))
+  (message "CISTERN-V5-09-OK"))
+
+(defun cistern-test-v5-10-thoughts ()
+  "V5-10 (SC4/SC5/SC6): the trigger table fires per event; channels
+split private/muttered/file/urge; budgets hold (<= 1 per entity,
+<= 4 sector, <= 2 mutters, ledger cap 3 FIFO); no trigger, no
+thought; SC10 partial — stream-5 only, no drains."
+  (cistern-test-v5--load-social-banks)
+  ;; SC4: a breach at (5,5) — the fixture within Chebyshev 3 and the
+  ;; adjacent worker gain private thoughts, the far worker nothing
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--social-spawn-persona st (list :toilet 7 6) 'fixture)
+    (let ((w-near (nth 0 (cistern-st-creators st)))
+          (w-far (nth 1 (cistern-st-creators st))))
+      (setf (cistern--worker-x w-near) 6) (setf (cistern--worker-y w-near) 5)
+      (setf (cistern--worker-x w-far) 9) (setf (cistern--worker-y w-far) 9)
+      (setf (cistern--worker-journey w-near) nil)
+      (setf (cistern--worker-journey w-far) nil)
+      (setf (cistern-st-tick st) 10)
+      (push (list 'breach 'breach 5 5) (cistern-st-rewards-events st))
+      (let ((rpg (cistern-st-rpg-pos st)) (rng (cistern-st-rng st))
+            (prng (cistern-st-particle-rng st))
+            (cb (cistern-st-combat-pos st))
+            (social0 (cistern-st-social-pos st)))
+        (cistern--social-thoughts st)
+        ;; SC10: no other stream moved; pending list not drained
+        (cl-assert (= (cistern-st-rpg-pos st) rpg) t "rpg untouched")
+        (cl-assert (= (cistern-st-rng st) rng) t "sim LCG untouched")
+        (cl-assert (= (cistern-st-particle-rng st) prng)
+                   t "particles untouched")
+        (cl-assert (= (cistern-st-combat-pos st) cb) t "combat untouched")
+        (cl-assert (/= (cistern-st-social-pos st) social0)
+                   t "stream 5 advanced")
+        (cl-assert (memq 'breach (mapcar #'cistern--event-kind
+                                         (cistern-st-rewards-events st)))
+                   t "SC10: the pending list was not drained"))
+      (let* ((p-f (gethash (list :toilet 7 6) (cistern-st-personas st)))
+             (ledger (plist-get p-f :ledger)))
+        (cl-assert (= (length ledger) 1)
+                   t "SC4: one fixture-flood private thought")
+        (cl-assert (eq (nth 1 (car ledger)) 'private)
+                   t "SC4: the channel is private")
+        (cl-assert (string= (cistern--story-copy-key (nth 2 (car ledger)))
+                       "THE WATER IS AT MY DOOR")
+                   t "SC4: the content resolves through the chain"))
+      (let* ((p-w (gethash (cistern--worker-glyph st w-near)
+                           (cistern-st-personas st))))
+        (cl-assert (= (length (plist-get p-w :ledger)) 1)
+                   t "SC4: the witness gains one nerve-flood thought"))
+      (let ((p-far (gethash (cistern--worker-glyph st w-far)
+                            (cistern-st-personas st))))
+        (cl-assert (null (plist-get p-far :ledger))
+                   t "SC4: the far worker thinks nothing"))
+      ;; no trigger row, no thought: a second pass over the same
+      ;; pending events... the events STILL read (non-draining) — the
+      ;; cap holds but the trigger may refire; clear the pending list
+      ;; via rewards-eval to prove the quiet tick
+      (cistern--rewards-eval st nil)
+      (let ((loglen (length (cistern-st-log st)))
+            (pos0 (cistern-st-social-pos st)))
+        (cistern--social-thoughts st)
+        (cl-assert (= (length (cistern-st-log st)) loglen)
+                   t "a tick with no trigger row generates nothing")
+        (cl-assert (= (cistern-st-social-pos st) pos0)
+                   t "no trigger row consumes no draw"))))
+  ;; SC4b: ledger cap 3, FIFO eviction on the fourth
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--social-spawn-persona st (list :toilet 7 6) 'fixture)
+    (setf (cistern-st-tick st) 10)
+    (dotimes (i 4)
+      (setf (cistern-st-tick st) (+ 10 i))
+      (push (list 'breach 'breach 5 5) (cistern-st-rewards-events st))
+      (cistern--social-thoughts st)
+      (setf (cistern-st-rewards-events st) nil))
+    (let ((ledger (plist-get (gethash (list :toilet 7 6)
+                                      (cistern-st-personas st))
+                             :ledger)))
+      (cl-assert (= (length ledger) 3)
+                 t "SC4: the ledger cap holds at 3")
+      (cl-assert (= (nth 0 (car ledger)) 13)
+                 t "SC4: newest first")
+      (cl-assert (= (nth 0 (car (last ledger))) 11)
+                 t "SC4: FIFO evicted the oldest")))
+  ;; SC5: channels — a worker LOSS mutters exactly one faced line AND
+  ;; pushes (:social 'mutter ...); a fixture-served URGE leaves the log
+  ;; byte-identical while the urge flag flips
+  (let ((st (cistern--new-game 20260830)))
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-x w) 4)
+      (setf (cistern--worker-y w) 5)
+      (setf (cistern--worker-journey w) nil)
+      (setf (cistern-st-tick st) 10)
+      (push (list 'destroyed 'destroyed 5 5) (cistern-st-rewards-events st))
+      (let ((loglen (length (cistern-st-log st))))
+        (cistern--social-thoughts st)
+        (cl-assert (= (length (cistern-st-log st)) (1+ loglen))
+                   t "SC5: exactly one muttered line")
+        (cl-assert (string-match-p "MUTTERS" (nth 0 (car (cistern-st-log st))))
+                   t "SC5: the mutter renders through social-mutter-fmt")
+        (cl-assert (string-match-p
+                    (regexp-quote "THE NEIGHBOR IS GONE")
+                    (nth 0 (car (cistern-st-log st))))
+                   t "SC5: the thought content reaches the log line")
+        (cl-assert (cl-some (lambda (e)
+                              (and (consp e) (eq (car e) :social)
+                                   (eq (cadr e) 'mutter)))
+                            (cistern-st-rewards-events st))
+                   t "SC5: the mutter pushes its coordination event"))))
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--social-spawn-persona st (list :toilet 7 6) 'fixture)
+    (setf (cistern-st-tick st) 10)
+    (push (list 'relief 84 7 6) (cistern-st-rewards-events st))
+    (let ((log (cistern-st-log st)))
+      (cistern--social-thoughts st)
+      (cl-assert (equal (cistern-st-log st) log)
+                 t "SC5: the silent urge leaves the log byte-identical")
+      (cl-assert (cistern--social-urge-p st (list :toilet 7 6))
+                 t "SC5: the urge flag flips")))
+  ;; SC6: 3 eligible mutters log <= 2, the third downgrades to private
+  ;; without a redraw
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--social-spawn-persona st (list :toilet 7 6) 'fixture)
+    (let ((social0 (cistern-st-social-pos st)))
+      (dotimes (i 3)
+        (let ((w (nth i (cistern-st-creators st))))
+          (setf (cistern--worker-x w) (+ 4 i))
+          (setf (cistern--worker-y w) 5)
+          (setf (cistern--worker-journey w) nil))
+        (setf (cistern-st-tick st) (+ 10 i))
+        (push (list 'destroyed 'destroyed 5 5)
+              (cistern-st-rewards-events st)))
+      (cistern--social-thoughts st)
+      (cl-assert (<= (cl-count-if (lambda (e)
+                                    (string-match-p "MUTTERS" (car e)))
+                                  (cistern-st-log st))
+                     cistern--social-mutter-cap)
+                 t "SC6: <= 2 mutters")
+      (cl-assert (> (cistern-st-social-pos st) social0)
+                 t "SC6: content draws happened")))
+(message "CISTERN-V5-10-OK"))

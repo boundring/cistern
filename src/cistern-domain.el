@@ -148,7 +148,12 @@ by the view, not here).")
   (raid nil)
   ;; flood age tracking for S4/S5 ((X . Y) . BORN-TICK) — the spawn
   ;; table needs "flood open ≥ 20 ticks"; alist, L-099 deviation
-  (flood-born nil))
+  (flood-born nil)
+  ;; V5-08 (SOCIAL §1.2/§4.3): entity-id → persona plist.  SOCIAL-POS
+  ;; is the stream-5 position (seed ⊕ 5), pos-in/pos-out like every
+  ;; child stream.  Relationships (V5-11) complete the §4.3 list.
+  (personas nil)
+  (social-pos 0))
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -261,6 +266,179 @@ over a cache tile.")
     (setf (cistern-st-combat-pos st) (cdr r))
     (car r)))
 
+;; ---------------------------------------------------------------------------
+;; V5-08 (SOCIAL §1.1/§1.2/§4.1): the persona layer.  Stream 5 (seed
+;; 5), the census total order, and the persona spawn draw.
+
+(defun cistern--social-d6 (st)
+  "Stateful stream-5 d6 draw (pos-in/pos-out on `cistern-st-social-pos')."
+  (let ((p (cistern--stream-next (cistern-st-social-pos st))))
+    (setf (cistern-st-social-pos st) p)
+    (1+ (% (ash p -6) 6))))
+
+(defun cistern--social-select (st n)
+  "One stream-5 selector draw in [0,N) (mid-bits slice)."
+  (let ((p (cistern--stream-next (cistern-st-social-pos st))))
+    (setf (cistern-st-social-pos st) p)
+    (% (ash p -6) n)))
+
+(defconst cistern--social-order
+  '(worker goblin pest fixture tank structure)
+  "SOCIAL §1.1 census total order (ruling 2): workers < goblins <
+pests < fixtures < tanks < structures.  Also sorts romance pair
+keys (V5-11) — one defconst, one order.")
+
+(defconst cistern--social-species-names
+  '((worker . worker) (goblin . goblin) (fauna . pest)
+    (warband . goblin) (guild . goblin))
+  "COMBAT faction/kind → census species for hostile personas.")
+
+(defun cistern--social-quirk-bank (species)
+  "The quirk bank entries whose :species matches SPECIES (absent
+:species = any).  Nil when the bank is unloaded or carries no
+content for the species — a species with no bank content simply
+gets no persona (SOCIAL §1.2: structures ship bank-optional)."
+  (when cistern--banks
+    (cl-remove-if-not
+     (lambda (q)
+       (let ((sp (plist-get q :species)))
+         (or (null sp) (eq sp species) (eq sp 'any))))
+     (plist-get cistern--banks :quirks))))
+
+(defun cistern--social-spawn-persona (st id species)
+  "Spawn one persona (SOCIAL §1.2): one count draw (d6: 1-2 → 1
+quirk, 3-4 → 2, 5-6 → 3), then that many selector draws over the
+species-filtered quirk bank — stream 5, pos-in/pos-out.  No bank
+content for the species means no persona (SC2: :ledger nil at
+spawn)."
+  (let ((bank (cistern--social-quirk-bank species)))
+    (when bank
+      (let* ((d6 (cistern--social-d6 st))
+             (count (cond ((<= d6 2) 1) ((<= d6 4) 2) (t 3)))
+             (quirks nil))
+        (dotimes (_ count)
+          (push (plist-get (nth (cistern--social-select st (length bank))
+                                bank)
+                           :id)
+                quirks))
+        (puthash id (list :species species
+                          :quirks (nreverse quirks)
+                          :ledger nil :urge nil :urge-tick nil)
+                 (cistern-st-personas st))
+        id))))
+
+(defun cistern--social-urge-p (st id)
+  "V5-10 view query: does the entity's persona carry an uncleared
+silent urge?"
+  (and (cistern-st-personas st)
+       (plist-get (gethash id (cistern-st-personas st)) :urge)))
+
+;; ---------------------------------------------------------------------------
+;; V5-09 (SOCIAL §1.3): the derived mood enum — one pure banding
+;; function per species over state that already exists.  NO mood field
+;; anywhere: a mood that must be remembered is a thought, and thoughts
+;; have a channel.
+
+(defconst cistern--social-goblin-bands
+  '((40 . CRITICAL) (60 . STRAINED))
+  "SOCIAL §1.3: goblin/pest mood banding mapped from combat hp
+facts — one defconst, combat owns facts, social bands.  hp at or
+below 40% of max is CRITICAL, at or below 60% STRAINED.")
+
+(defun cistern--social-mood (st id)
+  "The derived mood word for the entity ID — existing reads only,
+never a stored field.  Unmapped ids are NOMINAL (structures, the
+manifold: it does not stress, it IS stress)."
+  (cond
+   ((and (consp id) (eq (car id) :toilet))
+    (let ((state (cistern--toilet-state st (nth 1 id) (nth 2 id))))
+      (cond ((eq state 'busy) 'STRAINED)
+            ((memq state '(down)) 'CRITICAL)
+            (t 'NOMINAL))))
+   ((and (consp id) (eq (car id) :tank))
+    (let* ((load (or (cistern--tank-load st (nth 1 id) (nth 2 id)) 0))
+           (pct (* 100.0 load (/ 1.0 cistern-tank-cap))))
+      (cond ((>= pct 85) 'CRITICAL)
+            ((>= pct 50) 'STRAINED)
+            (t 'NOMINAL))))
+   ((and (stringp id) (string-match-p "\\`g[0-9]+\\'" id))
+    ;; goblin or pest — band off the combat hp facts
+    (let ((e (cl-find id (cistern-st-hostiles st)
+                      :key #'cistern--enemy-id :test #'equal)))
+      (if (null e)
+          'NOMINAL
+        (let* ((max (+ (cdr (assq (cistern--enemy-kind e)
+                                  cistern--enemy-hp-base))
+                       (cistern--rpg-mod (nth 1 (cistern--enemy-stats e)))))
+               (pct (/ (* 100.0 (cistern--enemy-hp e)) (max 1 max)))
+               (band (cl-assoc pct cistern--social-goblin-bands #'<)))
+          (if band (cdr band) 'NOMINAL)))))
+   ((stringp id) ; a worker glyph
+    (let ((w (cl-find-if (lambda (w)
+                           (equal (cistern--worker-glyph st w) id))
+                         (cistern-st-creators st))))
+      (cond ((null w) 'NOMINAL)
+            ((or (>= (cistern--worker-bladder w) 110)
+                 (> (cistern--worker-sick w) 0))
+             'CRITICAL)
+            ((>= (cistern--worker-bladder w) 100) 'STRAINED)
+            (t 'NOMINAL))))
+   (t 'NOMINAL)))
+
+;; ---------------------------------------------------------------------------
+;; V5-10 (SOCIAL §1.4): the ONE trigger table — rows are
+;; (EVENT SPECIES MOOD-GATE CLASS); the resolver in the game layer
+;; expands each fired row into per-entity candidates.  Rows 9-11 read
+;; events/state that wave-2's later directives produce (faction-mock,
+;; romance-stage, relationships) and fire the day those land.
+
+(defconst cistern--social-trigger-table
+  '((1 breach fixture any fixture-flood)
+    (2 breach worker any nerve-flood)
+    (3 bladder-110 worker CRITICAL nerve-pressure)
+    (4 relief fixture any fixture-served)
+    (5 tank-85 tank CRITICAL tank-strain)
+    (6 purge tank any tank-purged)
+    (7 destroyed any any loss)
+    (8 goblin-death goblin any guild-mourning)
+    (9 faction-mock goblin any faction-mock)
+    (10 romance-stage any any romance-stage)
+    (11 idle-proximity worker NOMINAL fond-proximity))
+  "SOCIAL §1.4: event × species × mood → thought class.  No
+polling, no timers, no idle chatter: no trigger row, no thought.")
+
+(defconst cistern--social-classes
+  '(fixture-flood nerve-flood nerve-pressure fixture-served tank-strain
+    tank-purged loss guild-mourning faction-mock romance-stage
+    fond-proximity)
+  "The closed thought-class table (SOCIAL §4.4 loader).")
+
+(defconst cistern--social-channel-classes
+  '((mutter . (loss guild-mourning faction-mock))
+    (file . (fixture-served tank-strain tank-purged))
+    (private . (fixture-flood nerve-flood nerve-pressure
+               romance-stage fond-proximity)))
+  "SOCIAL §1.5: class → delivery channel (L-102: the design leaves
+the class→channel split unpinned; this is the deterministic pin —
+speakers quote loss/mourning/mock, non-speakers FILE their
+service classes, self-regarding classes stay private).  Urge
+classes live in `cistern--social-urge-classes'.")
+
+(defconst cistern--social-urge-classes '(fixture-served)
+  "SOCIAL §1.5: classes that deliver as a SILENT URGE (no text,
+no draw) — the served fixture blinks its busy countdown; L-102.")
+
+(defun cistern--social-channel (class species)
+  "The delivery channel for CLASS on SPECIES: non-speakers
+(fixtures, tanks, structures) cannot quote — a muttered class on
+them delivers as a FILE."
+  (let* ((entry (cl-find class cistern--social-channel-classes
+                         :key #'cdr :test #'memq))
+         (chan (if entry (car entry) 'private)))
+    (if (and (eq chan 'mutter)
+             (memq species '(fixture tank structure)))
+        'file chan)))
+
 (defun cistern--combat-roll-stat (st)
   "4d6 drop lowest, summed — one stat score (3-18), from stream 4.
 The identical draw procedure as the worker dossier (COMBAT §1:
@@ -304,6 +482,11 @@ Appends to `hostiles' — spawn order, never re-sorted."
           (1+ (cistern-st-hostile-seq st)))
     (setf (cistern-st-hostiles st)
           (append (cistern-st-hostiles st) (list e)))
+    ;; V5-08 (SOCIAL §1.2): goblins and pests are full social entities
+    ;; — persona at hostile spawn, keyed on the stable g<N> id
+    (cistern--social-spawn-persona
+     st (cistern--enemy-id e)
+     (cdr (assq faction cistern--social-species-names)))
     e))
 
 ;; ---------------------------------------------------------------------------
@@ -1995,7 +2178,12 @@ limit — it steals ticks, not health."
       (cistern--log-sev st 'error "%s" line)
       ;; breach (M4): payload carries the logged line for the M7
       ;; faced log intent
-      (push (list 'burst line) (cistern-st-rewards-events st)))))
+      (push (list 'burst line) (cistern-st-rewards-events st))
+      ;; V5-10 (SOCIAL §1.4 rows 1-2): the breach as a located event
+      ;; the trigger table reads; rewards and story ignore the kind
+      (push (list 'breach 'breach (cistern--worker-x w)
+                  (cistern--worker-y w))
+            (cistern-st-rewards-events st)))))
 
 (defun cistern--seek-toilet (st w)
   (let* ((x (cistern--worker-x w))
@@ -2234,6 +2422,21 @@ event-tiles phase keeps its post-hazards slot)."
     ;; V4-15 (STORY §3.1): the spine generates immediately after the
     ;; starter card; a no-op when no banks are loaded
     (cistern--story-generate st)
+    ;; V5-08 (SOCIAL §1.2): the persona pass — worker α and the
+    ;; starter toilet first (the pinned SC1 pair: 6 draws, L-102),
+    ;; then the remaining initial workers in creators order.  A no-op
+    ;; with no quirk banks (social-disabled runs).
+    (setf (cistern-st-personas st) (make-hash-table :test #'equal))
+    (setf (cistern-st-social-pos st)
+          (cistern--stream-init (cistern-st-seed st) 5))
+    (let ((workers (cistern-st-creators st)))
+      (when workers
+        (cistern--social-spawn-persona
+         st (cistern--worker-glyph st (nth 0 workers)) 'worker))
+      (cistern--social-spawn-persona st (list :toilet 3 3) 'fixture)
+      (dolist (w (cdr workers))
+        (cistern--social-spawn-persona
+         st (cistern--worker-glyph st w) 'worker)))
     st))
 
 (defun cistern--story-generate (st)
@@ -2320,6 +2523,11 @@ legal no-op state for tests)."
 ;; register — terse, institutional, deadpan.  The idle pressure line
 ;; is pre-existing view copy and stays byte-identical in
 ;; cistern-view.el.
+(defun cistern--social-copy (key)
+  "V5-10: one lookup into the (social . ...) copy subsection
+(spec §0 copy-table rule)."
+  (cdr (assq key (cdr (assq 'social cistern--copy)))))
+
 (defun cistern--combat-copy (key)
   "V5-07: one lookup into the (combat . ...) copy subsection
 (spec §0 copy-table rule; wave 2 adds social/comedy the same way)."
@@ -2411,6 +2619,11 @@ legal no-op state for tests)."
       (combat-guild-intel . "GUILD OF THE OPEN FLANGE — RESTORATIONS AT ONE ALLOY")
       (combat-inspect-fmt . "%s %s — %s · HP %d/%d · DEF %d · ATK %+d")
       ))
+    ;; V5-10 (SOCIAL §4.6): the social copy family — stage keys ride
+    ;; in V5-11's romance graph
+    (social . (
+      (social-mutter-fmt . "WORKER %s MUTTERS — %s")
+      (social-file-fmt . "%s FILES A %s")))
     ;; V4-07 (SURFACE S4.2/S4.3): the power layer's copy
     (capacity-none . "NO WIRED TOILET ON THE GRID — LAY PIPE (p)")
     (teach-arrows . "C-n/C-p/C-f/C-b MOVE TOO")
@@ -2440,8 +2653,14 @@ until `cistern--banks-load'.")
 section first, then bank :copy sections in load order (§4.4).")
 
 (defconst cistern--bank-kinds
-  '(scenario quirk keyword flavor dialogue)
-  "The bank kinds (STORY §4.2; dialogue = V4-SPEC §2, wave 3).")
+  '(scenario quirk keyword flavor dialogue thought)
+  "The bank kinds (STORY §4.2; dialogue = V4-SPEC §2, wave 3;
+thought = SOCIAL §4.4, v5 wave 2).")
+
+(defconst cistern--social-species-census
+  '(worker goblin pest fixture tank structure)
+  "SOCIAL §4.4: the closed species table for thought/quirk
+validation — the census total order's species.")
 
 (defconst cistern--story-stats '(tolerance integrity standing)
   "Story stat keys (STORY §6.1) — matrix :stat must be one of these.")
@@ -2642,7 +2861,8 @@ selectors known, :next names a LATER-declared node."
   (pcase kind
     ('scenario :scenarios) ('quirk :quirks)
     ('keyword :keywords) ('flavor :flavor)
-    ('dialogue :dialogues)))
+    ('dialogue :dialogues)
+    ('thought :thoughts)))
 
 (defvar cistern--matrix-sources (make-hash-table :test (quote eq))
   "V4-19: hash MATRIX-ID -> source file, for cross-source id
@@ -2703,8 +2923,29 @@ to 100 over 3 acts" id tiers)))
        (unless (memq (plist-get e :context) cistern--story-stats)
          (cistern--bank-error file "quirk %s :context %S unknown"
                               id (plist-get e :context)))
+       ;; V5-08 (SOCIAL §1.2): optional :species — worker | goblin |
+       ;; pest | fixture | tank | structure | any; absent = any
+       (when (plist-get e :species)
+         (unless (memq (plist-get e :species)
+                       (append cistern--social-species-census '(any)))
+           (cistern--bank-error file "quirk %s :species %S unknown"
+                                id (plist-get e :species))))
        (unless (cdr (assq (plist-get e :copy-key) cistern--story-copy))
          (cistern--bank-error file "quirk %s :copy-key unresolvable" id)))
+      ('thought
+       ;; V5-10 (SOCIAL §4.4): :class in the closed table, :species in
+       ;; the census, :when a mood band or any, :copy-key resolvable
+       (unless (memq (plist-get e :class) cistern--social-classes)
+         (cistern--bank-error file "thought %s :class %S unknown"
+                              id (plist-get e :class)))
+       (unless (memq (plist-get e :species) cistern--social-species-census)
+         (cistern--bank-error file "thought %s :species %S unknown"
+                              id (plist-get e :species)))
+       (unless (memq (plist-get e :when) '(any NOMINAL STRAINED CRITICAL))
+         (cistern--bank-error file "thought %s :when %S unknown"
+                              id (plist-get e :when)))
+       (unless (cdr (assq (plist-get e :copy-key) cistern--story-copy))
+         (cistern--bank-error file "thought %s :copy-key unresolvable" id)))
       ('keyword
        (unless (memq (plist-get e :class) '(place sector designation))
          (cistern--bank-error file "keyword %s :class %S unknown"

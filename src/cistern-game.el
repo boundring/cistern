@@ -55,10 +55,14 @@ cistern.el:498-525, rendered calls stripped."
          (puthash (cons x y) (list :busy nil :type type)
                   (cistern-st-toilets st))
          (setf (cistern-st-built-toilet st)
-               (1+ (cistern-st-built-toilet st))))
+               (1+ (cistern-st-built-toilet st)))
+         ;; V5-08 (SOCIAL §1.2): fixtures are persona-eligible at build
+         (cistern--social-spawn-persona st (list :toilet x y) 'fixture))
         ('tank
          (puthash (cons x y) (list :load 0) (cistern-st-tanks st))
-         (setf (cistern-st-built-tank st) (1+ (cistern-st-built-tank st))))
+         (setf (cistern-st-built-tank st) (1+ (cistern-st-built-tank st)))
+         ;; V5-08 (SOCIAL §1.2): tanks are persona-eligible at build
+         (cistern--social-spawn-persona st (list :tank x y) 'tank))
         ('pipe
          (setf (cistern-st-built-pipe st) (1+ (cistern-st-built-pipe st)))))
       (cistern--log st "%s PLACED AT (%d,%d) — %d ALLOY"
@@ -131,7 +135,10 @@ phantom-plumbing invariant, load-bearing)."
                                     glyph 'info 'sparkle))))
         (cistern--log st "DEMOLISHED %s AT (%d,%d) — %d ALLOY — %d REFUND"
                       (upcase (symbol-name kind)) x y
-                      cistern-cost-demolish refund))))))
+                      cistern-cost-demolish refund)
+      ;; V5-10 (SOCIAL §1.4 row 7): the destruction as a located event
+      (push (list 'destroyed 'destroyed x y)
+            (cistern-st-rewards-events st)))))))
 
 (defun cistern--tutorial-steps (&optional table)
   "Tutorial mechanism holder: table of (PROMPT . PREDICATE) steps,
@@ -1124,6 +1131,170 @@ lands, nil on refusal or empty cell."
       (setf (cistern-st-focus st) (cistern--enemy-id e))
       t))))
 
+;; ---------------------------------------------------------------------------
+;; V5-10 (SOCIAL §1.4-1.6): the thought pipeline.  ONE pass per tick
+;; (the social-eval call site wires in V5-12); reads pending events
+;; WITHOUT draining (rewards-eval stays the sole drainer, L-027);
+;; content draws on stream 5 only; budgets: <= 1 thought per entity
+;; per tick, <= 4 sector-wide, <= 2 mutters, ledger cap 3.
+
+(defconst cistern--social-mutter-cap 2
+  "SOCIAL §1.6: <= 2 muttered log lines per tick, sector cap.")
+
+(defconst cistern--social-thought-cap 4
+  "SOCIAL §1.6: <= 4 thought generations per tick, sector-wide.")
+
+(defun cistern--social-ledger-push (st id key)
+  "Append (TICK 'private KEY) to the persona's ledger — newest
+first, cap 3, FIFO eviction (SOCIAL §1.2/§1.5)."
+  (let* ((p (gethash id (cistern-st-personas st)))
+         (ledger (cons (list (cistern-st-tick st) 'private key)
+                       (plist-get p :ledger))))
+    (puthash id (plist-put p :ledger
+                           (if (> (length ledger) 3)
+                               (butlast ledger) ledger))
+             (cistern-st-personas st))))
+
+(defun cistern--social-thought-bank (class species mood)
+  "Thought bank entries matching (class, species, mood-or-any);
+goblin and pest share the census content slots."
+  (cl-remove-if-not
+   (lambda (e)
+     (and (eq (plist-get e :class) class)
+          (memq (plist-get e :species)
+                (list species
+                      (and (eq species 'goblin) 'pest)
+                      (and (eq species 'pest) 'goblin)
+                      'worker
+                      (and (eq species 'fixture) 'tank)
+                      (and (eq species 'tank) 'fixture)))
+          (memq (plist-get e :when) (list mood 'any))))
+   (plist-get cistern--banks :thoughts)))
+
+(defun cistern--social-thoughts (st)
+  "V5-10: one thought generation pass over the trigger table.
+Reads pending events WITHOUT draining (rewards-eval stays the
+sole drainer, L-027); content draws on stream 5 only; budgets:
+<= 1 thought per entity per tick, <= 4 sector-wide, <= 2 mutters,
+over-budget mutters downgrade to private without a redraw; urges
+set the persona flag with no text and no draw (ttl 1 tick)."
+  (when (and (cistern-st-personas st)
+             (plist-get cistern--banks :thoughts))
+    (let ((made 0) (mutters 0) (seen nil)
+          (events (cistern-st-rewards-events st))
+          (cheby (lambda (a b)
+                   (max (abs (- (car a) (car b)))
+                        (abs (- (cdr a) (cdr b)))))))
+      (cl-labels
+          ((deliver (id species class)
+             (when (and (< made cistern--social-thought-cap)
+                        (not (member id seen))
+                        (gethash id (cistern-st-personas st)))
+               (let* ((mood (cistern--social-mood st id))
+                      (bank (cistern--social-thought-bank
+                             class species mood)))
+                 (when bank
+                   (push id seen)
+                   (setq made (1+ made))
+                   (if (memq class cistern--social-urge-classes)
+                       (let ((p (gethash id (cistern-st-personas st))))
+                         (puthash id (plist-put (plist-put p :urge t)
+                                                :urge-tick
+                                                (cistern-st-tick st))
+                                  (cistern-st-personas st)))
+                     (let* ((entry (nth (cistern--social-select
+                                         st (length bank))
+                                        bank))
+                            (key (plist-get entry :copy-key))
+                            (chan (cistern--social-channel class species)))
+                       (cond
+                        ((and (eq chan 'mutter)
+                              (< mutters cistern--social-mutter-cap))
+                         (cistern--log-sev
+                          st 'info "%s"
+                          (format (cistern--social-copy
+                                   'social-mutter-fmt)
+                                  id (concat "\""
+                                             (cistern--story-copy-key
+                                              key)
+                                             "\"")))
+                         (push (list :social 'mutter :speaker id :key key)
+                               (cistern-st-rewards-events st))
+                         (setq mutters (1+ mutters)))
+                        ((eq chan 'file)
+                         (cistern--log-sev
+                          st 'info "%s"
+                          (format (cistern--social-copy 'social-file-fmt)
+                                  id (upcase (symbol-name class)))))
+                        (t
+                         (cistern--social-ledger-push st id key))))))))))
+        ;; rows 1-2 + 6-7: located events drive their rows in order
+        (dolist (ev events)
+          (let ((kind (cistern--event-kind ev)))
+            (cond
+             ((eq kind 'breach)
+              (let ((bx (nth 2 ev)) (by (nth 3 ev)))
+                (maphash
+                 (lambda (id _p)
+                   (when (and (consp id) (eq (car id) :toilet)
+                              (<= (funcall cheby (cons (nth 1 id) (nth 2 id))
+                                       (cons bx by))
+                                  3))
+                     (deliver id 'fixture 'fixture-flood)))
+                 (cistern-st-personas st))
+                (dolist (w (cistern-st-creators st))
+                  (when (<= (funcall cheby
+                                     (cons (cistern--worker-x w)
+                                           (cistern--worker-y w))
+                                     (cons bx by))
+                            3)
+                    (deliver (cistern--worker-glyph st w)
+                             'worker 'nerve-flood)))))
+             ((eq kind 'relief)
+              (deliver (list :toilet (nth 2 ev) (nth 3 ev))
+                       'fixture 'fixture-served))
+             ((eq kind 'purge)
+              (deliver (list :tank (nth 2 ev) (nth 3 ev))
+                       'tank 'tank-purged))
+             ((memq kind '(destroyed goblin-death))
+              (let ((ex (nth 2 ev)) (ey (nth 3 ev)))
+                (dolist (w (cistern-st-creators st))
+                  (when (<= (funcall cheby
+                                     (cons (cistern--worker-x w)
+                                           (cistern--worker-y w))
+                                     (cons ex ey))
+                            1)
+                    (deliver (cistern--worker-glyph st w)
+                             'worker 'loss))))))))
+        ;; row 3: bladder >= 110, self, CRITICAL gate
+        (dolist (w (cistern-st-creators st))
+          (let ((id (cistern--worker-glyph st w)))
+            (when (and (> (cistern--worker-bladder w) 110)
+                       (eq (cistern--social-mood st id) 'CRITICAL))
+              (deliver id 'worker 'nerve-pressure))))
+        ;; row 5: tanks at or over 85% of cap
+        (maphash (lambda (k _v)
+                   (when (>= (cistern--tank-load st (car k) (cdr k))
+                             (* 0.85 cistern-tank-cap))
+                     (deliver (list :tank (car k) (cdr k))
+                              'tank 'tank-strain)))
+                 (cistern-st-tanks st))
+        ;; row 8: goblin death within 6 of a guild goblin
+        (dolist (ev events)
+          (when (eq (cistern--event-kind ev) 'goblin-death)
+            (let ((dx (nth 2 ev)) (dy (nth 3 ev)))
+              (dolist (e (cistern-st-hostiles st))
+                (when (and (eq (cistern--enemy-faction e) 'guild)
+                           (gethash (cistern--enemy-id e)
+                                    (cistern-st-personas st))
+                           (<= (funcall cheby
+                                        (cons (cistern--enemy-x e)
+                                              (cistern--enemy-y e))
+                                        (cons dx dy))
+                               6))
+                  (deliver (cistern--enemy-id e)
+                           'goblin 'guild-mourning))))))))))
+
 (defun cistern--cmd-consume-hint (st)
   "Drain ST's transient cursor hint (Q17): the driver calls this
 after each render cycle, so a posted hint is visible for exactly
@@ -1161,7 +1332,9 @@ and never touches the contam limit)."
         (puthash (cons x y) (list :load 0) (cistern-st-tanks st))
         (setf (cistern-st-alloy st) (+ (cistern-st-alloy st) gain))
         (setf (cistern-st-purges st) (1+ (cistern-st-purges st)))
-        (cistern--log st "TANK PURGED — RECOVERED %d ALLOY" gain))))))
+        (cistern--log st "TANK PURGED — RECOVERED %d ALLOY" gain)
+        ;; V5-10 (SOCIAL §1.4 row 6): the purge as a located event
+        (push (list 'purge 'purge x y) (cistern-st-rewards-events st)))))))
 
 (defun cistern-run-selftest ()
   "Headless proof of every rule that can break gameplay, on the

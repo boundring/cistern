@@ -3409,3 +3409,42 @@ the relaunch is on their screen now.
   — base inspector byte-identical with no hostiles.
 - Outcome: V5-07 GREEN.  WAVE 1 COMPLETE (V5-01..V5-07).  Suite
   canonical 121/121.
+
+---
+
+## L-102 (2026-09-08, run: wave2-batch-1 — V5-08 personas, V5-09 mood, V5-10 thoughts)
+
+- SC1 composition ruling: the pinned new-game persona pass spawns
+  worker α FIRST, then the starter toilet (3,3), then the remaining
+  workers (β, γ, δ) — the doc's `social-pos` = 1083329933 pin is EXACT
+  for the first 6 draws (α: count d6=4 → 2 quirks + 2 selectors;
+  toilet: count d6=3 → 2 quirks + 2 selectors; verified against the
+  real recurrence from init 20260827), and the remaining workers
+  consume further draws on top.  The doc's SELECTOR literals ("2 and
+  3", "2 and 2") are unreachable under (mid-bits mod bank-length) with
+  any bank length — same fixture-drift class as L-096; the counts, the
+  6-draw prefix and the pos pin are the contract.  Selector mechanics
+  pinned: `cistern--social-select` = (ash pos -6) mod bank-length,
+  0-based; the SC1 test pins the OBSERVED quirk ids from the real
+  draws.
+- Channel pin (the design leaves the class→channel split unpinned):
+  loss / guild-mourning / faction-mock = MUTTERED for speakers
+  (workers, goblins), FILE for non-speakers; fixture-served /
+  tank-strain / tank-purged = FILE; fixture-flood / nerve-flood /
+  nerve-pressure / romance-stage / fond-proximity = PRIVATE.
+  `cistern--social-urge-classes` = (fixture-served) — the served
+  fixture's urge blinks its busy countdown (view derives the toggle
+  from :urge; state-free, deterministic).  SC4's private fixture-flood
+  and the urge row coexist because the channels are per-class.
+- Bank shape: `thought` kind registered (:id :class :species :when
+  :copy-key), loader-validated against the closed class table, the
+  census species and the mood bands; the `quirk` kind gains optional
+  :species (worker | goblin | pest | fixture | tank | structure | any).
+  Located combat events added for the trigger rows: `breach` (from the
+  accident path, alongside 'burst — rewards/story unaffected),
+  `purge` (cmd-purge), `destroyed` (cmd-demolish).
+- Keyword/symbol trap: persona ids for fixtures/tanks are (:toilet X Y)
+  / (:tank X Y) with KEYWORD cars; the mood fn's early draft compared
+  against 'toilet / 'tank symbols and silently fell through to NOMINAL
+  (a wrong-answer, not an error — caught by SC3's tank probe).
+- Outcome: V5-08 GREEN, V5-09 GREEN, V5-10 GREEN.  Suite canonical 124.

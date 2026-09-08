@@ -145,7 +145,10 @@
     cistern-test-v5-06-verbs
     cistern-test-v5-07-copy
     cistern-test-v5-07-surfaces
-    cistern-test-v5-07-glyph-probe))
+    cistern-test-v5-07-glyph-probe
+    cistern-test-v5-08-personas
+    cistern-test-v5-09-mood
+    cistern-test-v5-10-thoughts))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
