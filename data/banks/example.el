@@ -65,5 +65,33 @@
     ((:id fl-condensation :when act-2 :copy-key story-condensation)
      (:id fl-sound :when act-1 :copy-key story-sound))))
 
+(defconst cistern-bank-example-dialogue
+  '(:kind dialogue :version "1" :generator "hand (test fixture)"
+    :copy
+    ((dlg-review-open . "REVIEW: %s FILES A PRESSURE COMPLAINT")
+     (dlg-review-wary . "%s: WATCH THE GAUGES — %s AGREES")
+     (dlg-review-endorsed . "%s ENDORSES %s — REQUISITION FILED"))
+    :entries
+    ((:id dlg-pressure-review :actors 2 :tier common :act 1
+      :gate (seal-creak . resolved) :as pass
+      :pair (stat nerve stat flow)
+      :root t :line dlg-review-open
+      :branch (:stat nerve :difficulty 10 :matrix dlg-review-verdict
+               :next (dlg-review-wary dlg-review-endorsed
+                                     dlg-review-wary
+                                     dlg-review-endorsed)))
+     (:id dlg-review-wary :line dlg-review-wary :root nil
+      :branch (:stat flow :difficulty 12 :matrix dlg-review-verdict
+               :next (dlg-review-endorsed dlg-review-endorsed
+                                          dlg-review-endorsed
+                                          dlg-review-endorsed)))
+     (:id dlg-review-endorsed :line dlg-review-endorsed :root nil))
+    :matrices
+    ((:id dlg-review-verdict :difficulty 10 :stat nerve :act-mods (0 0 0)
+      :outcomes ((:line-key dlg-review-wary :effect none :arg nil)
+                 (:line-key dlg-review-wary :effect none :arg nil)
+                 (:line-key dlg-review-endorsed :effect none :arg nil)
+                 (:line-key dlg-review-endorsed :effect none :arg nil))))))
+
 (provide 'cistern-bank-example)
 ;;; data/banks/example.el ends here

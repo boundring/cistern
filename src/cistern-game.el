@@ -486,6 +486,175 @@ with at most ONE story banner."
         (plist-put story :intents (nreverse intents))))
     (cons st intents)))
 
+;; ---------------------------------------------------------------------------
+;; V4-19/§2 (wave 3): dialogue evaluation.  Runs AFTER story-eval and
+;; BEFORE rewards-eval (§1 pinned order); draws stream 2 AFTER
+;; story-eval completes its draws; drains nothing; emits only faced
+;; log intents (§2.6 — never banner, never popup); ≤1 line per tick.
+
+(defun cistern--dialogue-cast-worker (st story sel-kind sel-arg)
+  "Resolve one flat :pair selector (SEL-KIND SEL-ARG) against the
+story cast (§2.3): (stat S) → the cast member with the highest S
+score (ties break in cast order); (quirk Q) → the cast member
+carrying quirk Q."
+  (let* ((cast (plist-get story :cast))
+         (workers (cistern-st-creators st))
+         (pick (pcase sel-kind
+                 ('stat
+                  (let ((best -99) (bi 0)
+                        (si (cl-position
+                             (intern (upcase (symbol-name sel-arg)))
+                             cistern--rpg-stat-names)))
+                    (dotimes (i (length cast))
+                      (let* ((ci (car (nth i cast)))
+                             (w (nth ci workers))
+                             (score (nth si (cistern--worker-stats w))))
+                        (when (> score best) (setq best score bi i))))
+                    bi))
+                 ('quirk
+                  (let ((bi 0))
+                    (dotimes (i (length cast))
+                      (when (eq (cdr (nth i cast)) sel-arg) (setq bi i)))
+                    bi))
+                 (_ 0))))
+    (nth (car (nth pick cast)) workers)))
+
+(defconst cistern--dialogue-cooldown 60
+  "STORY §2.5: pinned default tree cooldown in ticks.")
+
+(defun cistern--dialogue-eligible-p (st tree)
+  "§2.5: act reached, gate hook in the gated state (resolved
+default; :as pass|fail pins the verdict), cooldown honored."
+  (let* ((story (cistern-st-story st))
+         (act (plist-get story :act))
+         (tick (cistern-st-tick st))
+         (gate (plist-get tree :gate))
+         (hook (cl-find (car gate) (plist-get story :hooks)
+                        :key (lambda (x) (plist-get x :id))))
+         (want (or (cdr gate) 'resolved)))
+    (and (>= act (plist-get tree :act))
+         hook
+         (or (eq want 'open) (eq (plist-get hook :state) 'resolved))
+         (if (eq want 'open)
+             t
+           (if (plist-get tree :as)
+               (eq (plist-get hook :resolved-as) (plist-get tree :as))
+             t))
+         (let ((last (cdr (assq (plist-get tree :id)
+                                (plist-get story :dlg-cooldowns)))))
+           (or (null last) (>= (- tick last)
+                               cistern--dialogue-cooldown))))))
+
+(defun cistern--dialogue-eval (st)
+  "STORY §2.4-§2.6: at most ONE tree opens per tick; an open
+conversation delivers ONE line per tick; branch rolls consume
+stream 2 at open (tier-free: band 0..3 → :next index).  Drains
+nothing; emits only faced log intents (info severity)."
+  (let ((story (cistern-st-story st))
+        (intents nil))
+    (when (and story cistern--banks)
+      (let ((dlg (plist-get story :dlg)))
+        (cond
+         ;; deliver one pending line
+         ((and dlg (plist-get dlg :pending))
+          (push (list :layer 'log :text (car (plist-get dlg :pending))
+                      :face 'info)
+                intents)
+          (plist-put dlg :pending (cdr (plist-get dlg :pending))))
+         ;; open a new tree
+         (cistern--banks
+          (let ((act (plist-get story :act))
+                (chosen nil))
+            (dolist (tree (plist-get cistern--banks :dialogues))
+              (unless chosen
+                (when (and (plist-get tree :root)
+                           (cistern--dialogue-eligible-p st tree))
+                  (setq chosen tree))))
+            (when chosen
+              (let* ((tick (cistern-st-tick st))
+                     (dlg2 (or dlg (list :cooldowns nil)))
+                     (root chosen)
+                     (participants
+                      (let ((sel (plist-get chosen :pair)) (out nil))
+                        (while sel
+                          (push (cistern--dialogue-cast-worker
+                                 st story (car sel) (cadr sel)) out)
+                          (setq sel (cddr sel)))
+                        (nreverse out)))
+                     (glyphs (mapcar (lambda (w)
+                                       (cistern--worker-glyph st w))
+                                     participants))
+                     (branch-stats
+                      (let ((sel (plist-get chosen :pair)) (out nil))
+                        (while sel
+                          (when (eq (car sel) 'stat)
+                            (let* ((w (cistern--dialogue-cast-worker
+                                       st story 'stat (cadr sel)))
+                                   (si (cl-position
+                                        (intern
+                                         (upcase (symbol-name (cadr sel))))
+                                        cistern--rpg-stat-names)))
+                              (push (cons (cadr sel)
+                                          (cistern--rpg-stat-mod w si))
+                                    out)))
+                          (setq sel (cddr sel)))
+                        out))
+                     (rootline
+                      (cistern--story-fill (cistern--story-copy-key
+                                            (plist-get root :line))
+                                           glyphs))
+                     ;; walk the branch chain at open: one roll per
+                     ;; interior node, band → :next index; every node's
+                     ;; line queues for one-per-tick delivery
+                     (pending (list rootline))
+                     (node root)
+                     (rolls 0))
+                (while (plist-get node :branch)
+                  (let* ((br (plist-get node :branch))
+                         (stat (or (cdr (assq (plist-get br :stat)
+                                              branch-stats))
+                                   0))
+                         (roll (cistern--story-draw st 20))
+                         (margin (+ roll stat
+                                    (- (plist-get br :difficulty))))
+                         (band (cond ((<= margin -5) 0) ((<= margin -1) 1)
+                                     ((<= margin 4) 2) (t 3)))
+                         (next (nth band (plist-get br :next)))
+                         (nnode (cl-find next
+                                         (plist-get cistern--banks
+                                                    :dialogues)
+                                         :key (lambda (x)
+                                                (plist-get x :id)))))
+                    (setq rolls (1+ rolls))
+                    (setq node nnode)
+                    (when node
+                      (push (cistern--story-fill
+                             (cistern--story-copy-key
+                              (plist-get node :line))
+                             glyphs)
+                            pending))))
+                (setq pending (nreverse pending))
+                (plist-put story :dlg
+                           (list :tree (plist-get chosen :id)
+                                 :pending (cdr pending)
+                                 :cooldowns
+                                 (cons (cons (plist-get chosen :id) tick)
+                                       (plist-get dlg2 :cooldowns))))
+                ;; the ROOT line delivers this tick
+                (push (list :layer 'log :text (car pending) :face 'info)
+                      intents))))))))
+    (cons st intents)))
+
+(defun cistern--story-fill (line glyphs)
+  "Fill the line's %s slots with the cast glyphs in order."
+  (if (and glyphs (string-match-p "%s" line))
+      (let ((i (string-match "%s" line)))
+        (cistern--story-fill
+         (concat (substring line 0 i) (car glyphs)
+                 (substring line (+ i 2)))
+         (cdr glyphs)))
+    line))
+
 (defun cistern--do-tick (st)
   "Exactly one tick per action (R6): over-guard, then one domain
 sim tick, then the tutorial advance.  The legacy multi-tick
@@ -498,17 +667,22 @@ call exists at the use-case layer."
     (cistern--sim-tick st)
     ;; V4-16 (STORY §8.1, §1 pinned ordering): ONE story-eval call
     ;; BEFORE rewards-eval — reads pending events, drains nothing
+    ;; V4-16/§2 (§1 pinned ordering): story-eval completes ALL its
+    ;; draws, then dialogue-eval draws, then rewards-eval
     (let ((story-out (cistern--story-eval st)))
-      ;; per-tick rewards evaluation (L-027 wiring): runs ONCE per
-      ;; tick, after the sim phases and before the tutorial advance;
-      ;; stores outcome+intents in state for the view to read
-      (cistern--rewards-eval st nil)
-      ;; the story's intents append to the stored intent list —
-      ;; one stored slot, one render read, zero new view query paths
-      (setf (cistern-st-rewards-outcome st)
-            (cons (car (cistern-st-rewards-outcome st))
-                  (append (cdr (cistern-st-rewards-outcome st))
-                          (cdr story-out)))))))
+      (let ((dlg-out (cistern--dialogue-eval st)))
+        ;; per-tick rewards evaluation (L-027 wiring): runs ONCE per
+        ;; tick, after the sim phases and before the tutorial advance;
+        ;; stores outcome+intents in state for the view to read
+        (cistern--rewards-eval st nil)
+        ;; the story's + dialogue's intents append to the stored
+        ;; intent list — one stored slot, one render read, zero new
+        ;; view query paths
+        (setf (cistern-st-rewards-outcome st)
+              (cons (car (cistern-st-rewards-outcome st))
+                    (append (cdr (cistern-st-rewards-outcome st))
+                            (cdr story-out)
+                            (cdr dlg-out))))))))
 
 (defconst cistern--rewards-default-outcome
   '(:score 0 :objectives nil :unlocks nil :celebrate nil)

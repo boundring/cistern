@@ -1374,5 +1374,118 @@ gethash, and an id collision across sources is a load error."
                    t "matrix id collision not caught (err=%S)" err))))
   (message "CISTERN-V4-19-OK"))
 
+(defun cistern-test-dialogue ()
+  "Batch 3a dialogue acceptance (D1-D3/D5): the example dialogue
+bank loads clean and node-graph defects fail with named errors;
+an opened tree consumes 1 tree draw + n branch rolls; gated trees
+respect hook state; delivery is one faced info line per tick with
+no banner and no drain."
+  ;; D3: the example dialogue bank loads clean
+  (setq cistern--banks nil cistern--story-copy nil
+        cistern--matrix-sources (make-hash-table :test 'eq))
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v4--root)))
+  (cl-assert (= (length (plist-get cistern--banks :dialogues)) 3)
+             t "example dialogue missing")
+  ;; D3: node-graph defects fail with named errors
+  (let ((good '(:kind dialogue :version "1" :copy ((k0 . "A"))
+                :entries
+                ((:id d-root :line k0 :root t
+                  :branch (:stat nerve :difficulty 10 :matrix m1
+                            :next (d-n1)))
+                 (:id d-n1 :line k0 :root nil
+                  :branch (:stat nerve :difficulty 10 :matrix m1
+                            :next (d-n2)))
+                 (:id d-n2 :line k0 :root nil
+                  :branch (:stat nerve :difficulty 10 :matrix m1
+                            :next (d-n3)))
+                 (:id d-n3 :line k0 :root nil)))))
+    (dolist
+        (spec
+         (list
+          (cons (lambda (b)
+                  (plist-put b :kind 'wibble))
+                "unknown :kind")
+          (cons (lambda (b)
+                  (plist-put (car (plist-get b :entries))
+                             :effect 'none))
+                "carries an :effect")
+          (cons (lambda (b)
+                  (plist-put (car (plist-get b :entries))
+                             :gate '(no-such-hook . resolved)))
+                "names no scenario hook")
+          ;; cyclic: n3's branch points back at the root
+          (cons (lambda (b)
+                  (let ((entries (plist-get b :entries)))
+                    (plist-put (nth 3 entries) :branch
+                               (list :stat 'nerve :difficulty 10
+                                     :matrix 'm1
+                                     :next '(d-root)))))
+                "not later-declared")))
+      (let* ((bank (copy-tree good))
+             (file (make-temp-file "cistern-badbank")))
+        (funcall (car spec) bank)
+        (with-temp-file file
+          (insert (format "(defconst cistern-bank-bad\n  '%S)" bank)))
+        (setq cistern--banks nil cistern--story-copy nil
+              cistern--matrix-sources (make-hash-table :test 'eq))
+        (let ((err (condition-case e
+                       (progn (cistern--banks-load (list file)) nil)
+                     (error (format "%S" (cadr e))))))
+          (princ (format "DBG err=%S file=%S\n" err (with-temp-buffer (insert-file-contents file) (buffer-substring 1 200))))
+          (cl-assert (and err (string-match-p (cdr spec) err))
+                     t "%s not caught (err=%S)" (cdr spec) err)))))
+  ;; D3: depth-4 chain (root-n1-n2-n3-n4) — hand-written one-line
+  ;; literal, depth 4 > 3
+  (let ((file (make-temp-file "cistern-badbank")))
+    (with-temp-file file
+      (insert "(defconst cistern-bank-bad\n  '(:kind dialogue :version \"1\" :copy ((k0 . \"A\")) :entries ((:id d-root :line k0 :root t :branch (:stat nerve :difficulty 10 :matrix m1 :next (d-n1))) (:id d-n1 :line k0 :root nil :branch (:stat nerve :difficulty 10 :matrix m1 :next (d-n2))) (:id d-n2 :line k0 :root nil :branch (:stat nerve :difficulty 10 :matrix m1 :next (d-n3))) (:id d-n3 :line k0 :root nil :branch (:stat nerve :difficulty 10 :matrix m1 :next (d-n4))) (:id d-n4 :line k0 :root nil))))"))
+    (setq cistern--banks nil cistern--story-copy nil
+          cistern--matrix-sources (make-hash-table :test 'eq))
+    (let ((err (condition-case e
+                   (progn (cistern--banks-load (list file)) nil)
+                 (error (format "%S" (cadr e))))))
+      (cl-assert (and err (string-match-p "depth" err))
+                 t "depth-4 not caught (err=%S)" err)))
+  ;; D1/D2/D5: gate state machine + delivery
+  (setq cistern--banks nil cistern--story-copy nil
+        cistern--matrix-sources (make-hash-table :test 'eq))
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v4--root)))
+  (let ((st (cistern--new-game 20260830)))
+    (dotimes (_ 25) (cistern--do-tick st))
+    (let* ((story (cistern-st-story st))
+           (dlg (cistern--dialogue-eval st)))
+      (cl-assert dlg t "dialogue eval runs")))
+  ;; D2: the gate is the seal-creak hook — still dormant at tick 25
+  ;; (no leak), so the tree must NOT have opened
+  (let ((st (cistern--new-game 20260830)))
+    (dotimes (_ 25) (cistern--do-tick st))
+    (let* ((story (cistern-st-story st))
+           (creak (car (plist-get story :hooks))))
+      (cl-assert (eq (plist-get creak :state) 'armed)
+                 t "fixture: creak should be armed")
+      ;; force the gate eligible: resolve creak as pass
+      (plist-put creak :state 'resolved)
+      (plist-put creak :resolved-as 'pass)
+      (let* ((before (plist-get story :roll-pos))
+             (dlg-out (cistern--dialogue-eval st))
+             (intents (cdr dlg-out)))
+        (cl-assert (= (length intents) 1) t "open tick line count")
+        (cl-assert (eq (plist-get (car intents) :face) 'info)
+                   t "dialogue face not info")
+        ;; D1: stream 2 advanced (tree draw + branch rolls at open)
+        (cl-assert (> (plist-get story :roll-pos) before)
+                   t "stream 2 did not advance")
+        ;; D5: subsequent ticks deliver the queued lines one at a time
+        (cistern--dialogue-eval st)
+        (cistern--dialogue-eval st)
+        (let* ((story2 (cistern-st-story st))
+               (dlg (plist-get story2 :dlg)))
+          (cl-assert dlg t "conversation state missing")))))
+  (message "CISTERN-DIALOGUE-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here

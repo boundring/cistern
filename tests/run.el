@@ -126,7 +126,8 @@
     cistern-test-v4-15-story-generation
     cistern-test-v4-16-story-eval
     cistern-test-v4-17-story-coherence
-    cistern-test-v4-19-matrix-consolidation))
+    cistern-test-v4-19-matrix-consolidation
+    cistern-test-dialogue))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

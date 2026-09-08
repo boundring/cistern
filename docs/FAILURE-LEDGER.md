@@ -3029,3 +3029,41 @@ the relaunch is on their screen now.
 - Ledger: L-086..L-091 (per-directive + batch end summaries).
 
 ---
+
+## L-092 (2026-09-07, run: impl-v4-w2a — BATCH 3A: V4-19 matrix consolidation + dialogue bank kind + dialogue-eval)
+
+- Outcome: LANDED (red commits in the batch, green this commit).
+- V4-19: bank scenario matrices fold into the ONE shared
+  (matrix-id . band) hash at load (cistern--bank-fold-matrices);
+  cross-source id uniqueness via cistern--matrix-sources
+  (matrix-id -> source file; a SECOND file claiming an id is a
+  collision load error, the SAME file reloading is an idempotent
+  overwrite); story-eval's outcome lookup switched to the one
+  gethash — both sources resolve through it (asserted).
+- Dialogue bank kind (§2): :kind dialogue routes through the
+  uniform format; §2.7 loader validation (cistern--bank-dialogue-
+  nodes + -depth, split into flat functions after the deep-nesting
+  paren disease bit three times): duplicate :id, :effect keys
+  forbidden by syntax, :line resolvable, :gate hook present and
+  not later-acted, :pair selectors (flat kind/arg pairs, stats
+  case-normalized), :next names a LATER-declared node, depth ≤ 3.
+  Example dialogue bank added to data/banks/example.el (root +
+  2 nodes, gated on seal-creak resolved-as pass).
+- Dialogue-eval (game layer, after story-eval, before rewards-eval
+  — §1 pinned order): draws stream 2 AFTER story-eval; one tree
+  opens per tick (ROOT nodes only — the first build walked every
+  node as a tree, voiding non-root gates); branch stat = the
+  participant's RPG mod via cistern--rpg-stat-mod (2-arg — the
+  branch-stats wiring first called it 1-arg); band → :next index;
+  node lines queue and deliver ONE per tick (cistern--story-fill
+  rewritten — replace-match mutated only the first slot);
+  cooldown 60, once per act; delivery = faced info log intents,
+  no banner, no drain.
+- Fixtures: :line resolvability requires the dialogue bank's own
+  :copy to carry the node keys (a :copy-nil dialogue errors
+  unresolvable before the graph checks — fixture banks carry
+  (k0 . "A")); the D3 mutators mutate the BANK's :kind, not the
+  first entry's.
+- VERIFY: canonical suite ALL 104 TESTS PASSED (batch).
+
+---

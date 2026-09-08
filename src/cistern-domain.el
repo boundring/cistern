@@ -1436,8 +1436,9 @@ until `cistern--banks-load'.")
   "Folded copy alist built once at load: cistern--copy's story
 section first, then bank :copy sections in load order (§4.4).")
 
-(defconst cistern--bank-kinds '(scenario quirk keyword flavor)
-  "The four bank kinds (STORY §4.2; dialogue arrives in wave 3).")
+(defconst cistern--bank-kinds
+  '(scenario quirk keyword flavor dialogue)
+  "The bank kinds (STORY §4.2; dialogue = V4-SPEC §2, wave 3).")
 
 (defconst cistern--story-stats '(tolerance integrity standing)
   "Story stat keys (STORY §6.1) — matrix :stat must be one of these.")
@@ -1535,11 +1536,94 @@ earlier act" id req))))
           (cistern--bank-error file "goal-mod kind %S outside :goal-kinds"
                                (car pair)))))))
 
+(defconst cistern--dialogue-depth-max 3
+  "STORY §2.7: node depth ≤ 3 from any root (D3).")
+
+(defun cistern--bank-dialogue-nodes (file entries loaded)
+  "STORY §2.7 per-node dialogue checks: :effect forbidden, :line
+resolvable, :gate hook present and not later-acted, :pair
+selectors known, :next names a LATER-declared node."
+  (let ((index nil) (hook-acts nil) (idx 0))
+    (dolist (e entries)
+      (let ((id (plist-get e :id)))
+        (unless id
+          (cistern--bank-error file "dialogue node without :id"))
+        (when (plist-get e :effect)
+          (cistern--bank-error
+           file "dialogue entry %s carries an :effect key (forbidden)" id))
+        (unless (cdr (assq (plist-get e :line) cistern--story-copy))
+          (cistern--bank-error file "dialogue %s :line unresolvable" id))
+        (push (cons id idx) index)
+        (setq idx (1+ idx))))
+    (setq index (nreverse index))
+    (dolist (sc (plist-get loaded :scenarios))
+      (dolist (h (plist-get sc :hooks))
+        (push (cons (plist-get h :id) (plist-get h :act)) hook-acts)))
+    (dolist (e entries)
+      (let* ((gate (plist-get e :gate))
+             (hact (and gate (cdr (assq (car gate) hook-acts)))))
+        (when gate
+          (unless hact
+            (cistern--bank-error
+             file "dialogue %s :gate %S names no scenario hook"
+             (plist-get e :id) (car gate)))
+          (when (> (plist-get e :act) hact)
+            (cistern--bank-error
+             file "dialogue %s gates on a hook of a later act"
+             (plist-get e :id))))
+        (let ((sel (plist-get e :pair)))
+          (while sel
+            (pcase (car sel)
+              ('stat
+               (unless (memq (intern (upcase (symbol-name (cadr sel))))
+                             (list 'FLOW 'GRIT 'NERVE 'ARCHIVE))
+                 (cistern--bank-error file "pair stat unknown")))
+              ('quirk
+               (unless (cl-find (cadr sel)
+                                (plist-get cistern--banks :quirks)
+                                :key (lambda (x) (plist-get x :id)))
+                 (cistern--bank-error file "pair quirk unknown")))
+              (_ (cistern--bank-error file "bad pair selector")))
+            (setq sel (cddr sel)))))
+        (let ((br (plist-get e :branch)))
+          (when br
+            (dolist (nxt (plist-get br :next))
+              (let ((pos (cdr (assq nxt index)))
+                    (own (cdr (assq (plist-get e :id) index))))
+                (unless (and pos (> pos own))
+                  (cistern--bank-error
+                   file "node :next %s unknown or not later-declared"
+                   nxt)))))))))
+
+
+(defun cistern--bank-dialogue-depth (file entries)
+  "STORY §2.7: depth <= 3 from any dialogue root."
+  (let ((roots nil))
+    (dolist (e entries)
+      (when (plist-get e :root) (push e roots)))
+    (dolist (r roots)
+      (let ((d 0) (node r))
+        (while node
+          (setq d (1+ d))
+          (when (> d cistern--dialogue-depth-max)
+            (cistern--bank-error
+             file "dialogue depth exceeds %d from root %s"
+             cistern--dialogue-depth-max (plist-get r :id)))
+          (setq node
+                (cl-find (car (plist-get (plist-get node :branch) :next))
+                         entries :key (lambda (x) (plist-get x :id)))))))))
+
+(defun cistern--bank-validate-dialogue (file entries loaded)
+  "STORY §2.7 wrapper: per-node checks, then the depth check."
+  (cistern--bank-dialogue-nodes file entries loaded)
+  (cistern--bank-dialogue-depth file entries))
+
 (defun cistern--bank-registry-key (kind)
   "Registry slot (plural) for a bank KIND (STORY §4.1)."
   (pcase kind
     ('scenario :scenarios) ('quirk :quirks)
-    ('keyword :keywords) ('flavor :flavor)))
+    ('keyword :keywords) ('flavor :flavor)
+    ('dialogue :dialogues)))
 
 (defvar cistern--matrix-sources (make-hash-table :test (quote eq))
   "V4-19: hash MATRIX-ID -> source file, for cross-source id
@@ -1658,19 +1742,14 @@ one (or more) defconsts of pure data named cistern-bank-*."
                   (dolist (e entries)
                     (cistern--bank-fold-matrices
                      f (plist-get e :matrices))))
+                (when (eq kind 'dialogue)
+                  (cistern--bank-validate-dialogue f entries loaded))
                 (setq loaded
                       (plist-put loaded
-                                 (pcase kind
-                                   ('scenario :scenarios)
-                                   ('quirk :quirks)
-                                   ('keyword :keywords)
-                                   ('flavor :flavor))
+                                 (cistern--bank-registry-key kind)
                                  (append (plist-get loaded
-                                                     (pcase kind
-                                                       ('scenario :scenarios)
-                                                       ('quirk :quirks)
-                                                       ('keyword :keywords)
-                                                       ('flavor :flavor)))
+                                                     (cistern--bank-registry-key
+                                                      kind))
                                          entries)))))))))
     (setq cistern--banks loaded)
     cistern--banks))
