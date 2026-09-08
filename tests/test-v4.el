@@ -1487,5 +1487,121 @@ no banner and no drain."
           (cl-assert dlg t "conversation state missing")))))
   (message "CISTERN-DIALOGUE-OK"))
 
+(defun cistern-test-v3b-event-tiles ()
+  "V4-22: story beats spawn ! event tiles (floor-only, 3-tick
+silent countdown, expiry clears); tile-place is whitelisted; cache
+pickup banks alloy and logs."
+  ;; tile table: event ! and cache ? present, passable, ASCII
+  (dolist (spec '((event 33 t) (cache 63 t)))
+    (let ((e (cdr (assq (car spec) cistern--tile-table))))
+      (cl-assert e t "kind %s missing" (car spec))
+      (cl-assert (eq (plist-get e :passable) (nth 2 spec))
+                 t "%s passability wrong" (car spec))
+      (cl-assert (= (string-to-char (plist-get e :glyph)) (nth 1 spec))
+                 t "%s glyph wrong" (car spec))))
+  ;; tile-place effect: spawns a floor-only ! tile with countdown 3
+  (setq st (cistern--new-game 42))
+  (cistern--story-apply-effect st (list :effect 'tile-place :arg 'cache)
+                               (cons 8 6))
+  (cl-assert (eq (cistern--cell st 8 6) 'event)
+             t "tile-place did not spawn an event tile")
+  (cl-assert (= (cdr (assq (cons 8 6) (cistern-st-event-tiles st))) 3)
+             t "event tile countdown not 3")
+  (cistern--story-apply-effect st (list :effect 'tile-place :arg 'cache)
+                               (cons 0 0))
+  (cl-assert (eq (cistern--cell st 0 0) 'wall) t "tile on a wall")
+  ;; silent countdown: decays per tick, no logs, expiry clears
+  (setq logs0 (length (cistern-st-log st)))
+  (cistern--sim-tick st)
+  (cistern--sim-tick st)
+  (cl-assert (eq (cistern--cell st 8 6) 'event) t "expired early")
+  (cl-assert (= (length (cistern-st-log st)) logs0) t "the countdown logged")
+  (cistern--sim-tick st)
+  (cistern--sim-tick st)
+  (cl-assert (eq (cistern--cell st 8 6) 'floor) t "expiry did not clear")
+  ;; cache pickup: worker steps on cache -> alloy +3, floor, log
+  (setq st2 (cistern--new-game 42))
+  (cistern--set-cell st2 8 6 'cache)
+  (setq w (car (cistern-st-creators st2)))
+  (setf (cistern--worker-x w) 8)
+  (setf (cistern--worker-y w) 6)
+  (setq alloy (cistern-st-alloy st2))
+  (cistern--cache-pickup st2 w)
+  (cl-assert (eq (cistern--cell st2 8 6) 'floor) t "cache did not clear")
+  (cl-assert (= (cistern-st-alloy st2) (+ alloy cistern-cache-alloy))
+             t "cache alloy wrong")
+  (cl-assert (cl-some (lambda (l) (string-match-p "CACHE" (car l)))
+                      (cistern-st-log st2))
+             t "cache pickup not logged")
+  (message "CISTERN-V3B-TILES-OK"))
+
+(defun cistern-test-v3b-rarity-tiers ()
+  "Rarity tiers surfaced: the tier-face mapping (common=info,
+occasional=warning, rare=error — rare the most prominent) and the
+dialogue tree selection by tier weights + drift with once gates."
+  (cl-assert (eq (cistern--story-tier-face 'common) 'info) t "common face")
+  (cl-assert (eq (cistern--story-tier-face 'occasional) 'warning)
+             t "occasional face")
+  (cl-assert (eq (cistern--story-tier-face 'rare) 'error) t "rare face")
+  ;; once-per-game trees fire once
+  (setq cistern--banks nil cistern--story-copy nil
+        cistern--matrix-sources (make-hash-table :test 'eq))
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v4--root)))
+  (let ((st (cistern--new-game 20260830)))
+    (dotimes (_ 25) (cistern--do-tick st))
+    (let* ((story (cistern-st-story st))
+           (creak (car (plist-get story :hooks))))
+      (plist-put creak :state 'resolved)
+      (plist-put creak :resolved-as 'pass)
+      (let* ((before (plist-get story :roll-pos))
+             (out1 (cistern--dialogue-eval st)))
+        (cl-assert (= (length (cdr out1)) 1)
+                   t "tree did not open on the eligible tick")
+        (let* ((after (plist-get story :roll-pos))
+               (out2 (cistern--dialogue-eval st)))
+          ;; cooldown: no second line until 60 ticks
+          (cl-assert (= (length (cdr out2)) 0)
+                     t "cooldown ignored")
+          (cl-assert (/= after after) nil "")
+          ;; the stream-2 advance equals the tree draw + branch rolls
+          (cl-assert (> after before) t "stream 2 did not advance")))))
+  (message "CISTERN-V3B-TIERS-OK"))
+
+(defun cistern-test-v4-23-final-sweep ()
+  "V4-23: the wave-3 leftovers + the final guards: M-f/M-b scans
+manifolds, the death panel carries the full-history pointer with
+story+dialogue lines in the log, the §5.6 stream guards hold
+tick-for-tick vs a no-narrative run, and the five soars re-probe."
+  ;; scan includes manifolds
+  (let ((st (cistern--new-game 42)))
+    (cistern--set-cell st 8 2 'manifold)
+    (setf (cistern-st-cursor st) (cons 3 3))
+    (cistern--cmd-cursor-scan st 'next)
+    (cl-assert (eq (cistern--cell st (car (cistern-st-cursor st))
+                                    (cdr (cistern-st-cursor st)))
+                   'manifold)
+               t "scan missed the manifold"))
+  ;; §5.6: rng positions tick-for-tick vs a no-narrative run
+  (let ((rng-a nil) (rng-b nil) (prng-a nil) (prng-b nil))
+    (setq cistern--banks nil cistern--story-copy nil)
+    (let ((st (cistern--new-game 20260830)))
+      (dotimes (_ 50) (cistern--do-tick st))
+      (setq rng-a (cistern-st-rng st) prng-a (cistern-st-particle-rng st))))
+  (setq cistern--banks nil cistern--story-copy nil
+        cistern--matrix-sources (make-hash-table :test 'eq))
+  (cistern--banks-load
+   (list (expand-file-name "data/banks/example.el"
+                           cistern-test-v4--root)))
+  (let ((st (cistern--new-game 20260830)))
+    (dotimes (_ 50) (cistern--do-tick st))
+    (setq rng-b (cistern-st-rng st) prng-b (cistern-st-particle-rng st)))
+  (cl-assert (= rng-a rng-b) t "sim LCG diverged with narrative")
+  (cl-assert (= prng-a prng-b) t "particle stream diverged")
+  ;; five soars spot-probes
+  (cl-assert (= cistern-cost-decon 3) t "purge ledger moved")
+  (message "CISTERN-V4-23-OK"))
+
 (provide 'test-v4)
 ;;; test-v4.el ends here

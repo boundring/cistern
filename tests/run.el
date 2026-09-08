@@ -127,7 +127,10 @@
     cistern-test-v4-16-story-eval
     cistern-test-v4-17-story-coherence
     cistern-test-v4-19-matrix-consolidation
-    cistern-test-dialogue))
+    cistern-test-dialogue
+    cistern-test-v3b-event-tiles
+    cistern-test-v3b-rarity-tiers
+    cistern-test-v4-23-final-sweep))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."
