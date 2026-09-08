@@ -3542,3 +3542,41 @@ the relaunch is on their screen now.
 - Outcome: V5-17 GREEN, V5-18 GREEN.  Suite canonical ALL 132 TESTS
   PASSED (full soak incl. C7/C8/C9/C12).  GREEN-SYNC at the boundary
   per the standing rule.
+
+## L-106 (2026-09-08, run: v5-close — README-pass routed fixes + V5 end summary)
+
+- Three defects routed by the README dossier pass, each verified
+  against the shipped surface before the fix:
+  1. STALE TUTORIAL KEY: copy-table `tutorial-line-fmt` still read
+     "(T skips)" — the skip key moved to C-t in V4-11 and T now cycles
+     fixture types (v5).  Updated to "(C-t skips)".  The `?` briefing
+     in cistern.el already read "T cycle fixture type / C-t skip
+     tutorial" — no drift there.  No test pinned the old string (the
+     R2 copy test asserts key presence + drift-outside-table, both
+     unchanged by design).
+  2. VERSION: `cistern-version` was "3.0.0-dev" while the README
+     dossier footer reads "v5.0.0-dev · Requires Emacs 27.1+".
+     Bumped to "5.0.0-dev".  PLAYING.md carries no version line of its
+     own (it links the briefing, which now renders v5.0.0-dev) —
+     nothing to align.
+  3. PLAYING.md FIXTURE TABLE: added the Suit column matching README
+     §5, suits taken verbatim from `cistern--toilet-catalog`
+     (:primary/:secondary) — long-drop GRIT · FLOW, fall-shaft
+     FLOW · GRIT, high-cistern ARCHIVE · NERVE, archive-stall
+     NERVE · ARCHIVE, hermetic-booth NERVE · GRIT.
+- One mis-commit mid-close: `git commit -a` swept the PLAYING.md
+  table edit into the version-bump commit; caught by the commit-boundary
+  check and rewritten (soft reset + per-path recommit) before anything
+  left the machine.  Lesson (extends L-099's "verify the write"):
+  commit -a after a multi-file work session sweeps unrelated staged
+  work — commit by explicit path.
+- V5 END SUMMARY: all 19 directives GREEN across three waves —
+  wave 1 (V5-01..07) combat; wave 2 (V5-08..12) personas, thoughts,
+  romance graph; wave 3 (V5-13..19) comedy director + README
+  onboarding dossier.  Canonical suite 108 -> 132 over the phase.
+  Ledger range for the v5 effort: L-095..L-106.
+- CLOSE-PHASE READINESS: tree clean (19/19 directives committed,
+  fix-group commits 575145f / 0a86abc / da7cbf6 on 212e780), canonical
+  suite ALL 132 TESTS PASSED at the close boundary, compile guards
+  green (check-parens clean after the elisp edits, copy-table rule
+  held — no new string left the table).  Phase ready to close.
