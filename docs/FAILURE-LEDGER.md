@@ -3580,3 +3580,37 @@ the relaunch is on their screen now.
   suite ALL 132 TESTS PASSED at the close boundary, compile guards
   green (check-parens clean after the elisp edits, copy-table rule
   held — no new string left the table).  Phase ready to close.
+
+## L-107 (2026-09-08, run: v5-close-gate — social-eval wired into do-tick)
+
+- The verifier gate caught a real wiring gap on the v5 close-out:
+  `cistern--social-eval` was DEFINED (cistern-game.el, V5-12) but
+  never CALLED in `cistern--do-tick` — the let-chain ran
+  story-eval -> comedy-eval -> dialogue-eval -> rewards-eval,
+  skipping social entirely.  V5-SPEC §1 pins story-eval ->
+  social-eval -> dialogue-eval.  The L-095 class again: suite green,
+  feature dead — every V5-12 social test called `cistern--social-eval`
+  DIRECTLY, so no test exercised the do-tick path and the gap was
+  invisible to the 132/132 suite.
+- Red-first guard: extended cistern-test-v5-12-wiring with an
+  assertion that ONE `cistern--do-tick` with an injected breach event
+  at a fixture persona's tile delivers a private-channel thought
+  (fixture-flood -> v5t-ff) to that persona's ledger.  RED on the
+  unwired loop: `FAIL cistern-test-v5-12-wiring: (error "do-tick
+  wired social-eval: breach -> ledger")`.  The guard lives in the
+  wiring test, not a new test — the suite count stays 132.
+- Fix: one `(cistern--social-eval st)` call inserted after story-eval,
+  before comedy-eval in the do-tick let-chain; comments aligned (the
+  chain comment now names the full §1 order; the V5-10 thought-
+  pipeline header's "wires in V5-12" forward-reference replaced with
+  the L-107 wiring note).  social-eval reads pending events WITHOUT
+  draining (rewards-eval stays the sole drainer, L-027) and draws on
+  stream 5 only — C9/C11/C12 stream hygiene and the byte-identical
+  twin soaks all held with the wiring live.
+- Process note: the first red edit left one extra close paren in
+  test-v5.el — the suite then died on read syntax AFTER V5-12-OK
+  printed, which briefly masqueraded as a pass.  check-parens after
+  every elisp edit is the standing checklist for a reason; the paren
+  fix restored the true red before any green was claimed.
+- Outcome: V5 close-fix GREEN.  Suite canonical ALL 132 TESTS PASSED
+  (exit 0) at the L-107 boundary.

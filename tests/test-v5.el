@@ -1415,6 +1415,26 @@ social state and zero draws; the persona inspector degrades."
                  t "particles untouched")
       (cl-assert (= (cistern-st-rpg-pos st) rpg) t "RPG untouched")
       (cl-assert (= (cistern-st-combat-pos st) cb) t "combat untouched")))
+  ;; V5 close-fix (gate catch L-107): do-tick WIRES social-eval — one
+  ;; tick with a breach event next to a fixture persona delivers a
+  ;; private thought to that persona's ledger (fixture-flood is a
+  ;; private-channel class).  Red on the unwired loop: social-eval
+  ;; was defined-but-never-called (the L-095 class: suite green,
+  ;; feature dead).
+  (let ((st (cistern--new-game 20260830)))
+    (let ((id (cl-loop for k being the hash-keys
+                       of (cistern-st-personas st)
+                       when (and (consp k) (eq (car k) :toilet))
+                       return k)))
+      (cl-assert id t "fixture: a toilet persona exists")
+      (push (list 'breach 'breach (nth 1 id) (nth 2 id))
+            (cistern-st-rewards-events st))
+      (cistern--do-tick st)
+      (let ((led (plist-get (gethash id (cistern-st-personas st))
+                            :ledger)))
+        (cl-assert (and led (eq (nth 1 (car led)) 'private)
+                        (eq (nth 2 (car led)) 'v5t-ff))
+                   t "do-tick wired social-eval: breach -> ledger"))))
   ;; SC10 grep: no social symbol calls cistern--rand
   (with-temp-buffer
     (insert-file-contents

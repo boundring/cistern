@@ -692,8 +692,13 @@ call exists at the use-case layer."
     ;; V4-16 (STORY §8.1, §1 pinned ordering): ONE story-eval call
     ;; BEFORE rewards-eval — reads pending events, drains nothing
     ;; V4-16/§2 (§1 pinned ordering): story-eval completes ALL its
-    ;; draws, then dialogue-eval draws, then rewards-eval
+    ;; draws, then social-eval, then comedy-eval, then dialogue-eval
+    ;; draws, then rewards-eval (the sole drainer, L-027)
     (let* ((story-out (cistern--story-eval st))
+           ;; V5 close-fix (L-107): social-eval WAS defined-but-never-
+           ;; called — the gate caught it.  Wired here per §1: reads
+           ;; pending events WITHOUT draining, draws on stream 5 only.
+           (social-out (cistern--social-eval st))
            ;; V5-13 (COMEDY §1): comedy-eval slots after social-eval,
            ;; before dialogue-eval — the §1 pinned chain; arbitration
            ;; reads story's returned intents (§5.3)
@@ -1142,7 +1147,7 @@ lands, nil on refusal or empty cell."
 
 ;; ---------------------------------------------------------------------------
 ;; V5-10 (SOCIAL §1.4-1.6): the thought pipeline.  ONE pass per tick
-;; (the social-eval call site wires in V5-12); reads pending events
+;; (wired at the do-tick chain, L-107); reads pending events
 ;; WITHOUT draining (rewards-eval stays the sole drainer, L-027);
 ;; content draws on stream 5 only; budgets: <= 1 thought per entity
 ;; per tick, <= 4 sector-wide, <= 2 mutters, ledger cap 3.
