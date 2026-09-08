@@ -150,7 +150,11 @@
     cistern-test-v5-09-mood
     cistern-test-v5-10-thoughts
     cistern-test-v5-11-romance
-    cistern-test-v5-12-wiring))
+    cistern-test-v5-12-wiring
+    cistern-test-v5-13-tracker
+    cistern-test-v5-14-whimsey
+    cistern-test-v5-15-selection
+    cistern-test-v5-16-delivery))
 
 (defun cistern-run-all-tests ()
   "Run every cistern-test-* entry; exit non-zero on any failure."

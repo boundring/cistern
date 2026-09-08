@@ -93,5 +93,66 @@
                  (:line-key dlg-review-endorsed :effect none :arg nil)
                  (:line-key dlg-review-endorsed :effect none :arg nil))))))
 
+
+(defconst cistern-bank-example-whimsey
+  '(:kind whimsey :version "1" :generator "hand (test fixture)"
+    :copy
+    ((comedy-pipe-complaint . "WORKER %s FILES FORM 7-R AGAINST PIPE SEGMENT %d")
+     (comedy-pipe-flagged . "PIPE FLAGGED FOR REVIEW — FORM 7-R ON FILE")
+     (comedy-clog-blame . "GOBLIN %s CITES ADDENDUM %s — REVIEW PENDING")
+     (comedy-manifold-accent . "MANIFOLD %d ADOPTS A LOCAL DIALECT — REPORTS UNCHANGED")
+     (comedy-workers-comp . "CLAIM %d APPROVED — ONE (1) ALLOY DISBURSED TO %s")
+     (comedy-aesthetic . "FIXTURE %d DECLINES WORKER %s — AESTHETICS. NO APPEAL.")
+     (comedy-duel-1 . "WORKER %s AND ONE (1) RAT EXCHANGE APOLOGIES")
+     (comedy-duel-2 . "THE CORRIDOR IS %s'S — THE RAT CONCEDES")
+     (comedy-memo . "REGION (%d,%d)-(%d,%d) HEREBY %s — SIGNAGE PENDING")
+     (comedy-audit-l . "INVENTORY AUDIT — ONE (1) ALLOY LOCATED")
+     (comedy-audit-m . "INVENTORY AUDIT — ONE (1) ALLOY MISPLACED")
+     (comedy-queue . "WORKER %s DEFERS TO WORKER %s — THE DOOR REMAINS OPEN")
+     (comedy-rivalry . "FIXTURES %d AND %d ENTER COMPETITIVE REVIEW")
+     (comedy-rival-jab . "FIXTURE %d CONGRATULATES %d — THROUGH ITS TEETH")
+     (comedy-letter-1 . "A PREDECESSOR'S LETTER — 'PRIME THE EAST RUN FIRST'")
+     (comedy-letter-2 . "A PREDECESSOR'S LETTER — 'THE SOUTH MANIFOLD LIES'")
+     (comedy-letter-3 . "A PREDECESSOR'S LETTER — 'DO NOT NAME THE PIPES'")
+     (comedy-drill . "UNSCHEDULED SAFETY DRILL — PLEASE CONTINUE")
+     (comedy-drills-tally . "%d UNSCHEDULED DRILLS THIS ACT"))
+    :entries
+    ((:id pipe-complaint :when (pipes-long) :weight 10 :loud nil
+      :cooldown 200 :draws (cast 1 pipe 1) :thread nil
+      :footprint (complaint-count) :copy-key comedy-pipe-complaint)
+     (:id clog-blame :when (guild-goblins) :weight 8 :loud nil
+      :cooldown 200 :draws (goblin 1) :thread t
+      :footprint (mutter-push) :copy-key comedy-clog-blame)
+     (:id manifold-accent :when (manifold-attached) :weight 6 :loud nil
+      :cooldown 300 :draws nil :thread nil
+      :footprint (accent-ttl) :copy-key comedy-manifold-accent)
+     (:id workers-comp :when (pest-persona) :weight 7 :loud nil
+      :cooldown 250 :draws (goblin 1) :thread nil
+      :footprint (alloy-delta) :copy-key comedy-workers-comp)
+     (:id aesthetic-refusal :when (seeking-2usable) :weight 5 :loud nil
+      :cooldown 250 :draws (fixture 1) :thread nil
+      :footprint (aesthetic-p) :copy-key comedy-aesthetic)
+     (:id formal-duel :when (rat-adjacent) :weight 6 :loud nil
+      :cooldown 250 :draws (cast 1) :thread t
+      :footprint (xp-delta rat-despawn) :copy-key comedy-duel-1)
+     (:id memo-rename :when (always) :weight 5 :loud nil
+      :cooldown 300 :draws (name 1) :thread nil
+      :footprint (place-names) :copy-key comedy-memo)
+     (:id inventory-audit :when (always) :weight 6 :loud nil
+      :cooldown 250 :draws (outcome 1) :thread nil
+      :footprint (alloy-delta) :copy-key comedy-audit-l)
+     (:id queue-etiquette :when (two-workers) :weight 6 :loud nil
+      :cooldown 200 :draws (cast 2) :thread nil
+      :footprint (mutter-push) :copy-key comedy-queue)
+     (:id toilet-rivalry :when (same-type-toilets) :weight 5 :loud nil
+      :cooldown 300 :draws nil :thread nil
+      :footprint (rival-ttl) :copy-key comedy-rivalry)
+     (:id successor-letter :when (demolish-event) :weight 8 :loud nil
+      :cooldown 250 :draws (cast 1 letter 1) :thread nil
+      :footprint (alloy-delta) :copy-key comedy-letter-1)
+     (:id safety-drill :when (always) :weight 4 :loud nil
+      :cooldown 300 :draws nil :thread nil
+      :footprint (drill-counter) :copy-key comedy-drill))))
+
 (provide 'cistern-bank-example)
 ;;; data/banks/example.el ends here

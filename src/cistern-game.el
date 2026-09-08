@@ -693,10 +693,11 @@ call exists at the use-case layer."
     ;; BEFORE rewards-eval — reads pending events, drains nothing
     ;; V4-16/§2 (§1 pinned ordering): story-eval completes ALL its
     ;; draws, then dialogue-eval draws, then rewards-eval
-    (let ((story-out (cistern--story-eval st)))
-      ;; V5-12 (SOCIAL §4.2): social-eval slots between story-eval and
-      ;; dialogue-eval — the §1 pinned chain
-      (cistern--social-eval st)
+    (let* ((story-out (cistern--story-eval st))
+           ;; V5-13 (COMEDY §1): comedy-eval slots after social-eval,
+           ;; before dialogue-eval — the §1 pinned chain; arbitration
+           ;; reads story's returned intents (§5.3)
+           (comedy-out (cistern--comedy-eval st (cdr story-out))))
       (let ((dlg-out (cistern--dialogue-eval st)))
         ;; per-tick rewards evaluation (L-027 wiring): runs ONCE per
         ;; tick, after the sim phases (the tutorial advance runs
@@ -1345,6 +1346,265 @@ Social-disabled runs (banks absent) are byte-identical sims
     (cistern--romance-proximity-tick st)
     ;; the thought pass (trigger table, channels, budgets)
     (cistern--social-thoughts st)))
+
+;; ---------------------------------------------------------------------------
+;; V5-13/15/16 (COMEDY §1-§2/§5.3): the comedy director — dual-clock
+;; tracker, suppression, latching, selection, delivery.
+
+(defun cistern--comedy-anchors-scan (st)
+  "Record this tick's violent anchors (worker-death, burst,
+infestation) and a raid close on the comedy plist — pruned to 60
+ticks for the density dampener."
+  (let* ((c (cistern-st-comedy st))
+         (tick (cistern-st-tick st))
+         (anchors (plist-get c :anchors))
+         (close (plist-get (cistern-st-raid st) :last-end))
+         (last-c (plist-get c :last-close)))
+    (dolist (ev (cistern-st-rewards-events st))
+      (when (memq (cistern--event-kind ev)
+                  '(worker-death burst infestation))
+        (push tick anchors)))
+    (when (and close (not (eq close last-c)))
+      (push tick anchors)
+      (plist-put c :last-close close))
+    (plist-put c :anchors
+               (cl-remove-if (lambda (a) (< tick (+ a 60))) anchors))))
+
+(defun cistern--comedy-suppressed-p (st)
+  "The §1.2 suppression rows in pinned order (S1-S4).  S5
+(beat active) is handled at the delivery site."
+  (let* ((c (cistern-st-comedy st))
+         (tick (cistern-st-tick st))
+         (raid (cistern-st-raid st)))
+    (or
+     ;; S1: raid open
+     (and raid (plist-get raid :open))
+     ;; S2: <= 40 ticks since a violent anchor
+     (cl-some (lambda (a) (<= (- tick a) cistern--comedy-calm))
+              (plist-get c :anchors))
+     ;; S3: contamination >= 15
+     (>= (cistern-st-contam st) 15)
+     ;; S4: act-rollover ± 10
+     (or (<= (abs (- tick 120)) 10) (<= (abs (- tick 240)) 10)))))
+
+(defun cistern--comedy-tense-p (st)
+  "§1.2 density dampener: >= 2 violent anchors within 60 ticks."
+  (>= (length (plist-get (cistern-st-comedy st) :anchors)) 2))
+
+(defun cistern--comedy-budget (st)
+  "The mode-conditional budget (Clock A): auto-run flag = existing
+state, no new sim input."
+  (if (cistern-st-auto-run st)
+      cistern--comedy-budget-auto
+    cistern--comedy-budget-manual))
+
+(defun cistern--comedy-eval (st story-intents)
+  "V5-13/15/16: the comedy director — ONE call per tick, pinned
+story-eval -> social-eval -> comedy-eval -> dialogue-eval.  Reads
+pending events without draining; draws stream 6 only; emits the
+existing intent shapes.  Returns the intent list."
+  (let ((intents nil)
+        (c (cistern-st-comedy st)))
+    (when c
+      ;; clear last tick's aesthetic marks (1-tick lifetime)
+      (maphash (lambda (k v)
+                 (when (plist-get v :aesthetic-p)
+                   (puthash k (plist-put v :aesthetic-p nil)
+                            (cistern-st-toilets st))))
+               (cistern-st-toilets st))
+      (cistern--comedy-anchors-scan st)
+      (let* ((tick (cistern-st-tick st))
+             (since (- tick (plist-get c :last-beat-tick)))
+             (budget (cistern--comedy-budget st))
+             (suppressed (cistern--comedy-suppressed-p st)))
+        (cond
+         ;; thread delivery: the active beat's next line, calm ticks only
+         ((and (plist-get c :active) (not suppressed))
+          (setq intents (cistern--comedy-thread st)))
+         (suppressed
+          ;; latch: budget expired under suppression
+          (when (>= since budget)
+            (plist-put c :due-p t)))
+         (t
+          (when (>= since budget) (plist-put c :due-p t))
+          (let ((due (plist-get c :due-p))
+                (spont (and (not (cistern-st-auto-run st))
+                            (= 0 (cistern--comedy-draw st 90)))))
+            (when (or due spont)
+              (setq intents (cistern--comedy-select st story-intents))))))))
+    intents))
+
+(defun cistern--comedy-thread (st)
+  "Deliver the active multi-tick beat's next line; finish the
+thread at 0 remaining."
+  (let* ((c (cistern-st-comedy st))
+         (act (plist-get c :active))
+         (lines (plist-get act :lines))
+         (left (plist-get act :remaining))
+         (line (nth (- (length lines) left) lines)))
+    (plist-put act :remaining (1- left))
+    (when (<= (1- left) 0) (plist-put c :active nil))
+    (list (list :layer 'log :text line :face 'comedy))))
+
+(defun cistern--comedy-select (st story-intents)
+  "§1.4 selection: eligibility -> weight fold -> archetype draw ->
+instance draws -> commit + deliver.  Returns the intent list."
+  (let* ((c (cistern-st-comedy st))
+         (tick (cistern-st-tick st))
+         (tense (cistern--comedy-tense-p st))
+         (entries (plist-get cistern--banks :whimseys))
+         (eligible nil) (total 0))
+    (dolist (e entries)
+      (let* ((when-p (car (plist-get e :when)))
+             (recent (plist-get c :recent))
+             (cds (plist-get c :cooldowns))
+             (lastcd (cdr (assq (plist-get e :id) cds))))
+        (when (and (cistern--comedy-when when-p st)
+                   (not (memq (plist-get e :id) recent))
+                   (or (null lastcd) (>= tick (+ lastcd
+                                                 (plist-get e :cooldown)))))
+          (let ((w (plist-get e :weight)))
+            (when (and tense (plist-get e :loud)) (setq w (/ w 2)))
+            (setq total (+ total w))
+            (push (cons w e) eligible)))))
+    (setq eligible (nreverse eligible))
+    (when (and eligible (> total 0))
+      ;; banner arbitration: comedy takes the slot only if story
+      ;; emitted none this tick
+      (let ((story-banner
+             (cl-some (lambda (i) (eq (plist-get i :layer) 'banner))
+                      story-intents)))
+        (let* ((sel (cistern--comedy-draw st total))
+               (walk 0) (entry nil))
+          (dolist (pair eligible)
+            (unless entry
+              (setq walk (+ walk (car pair)))
+              (when (< sel walk) (setq entry (cdr pair)))))
+          (when entry
+            (cistern--comedy-commit st entry story-banner)))))))
+
+(defun cistern--comedy-commit (st entry story-banner)
+  "§1.4 step 5: instance draws, footprint, :recent/:last-beat-tick
+update, delivery via the intent grammar."
+  (let* ((c (cistern-st-comedy st))
+         (tick (cistern-st-tick st))
+         (id (plist-get entry :id))
+         (draws (plist-get entry :draws))
+         (inst nil)
+         (intents nil))
+    ;; instance draws left to right — the :draws spec is a flat list
+    ;; (kind1 n1 kind2 n2 ...) parsed as consecutive (kind count) pairs
+    (let ((d draws))
+      (while d
+      (let ((kind (car d)) (n (cadr d)))
+        (dotimes (_ n)
+          (let ((v (pcase kind
+                     ('cast
+                      (cistern--worker-glyph
+                       st (nth (cistern--comedy-draw
+                                st (length (cistern-st-creators st)))
+                               (cistern-st-creators st))))
+                     ('goblin
+                      (cistern--enemy-id
+                       (nth (cistern--comedy-draw
+                             st (max 1 (length (cistern-st-hostiles st))))
+                            (cistern-st-hostiles st))))
+                     ('pipe
+                      (cistern--comedy-draw st 900))
+                     ('fixture
+                      (car (cistern--comedy-free-toilets-plain st)))
+                     ('rat 'ONE-RAT)
+                     ('name 'EAST-RUN)
+                     ('outcome (cistern--comedy-draw st 2))
+                     ('letter (cistern--comedy-draw st 3))
+                     (_ nil))))
+            (push v inst))))
+      (setq d (cddr d))))
+    (setq inst (nreverse inst))
+    ;; commit
+    (plist-put c :last-beat-tick tick)
+    (plist-put c :due-p nil)
+    (plist-put c :recent (cons id (butlast (plist-get c :recent)
+                                           (if (>= (length (plist-get c :recent)) 3) 1 0))))
+    (plist-put c :cooldowns
+               (cons (cons id tick)
+                     (cl-remove-if (lambda (p) (eq (car p) id))
+                                   (plist-get c :cooldowns))))
+    ;; footprints + delivery per archetype
+    (pcase id
+      ('workers-comp
+       (setf (cistern-st-alloy st) (1+ (cistern-st-alloy st))))
+      ('inventory-audit
+       (if (= (or (nth 0 inst) 0) 0)
+           (setf (cistern-st-alloy st) (1+ (cistern-st-alloy st)))
+         (setf (cistern-st-alloy st) (1- (cistern-st-alloy st)))))
+      ('successor-letter
+       (setf (cistern-st-alloy st) (1+ (cistern-st-alloy st))))
+      ('safety-drill
+       (plist-put c :drills (1+ (plist-get c :drills)))
+       (unless story-banner
+         (push (list :layer 'banner :text
+                     (cistern--story-copy-key 'comedy-drill))
+               intents)))
+      ('aesthetic-refusal
+       (let* ((ft (cistern--comedy-free-toilets-plain st)))
+         (when (>= (length ft) 2)
+           (let ((pick (nth (cistern--comedy-draw st (length ft)) ft)))
+             (puthash pick
+                      (plist-put (gethash pick (cistern-st-toilets st))
+                                 :aesthetic-p t)
+                      (cistern-st-toilets st)))))))
+    ;; the log line
+    (let* ((copy-key (plist-get entry :copy-key))
+           (tmpl (cistern--story-copy-key copy-key))
+           (args (pcase id
+                   ('pipe-complaint (list (or (nth 0 inst) "α")
+                                          (or (nth 1 inst) 1)))
+                   ('clog-blame (list (or (nth 0 inst) "g1")
+                                      (or (nth 1 inst) "C")))
+                   ('manifold-accent (list 1))
+                   ('workers-comp (list tick (or (nth 0 inst) "g1")))
+                   ('aesthetic-refusal
+                    (list (if (nth 0 inst) (car (nth 0 inst)) 0)
+                          (or (nth 1 inst) "α")))
+                   ('formal-duel (list (or (nth 0 inst) "α")))
+                   ('memo-rename (list 1 1 (or (nth 0 inst) "EAST-RUN")))
+                   ('inventory-audit
+                    (list (if (= (or (nth 0 inst) 0) 0)
+                              "LOCATED" "MISPLACED")))
+                   ('queue-etiquette (list "α" "β"))
+                   ('toilet-rivalry (list 3 5))
+                   ('successor-letter
+                    (nth (or (nth 1 inst) 0)
+                         (list "A PREDECESSOR'S LETTER — 'PRIME THE EAST RUN FIRST'"
+                               "A PREDECESSOR'S LETTER — 'THE SOUTH MANIFOLD LIES'"
+                               "A PREDECESSOR'S LETTER — 'DO NOT NAME THE PIPES'")))
+                   (_ nil)))
+           (line (condition-case nil (apply #'format tmpl args)
+                   (error tmpl))))
+      (push (list :layer 'log :text line :face 'comedy) intents))
+    ;; thread setup
+    (when (plist-get entry :thread)
+      (let ((thread-lines
+             (pcase id
+               ('clog-blame
+                (list (format (cistern--story-copy-key 'comedy-clog-blame)
+                              (or (nth 0 inst) "g1") "C")
+                      (format (cistern--story-copy-key 'comedy-clog-blame)
+                              (or (nth 0 inst) "g1") "D")
+                      (format (cistern--story-copy-key 'comedy-clog-blame)
+                              (or (nth 0 inst) "g1") "E")))
+               ('formal-duel
+                (list (format (cistern--story-copy-key 'comedy-duel-1)
+                              (or (nth 0 inst) "α"))
+                      (format (cistern--story-copy-key 'comedy-duel-2)
+                              (or (nth 0 inst) "α"))))
+               (_ nil))))
+        (when thread-lines
+          (plist-put c :active
+                     (list :id id :lines thread-lines
+                           :remaining (length thread-lines))))))
+    (nreverse intents)))
 
 (defun cistern--cmd-consume-hint (st)
   "Drain ST's transient cursor hint (Q17): the driver calls this

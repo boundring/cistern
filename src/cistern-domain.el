@@ -154,7 +154,8 @@ by the view, not here).")
   ;; child stream.  Relationships (V5-11) complete the §4.3 list.
   (personas nil)
   (social-pos 0)
-  (relationships nil))
+  (relationships nil)
+  (comedy nil))
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -753,6 +754,101 @@ copy chain; the VIEW may not, per the r5/v4-16 layer pins)."
                     (format "%s: \"%s\""
                             (upcase (symbol-name class))
                             (cistern--story-copy-key (nth 2 th)))))))))))
+
+;; ---------------------------------------------------------------------------
+;; V5-13/14 (COMEDY §1.1/§5.2): the comedy tracker state, stream 6,
+;; and the closed footprint/when tables.
+
+(defconst cistern--comedy-budget-manual 150
+  "COMEDY §1.1: 150 manual ticks = 2.5 min at the design 1 tps.")
+
+(defconst cistern--comedy-budget-auto 750
+  "COMEDY §1.1: 750 auto ticks = 2.5 min at the pinned 5 tps.")
+
+(defconst cistern--comedy-calm 40
+  "COMEDY §1.2: the violence-contrast cooldown after an anchor.")
+
+(defconst cistern--comedy-footprints
+  '(complaint-count accent-ttl aesthetic-p rival-ttl place-names
+    alloy-delta xp-delta rat-despawn drill-counter thought-push
+    mutter-push)
+  "COMEDY §5.2: the closed footprint whitelist — every state delta
+comedy may make.  The loader and a batch guard reject any bank
+entry whose :footprint names anything else.")
+
+(defconst cistern--comedy-when-names
+  '(always pipes-long guild-goblins manifold-attached pest-persona
+    seeking-2usable rat-adjacent two-workers same-type-toilets
+    demolish-event)
+  "COMEDY §2.2: the closed :when predicate name table.")
+
+(defun cistern--comedy-draw (st n)
+  "One stream-6 draw in [0,N) (mid-bits slice), pos-in/pos-out on
+the comedy plist's :pos."
+  (let* ((c (cistern-st-comedy st))
+         (p (cistern--stream-next (plist-get c :pos))))
+    (plist-put c :pos p)
+    (% (ash p -6) n)))
+
+(defun cistern--comedy-free-toilets-plain (st)
+  "Free usable toilets WITHOUT the aesthetic filter — the
+aesthetic-refusal eligibility read needs the pre-filter count."
+  (let ((out nil))
+    (maphash (lambda (k v)
+               (when (and (cistern--toilet-usable-p st (car k) (cdr k))
+                          (not (plist-get v :aesthetic-p)))
+                 (push k out)))
+             (cistern-st-toilets st))
+    (sort out (lambda (a b) (< (car a) (car b))))))
+
+(defun cistern--comedy-when (name st)
+  "Evaluate the pinned :when predicate NAME over existing state."
+  (let ((workers (cistern-st-creators st)))
+    (pcase name
+      ('always t)
+      ('pipes-long
+       (let* ((tk (cistern--nearest-tank st 0 0)) (n 0))
+         (when tk
+           (let ((seen (cistern--flood st (car tk) (cdr tk)
+              (lambda (px py) (memq (cistern--cell st px py) '(pipe tank))))))
+             (maphash (lambda (k _v)
+                (when (eq (cistern--cell st (car k) (cdr k)) 'pipe)
+                  (setq n (1+ n)))) seen)))
+         (>= n 6)))
+      ('guild-goblins
+       (>= (cl-count-if (lambda (e) (eq (cistern--enemy-faction e) 'guild))
+            (cistern-st-hostiles st)) 2))
+      ('manifold-attached
+       (let ((found nil) (i 0))
+         (while (and (not found) (< i (length (cistern-st-map st))))
+           (when (eq (aref (cistern-st-map st) i) 'manifold) (setq found t))
+           (setq i (1+ i))) found))
+      ('pest-persona
+       (cl-some (lambda (e) (and (eq (cistern--enemy-faction e) 'fauna)
+            (gethash (cistern--enemy-id e) (cistern-st-personas st))))
+        (cistern-st-hostiles st)))
+      ('seeking-2usable
+       (and (>= (length (cistern--comedy-free-toilets-plain st)) 2)
+        (cl-some (lambda (w) (>= (cistern--worker-bladder w)
+           cistern-bladder-seek)) workers)))
+      ('rat-adjacent
+       (cl-some (lambda (e) (and (eq (cistern--enemy-kind e) 'rat)
+        (cl-some (lambda (w) (<= (max (abs (- (cistern--enemy-x e)
+          (cistern--worker-x w))) (abs (- (cistern--enemy-y e)
+          (cistern--worker-y w)))) 1)) workers)))
+        (cistern-st-hostiles st)))
+      ('two-workers
+       (and (>= (length workers) 2)
+        (cl-some (lambda (a) (cl-some (lambda (b) (and (not (eq a b))
+          (<= (max (abs (- (cistern--worker-x a) (cistern--worker-x b)))
+            (abs (- (cistern--worker-y a) (cistern--worker-y b)))) 2)))
+          workers)) workers)))
+      ('same-type-toilets
+       (>= (length (cistern--comedy-free-toilets-plain st)) 2))
+      ('demolish-event
+       (cl-some (lambda (e) (eq (cistern--event-kind e) 'destroyed))
+        (cistern-st-rewards-events st)))
+      (_ nil))))
 
 (defun cistern--combat-roll-stat (st)
   "4d6 drop lowest, summed — one stat score (3-18), from stream 4.
@@ -2042,9 +2138,12 @@ OR is anchored to a manifold."
 ACCESS-reality read, not a new rule."
   (let ((out nil)
         (crabs (cistern--kind-cells st 'crab)))
-    (maphash (lambda (k _v)
+    (maphash (lambda (k v)
                (when (and (cistern--toilet-usable-p st (car k) (cdr k))
-                          (not (gethash k crabs)))
+                          (not (gethash k crabs))
+                          ;; V5-15 (COMEDY §2.2 #5): the aesthetic
+                          ;; refusal drops the marked fixture
+                          (not (plist-get v :aesthetic-p)))
                  (push k out)))
              (cistern-st-toilets st))
     (sort out (lambda (a b) (< (car a) (car b))))))
@@ -2755,6 +2854,11 @@ event-tiles phase keeps its post-hazards slot)."
         (cistern--social-spawn-persona
          st (cistern--worker-glyph st w) 'worker)))
     (setf (cistern-st-relationships st) (make-hash-table :test #'equal))
+    (setf (cistern-st-comedy st)
+          (list :pos (cistern--stream-init (cistern-st-seed st) 6)
+                :last-beat-tick 0 :due-p nil :recent nil :active nil
+                :anchors nil :cooldowns nil :drills 0 :place-names nil
+                :last-close nil))
     st))
 
 (defun cistern--story-generate (st)
@@ -2974,9 +3078,9 @@ until `cistern--banks-load'.")
 section first, then bank :copy sections in load order (§4.4).")
 
 (defconst cistern--bank-kinds
-  '(scenario quirk keyword flavor dialogue thought)
+  '(scenario quirk keyword flavor dialogue thought whimsey)
   "The bank kinds (STORY §4.2; dialogue = V4-SPEC §2, wave 3;
-thought = SOCIAL §4.4, v5 wave 2).")
+thought = SOCIAL §4.4, whimsey = COMEDY §2.1, v5 wave 3).")
 
 (defconst cistern--social-species-census
   '(worker goblin pest fixture tank structure)
@@ -3185,7 +3289,8 @@ selectors known, :next names a LATER-declared node."
     ('scenario :scenarios) ('quirk :quirks)
     ('keyword :keywords) ('flavor :flavor)
     ('dialogue :dialogues)
-    ('thought :thoughts)))
+    ('thought :thoughts)
+    ('whimsey :whimseys)))
 
 (defvar cistern--matrix-sources (make-hash-table :test (quote eq))
   "V4-19: hash MATRIX-ID -> source file, for cross-source id
@@ -3269,6 +3374,26 @@ to 100 over 3 acts" id tiers)))
                               id (plist-get e :when)))
        (unless (cdr (assq (plist-get e :copy-key) cistern--story-copy))
          (cistern--bank-error file "thought %s :copy-key unresolvable" id)))
+      ('whimsey
+       ;; V5-14 (COMEDY §2.1/§5.2): :when in the closed predicate
+       ;; table, :weight/:cooldown numbers, :draws a list of (KIND N),
+       ;; :footprint entries on the §5.2 whitelist — fail-first on
+       ;; anything else
+       (unless (memq (car (plist-get e :when))
+                     cistern--comedy-when-names)
+         (cistern--bank-error file "whimsey %s :when %S unknown"
+                              id (plist-get e :when)))
+       (unless (and (numberp (plist-get e :weight))
+                    (> (plist-get e :weight) 0))
+         (cistern--bank-error file "whimsey %s :weight invalid" id))
+       (unless (numberp (plist-get e :cooldown))
+         (cistern--bank-error file "whimsey %s :cooldown invalid" id))
+       (dolist (fp (plist-get e :footprint))
+         (unless (memq fp cistern--comedy-footprints)
+           (cistern--bank-error
+            file "whimsey %s :footprint %S off the whitelist" id fp)))
+       (unless (cdr (assq (plist-get e :copy-key) cistern--story-copy))
+         (cistern--bank-error file "whimsey %s :copy-key unresolvable" id)))
       ('keyword
        (unless (memq (plist-get e :class) '(place sector designation))
          (cistern--bank-error file "keyword %s :class %S unknown"

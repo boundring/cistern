@@ -3482,3 +3482,34 @@ the relaunch is on their screen now.
   ~/.emacs.d/lisp/, no stale cistern.elc present, no running cistern
   instance found to relaunch (pgrep empty — the installed copy is
   current for the next launch).
+
+---
+
+## L-104 (2026-09-08, run: wave3-batch-1 — V5-13..16 comedy director)
+
+- The comedy tracker's dual clock uses the existing auto-run flag
+  (`cistern-st-auto-run`) as the mode signal — no new sim input (§1.1).
+  Budget boundaries tested by setting :last-beat-tick directly (the
+  do-tick loop approach was brittle: breaches produce violent anchors
+  that legitimately suppress, making the 150-tick manual boundary
+  nondeterministic in a raw soak).
+- Draws spec parsing: the bank's `:draws (goblin 1)` is a FLAT list
+  parsed as consecutive (kind count) pairs — not a list of lists.  The
+  first test fixture used `(list (list 'fixture 1))` which broke the
+  while/cddr parsing.  L-099 lesson (whole-file writes, no line
+  surgery) extended: always validate the DATA SHAPE against the
+  parsing code, not just the parens.
+- Two-workers predicate: the nested cl-some's outer seq arg drifted to
+  `t` through paren surgery — caught by the compiler as
+  wrong-number-of-arguments.  L-099 triple-confirmed.
+- The aesthetic refusal filter was lost during the c65a888 restore —
+  re-added to `cistern--free-usable-toilets`.  The restore/reapply
+  cycle must carry a checklist of every filter added since the base
+  commit.
+- The SC3 "no mood field" grep narrowed from the over-broad `:mood`
+  substring (which matched the v5-12 persona-words query plist keys)
+  to the actual pin: struct constructors carry no mood slot (asserted
+  via plist-get on the make-fn results).
+- Outcome: V5-13 GREEN, V5-14 GREEN, V5-15 GREEN, V5-16 GREEN.  Suite
+  canonical 130/130.  GREEN-SYNC: the five src files synced to
+  ~/.emacs.d/lisp/ at the boundary per the standing rule.

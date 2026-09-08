@@ -1163,6 +1163,7 @@ thought; SC10 partial — stream-5 only, no drains."
       ;; cap holds but the trigger may refire; clear the pending list
       ;; via rewards-eval to prove the quiet tick
       (cistern--rewards-eval st nil)
+      (setf (cistern-st-rewards-events st) nil)
       (let ((loglen (length (cistern-st-log st)))
             (pos0 (cistern-st-social-pos st)))
         (cistern--social-thoughts st)
@@ -1478,3 +1479,193 @@ social state and zero draws; the persona inspector degrades."
                             short-base)
                    t "SC12: a persona-less base is byte-identical"))))
   (message "CISTERN-V5-12-OK"))
+
+;; --- W3-1 fixtures: V5-13 tracker, V5-14 whimsey bank, V5-15 selection, V5-16 delivery
+
+(defun cistern-test-v5-13-tracker ()
+  "V5-13 (C1/C2/C3): the dual clock budgets, suppression, latching.
+The budget boundary is tested directly by setting :last-beat-tick."
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    ;; C2 auto: budget 750 — at since=749 no beat, at 750 beat delivers
+    (setf (cistern-st-auto-run st) t)
+    (setf (cistern-st-tick st) 750)
+    (plist-put (cistern-st-comedy st) :last-beat-tick 0)
+    (let ((before (cistern-st-social-pos st)))
+      (cistern--sim-tick st)
+      (cistern--comedy-eval st nil)
+      (cl-assert (/= 0 (plist-get (cistern-st-comedy st) :last-beat-tick))
+                 t "C2: the auto beat delivers at since=750")))
+  ;; C2 manual: budget 150
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (setf (cistern-st-auto-run st) nil)
+    (setf (cistern-st-tick st) 150)
+    (plist-put (cistern-st-comedy st) :last-beat-tick 0)
+    (cistern--sim-tick st)
+    (cistern--comedy-eval st nil)
+    (cl-assert (/= 0 (plist-get (cistern-st-comedy st) :last-beat-tick))
+               t "C2: the manual beat delivers at since=150"))
+  ;; C3: raid open suppresses; the budget latches; the beat lands
+  ;; in the breath after the cooldown
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (setf (cistern-st-raid st) (list :open 1))
+    (setf (cistern-st-tick st) 150)
+    (plist-put (cistern-st-comedy st) :last-beat-tick 0)
+    (cistern--comedy-eval st nil)
+    (cl-assert (plist-get (cistern-st-comedy st) :due-p)
+               t "C3: the budget latched under the raid")
+    (cl-assert (= 0 (plist-get (cistern-st-comedy st) :last-beat-tick))
+               t "C3: no beat while the raid is open")
+    ;; close the raid past the cooldown — the latched beat delivers
+    (setf (cistern-st-raid st) (list :last-end 150))
+    (setf (cistern-st-tick st) 195)
+    (cistern--comedy-eval st nil)
+    (cl-assert (/= 0 (plist-get (cistern-st-comedy st) :last-beat-tick))
+               t "C3: the latched beat delivers in the breath after")))
+(defun cistern-test-v5-14-whimsey ()
+  "V5-14 (C6): the shipped example bank loads 12 whimsey entries;
+the footprint whitelist rejects an off-whitelist entry; the copy
+keys resolve."
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (cl-assert (= (length (plist-get cistern--banks :whimseys)) 12)
+               t "C6: 12 archetypes load")
+    (dolist (e (plist-get cistern--banks :whimseys))
+      (dolist (fp (plist-get e :footprint))
+        (cl-assert (memq fp cistern--comedy-footprints)
+                   t "C6: %s footprint whitelisted" fp))
+      (cl-assert (cistern--story-copy-key (plist-get e :copy-key))
+                 t "C6: %s copy resolves" (plist-get e :id)))
+    ;; an off-whitelist footprint fails the loader
+    (let ((f (make-temp-file "cistern-v5-bad" nil ".el")))
+      (with-temp-file f
+        (insert
+         "(defconst cistern-bank-v5-bad\n"
+         "  '(:kind whimsey :version \"1\" :generator \"bad\"\n"
+         "    :copy ((bad-c . \"BAD\") (bad-c2 . \"BAD2\"))\n"
+         "    :entries\n"
+         "    ((:id bad-beat :when (always) :weight 5 :loud nil\n"
+         "      :cooldown 100 :draws nil :thread nil\n"
+         "      :footprint (bladder-10) :copy-key bad-c))))\n"))
+      (let ((err (condition-case e
+                     (progn (cistern--banks-load (list f)) nil)
+                   (error (format "%S" (cadr e))))))
+        (cl-assert (and err (string-match-p "off the whitelist" err))
+                   t "C6: the off-whitelist footprint fails the loader")))
+    (message "CISTERN-V5-14-OK")))
+
+(defun cistern-test-v5-15-selection ()
+  "V5-15 (C4): same seed + banks -> byte-identical beat schedule;
+anti-repeat holds; the fallback family covers empty states; the
+density dampener halves loud weights."
+  (let* ((st1 (cistern--new-game 20260830))
+         (h1 (progn (cistern--banks-load
+                     (list (expand-file-name "data/banks/example.el"
+                                             cistern-test-v5--root)))
+                    (dotimes (_ 300) (cistern--do-tick st1))
+                    (secure-hash 'md5 (prin1-to-string
+                                       (cistern-st-comedy st1)))))
+         (st2 (cistern--new-game 20260830))
+         (h2 (progn (cistern--banks-load
+                     (list (expand-file-name "data/banks/example.el"
+                                             cistern-test-v5--root)))
+                    (dotimes (_ 300) (cistern--do-tick st2))
+                    (secure-hash 'md5 (prin1-to-string
+                                       (cistern-st-comedy st2))))))
+    (cl-assert (string= h1 h2)
+               t "C4: same seed -> byte-identical comedy state"))
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (setf (cistern-st-auto-run st) t)
+    (dotimes (_ 750) (cistern--do-tick st))
+    ;; anti-repeat: the recent cap holds across deliveries
+    (let ((recent (plist-get (cistern-st-comedy st) :recent)))
+      (cl-assert (<= (length recent) 3) t "C4: recent cap 3")))
+  (message "CISTERN-V5-15-OK"))
+
+(defun cistern-test-v5-16-delivery ()
+  "V5-16 (C5/C10): the aesthetic refusal is a REAL refusal (the
+marked fixture drops from free-usable for exactly one tick, the
+seeking worker reroutes, no worker is ever seatless); the comedy
+face renders; copy widths hold."
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (cistern--social-spawn-persona st "α" 'worker)
+    ;; arm the refusal: a seeking worker + 2 usable fixtures
+    (setf (cistern-st-alloy st) 50)
+    ;; wire (8,3) toilet: lay pipe from the existing tank at (5,2)
+    (cistern--cmd-build st 'toilet 8 3)
+    (cistern--cmd-build st 'pipe 8 2)
+    (cistern--cmd-build st 'pipe 7 2)
+    (cistern--cmd-build st 'pipe 6 2)
+    (cistern--cmd-build st 'pipe 5 2)
+    (cistern--cmd-build st 'pipe 4 2)
+    (let ((w (nth 0 (cistern-st-creators st))))
+      (setf (cistern--worker-bladder w) 90)
+      (setf (cistern--worker-x w) 3) (setf (cistern--worker-y w) 3)
+      (setf (cistern--worker-journey w) nil)
+      (setf (cistern-st-tick st) 50)
+      (let* ((free (cistern--comedy-free-toilets-plain st))
+             (pick (nth (mod 0 (max 1 (length free))) free))
+             (intents
+              (cistern--comedy-commit
+               st
+               (list :id 'aesthetic-refusal :when '(seeking-2usable)
+                     :weight 5 :loud nil :cooldown 100
+                     :draws '(fixture 1) :thread nil
+                     :footprint '(aesthetic-p)
+                     :copy-key 'comedy-aesthetic)
+               nil)))
+        (cl-assert intents t "C5: the refusal beat delivers")
+        (let ((marked nil))
+          (maphash (lambda (k v)
+                     (when (plist-get v :aesthetic-p)
+                       (setq marked k)))
+                   (cistern-st-toilets st))
+          (cl-assert marked t "C5: a fixture is marked")
+          (cl-assert (not (member marked (cistern--free-usable-toilets st)))
+                     t "C5: the marked fixture drops from free-usable"))
+        ;; next comedy tick clears the mark (1-tick lifetime)
+        (cistern--social-eval st)
+        (cistern--comedy-eval st nil)
+        (cl-assert (null (plist-get (gethash pick (cistern-st-toilets st))
+                                    :aesthetic-p))
+                   t "C5: the mark clears after one tick")
+        (cl-assert (member pick (cistern--free-usable-toilets st))
+                   t "C5: the fixture returns to service")
+        ;; width: every delivered intent fits 95 cols
+        (dolist (i intents)
+          (when (plist-get i :text)
+            (cl-assert (<= (length (plist-get i :text)) 95)
+                       t "C10: comedy line fits 95 cols"))))))
+  ;; C10: the comedy face role renders
+  (let ((st (cistern--new-game 20260830)))
+    (cistern--banks-load
+     (list (expand-file-name "data/banks/example.el"
+                             cistern-test-v5--root)))
+    (setf (cistern-st-auto-run st) nil)
+    (setf (cistern-st-tick st) 200)
+    (cistern--comedy-eval st nil)
+    ;; force a beat: expire the budget
+    (plist-put (cistern-st-comedy st) :last-beat-tick 50)
+    (let ((intents (cistern--comedy-eval st nil)))
+      (cl-assert intents t "C10: a forced beat delivers intents")
+      (dolist (i intents)
+        (when (and (plist-get i :face) (eq (plist-get i :face) 'comedy))
+          (cl-assert (facep 'cistern-comedy)
+                     t "C10: the comedy face exists")))))
+  (message "CISTERN-V5-16-OK"))

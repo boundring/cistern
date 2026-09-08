@@ -290,6 +290,7 @@ drop the others, so `cistern' reliably lands the user on the map."
 (defun cistern-tick ()
   (interactive)
   (cistern--cmd-consume-hint cistern--st)      ; R2-Q06: non-cursor
+  (cistern--comedy-nudge-maybe)                ; V5-13 Clock B
   (if (cistern-st-over cistern--st)
       ;; Q23: ONE restart line, not one per post-over keypress — the
       ;; duplicate suppression is silent (log history keeps the first)
@@ -428,6 +429,50 @@ no arm-then-fail noise."
   (interactive) (cistern--arm-and-build 'pipe))
 (defun cistern-build-tank ()
   (interactive) (cistern--arm-and-build 'tank))
+
+;; V5-13 (COMEDY §1.1 Clock B): the wall-clock backstop — driver-side,
+;; non-sim, determinism-free.  No comedy line in 2.5 real minutes AND
+;; at least one tick advanced since the last nudge -> cycle one
+;; deadpan one-liner through the hint slot.  A nudge is comedy, not a
+;; beat: no bank entry, no stream-6 draw, no cistern-st mutation.
+(defconst cistern--comedy-nudges
+  '["THE SECTOR REMAINS UNDER REVIEW. SO DO YOU."
+    "A PIPE SOMEWHERE IS HAVING A THOUGHT."
+    "FORM 7-R SUBMISSIONS ARE UP THIS QUARTER."
+    "THE MANIFOLD HAS NOTED YOUR ABSENCE."
+    "ONE (1) UNCLAIMED ALLOY IS STILL UNCLAIMED."
+    "THE RATS HAVE FILED FOR QUIET HOURS."
+    "TANK STATUS: TANK."
+    "THIS SPACE INTENTIONALLY UNSUPPRESSIVE."]
+  "COMEDY §1.1 Clock B: 8 deadpan one-liners, no bank, no draws.")
+
+(defvar cistern--comedy-nudge-time nil
+  "Wall time of the last Clock B nudge.  Ephemeral, driver-only.")
+(defvar cistern--comedy-nudge-tick nil
+  "The tick at the last nudge — a second nudge needs a tick advanced.")
+(defvar cistern--comedy-nudge-idx 0
+  "The cycling index into cistern--comedy-nudges.")
+
+(defun cistern--comedy-nudge-maybe ()
+  "Clock B backstop: post one nudge line through the hint slot if
+2.5 real minutes passed since the last comedy line AND a tick
+advanced since the last nudge."
+  (when cistern--st
+    (let* ((now (float-time))
+           (gap (if cistern--comedy-nudge-time
+                    (- now cistern--comedy-nudge-time) 0))
+           (tick-moved
+            (or (null cistern--comedy-nudge-tick)
+                (/= (cistern-st-tick cistern--st) cistern--comedy-nudge-tick))))
+      (when (and (>= gap 150) tick-moved)
+        (setf (cistern-st-hint cistern--st)
+              (aref cistern--comedy-nudges
+                    (% cistern--comedy-nudge-idx
+                       (length cistern--comedy-nudges))))
+        (setq cistern--comedy-nudge-idx
+              (1+ cistern--comedy-nudge-idx)
+              cistern--comedy-nudge-time now
+              cistern--comedy-nudge-tick (cistern-st-tick cistern--st))))))
 
 (defun cistern-focus ()
   (interactive)

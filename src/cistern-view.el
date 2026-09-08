@@ -67,6 +67,9 @@ auto-run) makes 4.  Never two independent numbers."
   "Goblins — warband hostiles and the guild fixer alike.")
 (defface cistern-pest '((t :weight bold))
   "Fauna hostiles: rat, crab, leech, sponge.")
+;; V5-16 (COMEDY §5.3): the comedy face — S2-derived, standard
+;; emphasis, never an alert role (a joke must not look like a fire)
+(defface cistern-comedy '((t :weight bold)) "Whimsey report lines.")
 
 ;; ---------------------------------------------------------------------------
 ;; Theme-contrast palette (V4-03, SURFACE S2.1/S2.2).  PURE MATH: the
@@ -103,7 +106,8 @@ auto-run) makes 4.  Never two independent numbers."
     (event . (60 0.6 standard))
     ;; V5-07: hostile goblins alert-magenta, fauna standard-olive
     (goblin . (330 0.7 alert))
-    (pest . (90 0.5 standard)))
+    (pest . (90 0.5 standard))
+    (comedy . (200 0.45 standard)))
   "Face/role → (HUE SAT CLASS); CLASS ∈ recessive/standard
 \(target 4.5:1) or emphatic/alert (7.0:1).")
 
