@@ -85,7 +85,12 @@ by the view, not here).")
   x y (bladder 20) (sick 0) (mine 0) (use-t 0) (using nil) (toilet nil)
   ;; V4-10 (RPG §1): the maintenance dossier — (FLOW GRIT NERVE
   ;; ARCHIVE) scores 3-18, XP ledger, clearance level 1..3
-  (stats nil) (xp 0) (clearance 1) (journey nil))
+  (stats nil) (xp 0) (clearance 1) (journey nil)
+  ;; V5-01 (COMBAT §5.1): the injury track (max = 8 + GRIT mod,
+  ;; rolled at spawn — V5-03) and the stable spawn-index — the
+  ;; identity glyph reads the STORED index, never list position,
+  ;; so a death renames nobody (COMBAT §3.4.2, fail-first C4).
+  (hp nil) (spawn-idx nil))
 
 (cl-defstruct cistern-st
   (w cistern-w) (h cistern-h)
@@ -125,7 +130,15 @@ by the view, not here).")
   ;; (banks not loaded — a legal no-op state for tests)
   (story nil)
   ;; V4-22: alist ((X . Y) . TICKS-LEFT) - the ! tiles' countdowns
-  (event-tiles nil))
+  (event-tiles nil)
+  ;; V5-01 (COMBAT §5.1): the violent base.  HOSTILES is the full
+  ;; enemy list — spawn-appended, never re-sorted (§1.4).  COMBAT-POS
+  ;; is the stream-4 position (seed ⊕ 4), pos-in/pos-out like rpg-pos;
+  ;; HOSTILE-SEQ is the g<N> id counter (§1.4: stable for the
+  ;; entity's life; nothing else may collide with it).
+  (combat-pos 0)
+  (hostiles nil)
+  (hostile-seq 0))
 
 (defun cistern--rand (st n)
   "Advance ST's LCG, return a value in [0,N).  Deterministic."
@@ -210,6 +223,136 @@ clamp(3 − mod, 2, 6); sick workers take twice as many (§1)."
 (defconst cistern--cache-alloy 3
   "V4-22 (S3.2): the alloy bonus banked by the first worker to walk
 over a cache tile.")
+
+;; ---------------------------------------------------------------------------
+;; V5-01 (COMBAT §1/§5.2): the combat child stream — id 4 (seed ⊕ 4),
+;; the first free id after 0 reserved, 1 story-gen, 2 story-runtime,
+;; 3 RPG.  Same recurrence, same mid-bits slice as every other child
+;; stream (RPG §3.2 ruling: one rule, all streams); pos-in/pos-out on
+;; `cistern-st-combat-pos'.  NEVER the sim LCG, never streams 0–3.
+
+(defun cistern--combat-d6-pos (pos)
+  (let ((p (cistern--stream-next pos)))
+    (cons (1+ (% (ash p -6) 6)) p)))
+
+(defun cistern--combat-d20-pos (pos)
+  (let ((p (cistern--stream-next pos)))
+    (cons (1+ (% (ash p -6) 20)) p)))
+
+(defun cistern--combat-d6 (st)
+  "Stateful stream-4 d6 draw (pos-in/pos-out on `cistern-st-combat-pos')."
+  (let ((r (cistern--combat-d6-pos (cistern-st-combat-pos st))))
+    (setf (cistern-st-combat-pos st) (cdr r))
+    (car r)))
+
+(defun cistern--combat-d20 (st)
+  "Stateful stream-4 d20 draw (pos-in/pos-out on `cistern-st-combat-pos')."
+  (let ((r (cistern--combat-d20-pos (cistern-st-combat-pos st))))
+    (setf (cistern-st-combat-pos st) (cdr r))
+    (car r)))
+
+(defun cistern--combat-roll-stat (st)
+  "4d6 drop lowest, summed — one stat score (3-18), from stream 4.
+The identical draw procedure as the worker dossier (COMBAT §1:
+every entity reads its numbers the same way)."
+  (let ((rolls (sort (list (cistern--combat-d6 st) (cistern--combat-d6 st)
+                           (cistern--combat-d6 st) (cistern--combat-d6 st))
+                     #'<)))
+    (+ (nth 1 rolls) (nth 2 rolls) (nth 3 rolls))))
+
+;; ---------------------------------------------------------------------------
+;; V5-01 (COMBAT §1.4): the full entity — stable id, stats, position,
+;; faction.  One struct, one state list, least-active.  GNAW/ DRAIN/
+;; GRIP are kind-specific scratch (gnaw timer, drain/split counter,
+;; leech host); IDLE is the fixer loop's ticks-since-productive
+;; counter (V5-05; one slot past the §1.4 sketch, ledgered L-096).
+
+(defconst cistern--enemy-hp-base
+  '((warband . 6) (fixer . 6) (rat . 4) (crab . 5) (leech . 3) (sponge . 8))
+  "COMBAT §1 bestiary: kind HP bases.")
+
+(cl-defstruct (cistern--enemy (:constructor cistern--enemy-make))
+  id faction kind x y (stats nil) (hp 0)
+  (gnaw 0) (drain 0) (grip nil) (idle 0))
+
+(defun cistern--spawn-enemy (st faction kind x y)
+  "Spawn one full combat entity into ST (COMBAT §1.4/§2): stable
+`g<N>' id from the state counter, a 4d6-drop-lowest × 4 dossier
+from stream 4 in the pinned call order, hp = kind-base + GRIT mod.
+Appends to `hostiles' — spawn order, never re-sorted."
+  (let* ((stats (list (cistern--combat-roll-stat st)
+                      (cistern--combat-roll-stat st)
+                      (cistern--combat-roll-stat st)
+                      (cistern--combat-roll-stat st)))
+         (grit-mod (cistern--rpg-mod (nth 1 stats)))
+         (e (cistern--enemy-make
+             :id (format "g%d" (1+ (cistern-st-hostile-seq st)))
+             :faction faction :kind kind :x x :y y
+             :stats stats
+             :hp (+ (cdr (assq kind cistern--enemy-hp-base)) grit-mod))))
+    (setf (cistern-st-hostile-seq st)
+          (1+ (cistern-st-hostile-seq st)))
+    (setf (cistern-st-hostiles st)
+          (append (cistern-st-hostiles st) (list e)))
+    e))
+
+;; ---------------------------------------------------------------------------
+;; V5-02 (COMBAT §3.1/§3.2): combat resolution on the shared core.
+;; One roll, one band, one lookup — the v4 pipeline reused verbatim.
+
+(defun cistern--combat-band (st atk def)
+  "One attack roll on stream 4 (COMBAT §3.1): margin = roll + ATK
+− DEF through the SHARED `cistern--margin-band', with nat-20/nat-1
+promotion pre-lookup.  Pos-in/pos-out on `cistern-st-combat-pos'."
+  (let* ((r (cistern--combat-d20-pos (cistern-st-combat-pos st)))
+         (roll (car r))
+         (band (cistern--margin-band (+ roll atk (- def)))))
+    (setf (cistern-st-combat-pos st) (cdr r))
+    (cond ((= roll 20) 3) ((= roll 1) 0) (t band))))
+
+(defun cistern--combat-strike (st matrix-id atk def)
+  "One attack: d20 + ATK − DEF, shared band + promotion, one
+gethash on (MATRIX-ID . BAND).  Returns the effect plist; band 0
+is a MISS (:dmg 0) that logs nothing (S2: misses are silent)."
+  (cistern--matrix-effect matrix-id (cistern--combat-band st atk def)))
+
+(defun cistern--enemy-atk (e)
+  "ATK = FLOW mod (COMBAT §1 derived stats)."
+  (cistern--rpg-mod (nth 0 (cistern--enemy-stats e))))
+
+(defun cistern--enemy-def (e)
+  "DEF = 10 + GRIT mod (COMBAT §1 derived stats)."
+  (+ 10 (cistern--rpg-mod (nth 1 (cistern--enemy-stats e)))))
+
+(defun cistern--adjacent-hostiles (st x y)
+  "Hostiles 4-adjacent to (X,Y), in spawn (list) order."
+  (cl-remove-if-not
+   (lambda (e)
+     (let ((dx (abs (- (cistern--enemy-x e) x)))
+           (dy (abs (- (cistern--enemy-y e) y))))
+       (and (= dx 1) (zerop dy))))
+   (cistern-st-hostiles st)))
+
+(defun cistern--combat-target (st w)
+  "Worker W's auto-defense target (COMBAT §3.2/§3.5): the player's
+`focus' enemy first when it is adjacent, else the nearest adjacent
+hostile (spawn order breaks ties) — ALWAYS filtered to exclude
+faction `guild' (§3.5 guard-rail).  nil when nothing qualifies."
+  (let* ((x (cistern--worker-x w)) (y (cistern--worker-y w))
+         (cands (cl-remove-if
+                 (lambda (e) (eq (cistern--enemy-faction e) 'guild))
+                 (cistern--adjacent-hostiles st x y)))
+         (focus (and (cistern-st-focus st)
+                     (cl-find (cistern-st-focus st) cands
+                              :key #'cistern--enemy-id :test #'equal))))
+    (or focus
+        (let ((best nil) (bd nil))
+          (dolist (e cands)
+            (let ((d (+ (abs (- (cistern--enemy-x e) x))
+                        (abs (- (cistern--enemy-y e) y)))))
+              (when (or (null bd) (< d bd))
+                (setq bd d best e))))
+          best))))
 
 (defun cistern--story-tier-face (tier)
   "V4-22 rarity surfacing: the tier maps onto the existing severity
@@ -318,8 +461,14 @@ alloy bonus; the tile clears to floor and the pickup logs success."
 (defconst cistern--matrix-hash
   (let ((h (make-hash-table :test #'equal)))
     (dolist (m '((exposure-grit . ((:sick 5) (:sick 0) (:sick 0) (:sick 0 :xp 1)))
-                 (composure-nerve . ((:spike 10) (:spike 5) (:spike 0)
-                                     (:spike 0 :xp 1)))))
+                (composure-nerve . ((:spike 10) (:spike 5) (:spike 0)
+                                    (:spike 0 :xp 1)))
+                ;; V5-02 (COMBAT §3.1): the two damage matrices, folded
+                ;; into the ONE hash at load time — no second band
+                ;; vocabulary, no new matrix id per verb (A9).  Band 0
+                ;; is a MISS: damage 0, nothing logs.
+                (dmg-minor . ((:dmg 0) (:dmg 1) (:dmg 1) (:dmg 2)))
+                (dmg-warband . ((:dmg 0) (:dmg 1) (:dmg 2) (:dmg 3)))))
       (let ((i 0))
         (dolist (b (cdr m))
           (puthash (cons (car m) i) b h)
@@ -502,10 +651,14 @@ V4-01: the entry is (LINE SEVERITY TICK), stamped at append."
 in the creators list.")
 
 (defun cistern--worker-glyph (st w)
-  "Identity glyph for worker W from its stable creators-list
-index.  The map, the inspector and the accident log all name the
-worker by this glyph (Q14: no format drift, no off-by-one)."
-  (let ((i (or (cl-position w (cistern-st-creators st) :test #'eq) 0)))
+  "Identity glyph for worker W from its STORED spawn-index (V5-01,
+COMBAT §3.4.2: the index is assigned at creation and never
+renumbered — a death renames nobody).  The map, the inspector and
+the accident log all name the worker by this glyph (Q14: no
+format drift, no off-by-one)."
+  (let ((i (or (cistern--worker-spawn-idx w)
+               (cl-position w (cistern-st-creators st) :test #'eq)
+               0)))
     (aref cistern--worker-glyphs
           (mod i (length cistern--worker-glyphs)))))
 
@@ -872,6 +1025,10 @@ entering a toilet IS seating yourself.  Toilets are rooms, not floors."
 
 (defun cistern--spawn-worker (st x y)
   (let ((w (cistern--worker-make :x x :y y :bladder 20
+                                 ;; V5-01: the stable spawn-index is
+                                 ;; monotonic — initial procgen workers
+                                 ;; take 0..3, migrant N takes 4+N
+                                 :spawn-idx (+ 4 (cistern-st-migrants st))
                                  :stats (cistern--rpg-roll-stats st))))
     (setf (cistern-st-creators st)
           (append (cistern-st-creators st) (list w)))
@@ -1311,11 +1468,18 @@ game layer (Phase 2)."
     ;; before the cast so spawn stat draws consume it sequentially
     (setf (cistern-st-rpg-pos st)
           (cistern--stream-init (cistern-st-seed st) 3))
-    (dolist (p cistern--procgen-spawns)
+    ;; V5-01 (COMBAT §5.2): the combat child stream (seed ⊕ 4)
+    ;; initializes at construction, like the RPG stream
+    (setf (cistern-st-combat-pos st)
+          (cistern--stream-init (cistern-st-seed st) 4))
+    (let ((i 0))
+      (dolist (p cistern--procgen-spawns)
       (let ((w (cistern--worker-make :x (nth 0 p) :y (nth 1 p)
+                                     :spawn-idx i
                                      :stats (cistern--rpg-roll-stats st))))
         (setf (cistern-st-creators st) (append (cistern-st-creators st)
-                                               (list w)))))
+                                               (list w)))
+        (setq i (1+ i)))))
     (setf (cistern-st-migrants st) 0)
     (setf (cistern-st-built-at st) (make-hash-table :test #'equal))
     ;; Q03 (REWARDS-DESIGN §1): the starter card is dealt from tick

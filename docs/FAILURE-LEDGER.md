@@ -3251,3 +3251,31 @@ the relaunch is on their screen now.
   user-visible (docs pass should mention it under install/troubleshooting).
 
 ---
+
+---
+
+## L-096 (2026-09-08, run: wave1-violent-base — V5-01 entity struct + stream 4)
+
+- Finding (doc fixture drift, not a code bug): COMBAT.md §7's worked-example
+  dossier ledger is only reachable for g1 — (11 8 10 15) equals stream-4
+  positions 1–16 read as d6 from init 20260826 (verified against the raw
+  recurrence).  The g2/g3 rows ((15 17 15 14) / (11 11 11 11) and the d6
+  list past position 16) do not exist in the real stream — the author
+  padded plausible values.  The §7 d20 table (17, 12, 13, …) and d6 table
+  (3, 2, 3, 5, …) ARE the true modulus readings of the same positions, so
+  the stream itself is pinned correctly.
+- Ruling applied: the binding contract is the DRAW PROCEDURE (4d6-drop-lowest
+  × 4 from stream 4, mid-bits slice, in spawn order), not the unreachable
+  literals.  CB1's test derives the expected dossiers independently from the
+  raw recurrence and pins g1 to §7's literal.  Related §7 inconsistencies
+  (g3's objective "7 → harass" contradicts the "d20 mod 3 → gnaw/steal/
+  harass" mapping — 7 mod 3 = 1 = steal; prose "12 d6 each" vs the actual
+  16 d6 per raider) resolved in favor of the twice-stated rule text:
+  mapping wins, 16 d6 wins.  V5-04 consumes objectives accordingly.
+- Structural deviation (pinned): `cistern--enemy` carries ONE slot beyond
+  the §1.4 sketch — `idle` (ticks since the fixer's last productive action;
+  V5-05's C8 needs a 40-idle / 20-broke wait counter and the pinned slots
+  gnaw/drain/grip are all load-bearing for other kinds).  Spawn-index for
+  workers is derived (initial workers 0..3 in procgen order, migrant N takes
+  4+N off `cistern-st-migrants`) — no extra state field.
+- Outcome: V5-01 GREEN.  Suite canonical count grows to 109.
