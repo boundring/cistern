@@ -3127,7 +3127,7 @@ the relaunch is on their screen now.
 
 - Attempt: the six-item HANDBRIEF phase-closing checklist over
   a61b207..c17ad2f (23/23 directives).  Small fixes committed in
-  the closing commit: five leftover DBGW* `princ` debug lines
+  the closing commit (2404c7d): five leftover DBGW* `princ` debug lines
   removed from `cistern--dialogue-eval` and two DBG lines from
   tests/test-v4.el; `cistern--rpg-advance` deleted (identical twin
   of `cistern--stream-next` — one LCG primitive now serves both
