@@ -3680,3 +3680,64 @@ the relaunch is on their screen now.
 - Outcome: review complete.  Suite canonical ALL 132 TESTS PASSED at
   the close boundary (the P1 assert extends the existing CB6 test —
   the count holds); code untouched on the structural findings.
+
+## L-109 (2026-09-08, run: v5-last-round — L-108 #1-#4 routed fixes, delivery first)
+
+- Route DECISION for L-108 #1/#2: LOG-AT-SOURCE.  At do-tick's end,
+  every `:layer 'log` intent is written into the domain log ring as a
+  Q13 (LINE SEVERITY TICK) entry — the shape the faced log-tail and
+  the L browser already render — so story verdicts, dialogue lines and
+  comedy beats become reviewable history (the owner's notice /
+  review / re-review ask) instead of needing a new render path.
+  Banner intents stay banner; popup intents stay popup.  No new view
+  path, no new state.
+- #1 (comedy-out computed-then-dropped): comedy intents now ride the
+  stored merge alongside story + dialogue.  Trap found while wiring:
+  `cistern--comedy-eval` returns the PLAIN intent list, NOT the
+  (head . intents) 2-list story/dialogue return — the first merge used
+  `(cdr comedy-out)` and silently dropped everything again (caught by
+  the red test still failing after the "fix"; the thread-delivery
+  probe exposed it).  L-099 lesson: validate the DATA SHAPE of every
+  return you merge, not just the call order.
+- Red-first guard for #1/#2 (new cistern-test-v5-log-delivery): a
+  comedy THREAD beat forced through do-tick (comedy-thread delivers a
+  log intent unconditionally on a calm tick — no selection/bank
+  dependence) must land in the stored slot AND in the ring with its
+  face.  RED on the unwired loop: "a comedy beat delivered through
+  do-tick".  The `comedy` face joined `cistern-view--palette-faces`
+  (-> cistern-comedy) so the ring entry renders with its face.
+- #3 rows 9/11: row 9 — the faction-mock handler renders the FILED
+  OBJECTIONS copy (`social-objection`, previously an orphaned key) as
+  heard speech through the muttered channel, budget-capped like any
+  mutter; row 11 — the idle-proximity emitter (sustained Chebyshev-1
+  adjacency for a pinned `cistern--social-idle-proximity-ticks` 5,
+  NOMINAL gate, counter resets on separation or fire) pushes the
+  trigger-table event; the thought pass delivers fond-proximity
+  (private channel) to the worker persona.  Both RED before (void
+  implementation / no objection line).
+- L-108 #4: `cistern--social-star-crossed` — a raid-open event whose
+  cell is a positioned endpoint of a stage >= 2 pair pushes
+  `(:social 'star-crossed-raid :pair P :at (X . Y))` (SOCIAL §3.2's
+  pinned shape); social reads combat's fired events, combat never
+  reads social (ruling 7); the story engine opens the beat on its next
+  event read.
+- LATENT CRASH FOUND AND FIXED (belongs to no review item, found by
+  the driven capture): `cistern--romance-proximity-tick`'s delta
+  `let` closed BEFORE its `(> delta 0)` use — ANY filed pair with both
+  endpoints positioned crashed the tick.  The V5-11 +1/tick proximity
+  accrual had never run live (every soak used sim-tick or filed no
+  positioned pair — the L-095 class again: no test exercised the live
+  path).  Fixed with the row-11 emitter in the same function.
+- Process: the social-thoughts clause insertion went through four
+  paren miscounts (the extra-close-at-EOF masquerade again —
+  check-parens caught each).  Lesson extended: after ANY elisp edit
+  that touches a multi-clause cond, verify with check-parens AND one
+  targeted test run before trusting the shape; a byte-identical
+  read-parse is not evidence the clause landed in the intended cond.
+- L-095 ledger audit: its docs-pass item ("README §9 should name the
+  shipped banks file") was DROPPED by V5-19 and is now FIXED by the
+  review commit (L-108) — marked CLOSED.
+- Outcome: V5 last round GREEN — #1/#2/#3/#4 all landed.  Suite
+  canonical ALL 136 TESTS PASSED (132 + 4 new: log-delivery,
+  faction-mock, idle-proximity, star-crossed).  GREEN-BOUNDARY SYNC
+  at the boundary per the standing rule.
