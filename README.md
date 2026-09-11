@@ -189,6 +189,15 @@ problem, not yours.
 The whole job in one sentence: **wire the fixtures to the tanks before the
 bladders win.** Capacity you did not connect is not capacity.
 
+## §11 PROVENANCE
+
+This codebase is 100% vibe-coded — written end to end by AI models
+(mostly GLM-5.3-flash) under operator direction. The operator retains
+all creative control: every design decision, prompt, and accepted
+change passes through their hand. Contributions are welcome on the
+same terms — issues and patches will be reviewed and shaped by the
+operator before they land.
+
 - [docs/DESIGN-SPEC.md](docs/DESIGN-SPEC.md) — architecture and design spec
 - [PLAYING.md](PLAYING.md) — full player guide
 
