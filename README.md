@@ -5,7 +5,7 @@
 [![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7f5ab6)](README.md#run-it)
 [![Tests](https://img.shields.io/badge/tests-140%2F140%20batch-2ea043)](docs/METHODS.md#4-the-test-harness)
 [![Maps](https://img.shields.io/badge/maps-procedurally%20seeded-8a4fbe)](docs/METHODS.md#3-seeded-determinism)
-[![License](https://img.shields.io/badge/license-none%20yet-lightgrey)](#provenance)
+[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-39413A)](LICENSE)
 
 You run sanitation for one sector of a megastructure nobody finished
 and nobody will: thirty-four by sixteen cells of corridor, vein and
@@ -107,8 +107,8 @@ the seeded-RNG design are documented in [docs/METHODS.md](docs/METHODS.md).
   may shift between versions.
 - **Not persistent.** No save games, no high-score tables, no sound —
   all explicitly deferred ([docs/DESIGN-SPEC.md §6](docs/DESIGN-SPEC.md)).
-- **Not licensed yet.** No LICENSE file; all rights rest with the
-  operator ([§ Provenance](#provenance)).
+- **Licensed AGPL-3.0-or-later** ([LICENSE](LICENSE)), matching the
+  hngh project ([§ Provenance](#provenance)).
 
 ## Documentation map
 
