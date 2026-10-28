@@ -1,0 +1,49 @@
+// Base-pack render asset table (docs/spec/06 §4): tile / prop / billboard
+// asset references, replacing the P6 interim `assets/slabs/manifest.json`
+// (P10 D5-O1 reconciliation). Paths are relative to the renderer assets root
+// (`assets/`). `slab` files are baked voxel slabs (`tools/tile_to_slab.py`,
+// 1px = 1voxel); `png` on a baked tile is its bake SOURCE (lives upstream in
+// the Kenney CC0 pack, not in-tree — see assets/README.md).
+//
+// Ecology tile ids (`soil`, `grass`, `stream_water`, `conduit`) are
+// deliberately ABSENT: P10 renders them through the floor fallback + theme
+// lighting multipliers (P10 D6-O1); slabs for them are P12 content.
+(
+    tiles: {
+        "floor": (slab: Some("slabs/tile_floor.json"), layer: floor),
+        "gantry": (slab: Some("slabs/tile_gantry.json"), layer: floor),
+        "elevator_down": (slab: Some("slabs/tile_elevator_down.json"), layer: floor),
+        "elevator_up": (slab: Some("slabs/tile_elevator_up.json"), layer: floor),
+        "drain_grate": (slab: Some("slabs/tile_drain_grate.json"), layer: floor),
+        "nest_mark": (slab: Some("slabs/tile_nest_mark.json"), layer: floor),
+        "tile_blame_environment_v1": (slab: Some("slabs/tile_blame_environment_v1.json"), layer: floor),
+        "tile_blame_environment_v2": (slab: Some("slabs/tile_blame_environment_v2.json"), layer: floor),
+        "tile_blame_environment_v3": (slab: Some("slabs/tile_blame_environment_v3.json"), layer: floor),
+        "tile_tezuka_environment_v3": (slab: Some("slabs/tile_tezuka_environment_v3.json"), layer: floor),
+        "wall": (slab: Some("slabs/tile_wall.json"), layer: structure),
+        "gate": (slab: Some("slabs/tile_gate.json"), layer: structure),
+        "settlement": (slab: Some("slabs/tile_settlement.json"), layer: structure),
+    },
+    props: {
+        "prop_crystal": (slab: Some("slabs/prop_crystal.json"), layer: prop),
+        "prop_star": (slab: Some("slabs/prop_star.json"), layer: prop),
+        "figure_blame_character_v1": (slab: Some("slabs/figure_blame_character_v1.json"), layer: prop),
+        "figure_blame_character_v2": (slab: Some("slabs/figure_blame_character_v2.json"), layer: prop),
+        "figure_blame_character_v3": (slab: Some("slabs/figure_blame_character_v3.json"), layer: prop),
+        "prop_blame_prop_v1": (slab: Some("slabs/prop_blame_prop_v1.json"), layer: prop),
+        "prop_blame_prop_v2": (slab: Some("slabs/prop_blame_prop_v2.json"), layer: prop),
+        "prop_blame_prop_v3": (slab: Some("slabs/prop_blame_prop_v3.json"), layer: prop),
+        "figure_tezuka_character_v1": (slab: Some("slabs/figure_tezuka_character_v1.json"), layer: prop),
+        "figure_tezuka_character_v2": (slab: Some("slabs/figure_tezuka_character_v2.json"), layer: prop),
+        "figure_tezuka_character_v3": (slab: Some("slabs/figure_tezuka_character_v3.json"), layer: prop),
+        "prop_tezuka_prop_v1": (slab: Some("slabs/prop_tezuka_prop_v1.json"), layer: prop),
+        "prop_tezuka_prop_v2": (slab: Some("slabs/prop_tezuka_prop_v2.json"), layer: prop),
+        "prop_tezuka_prop_v3": (slab: Some("slabs/prop_tezuka_prop_v3.json"), layer: prop),
+        "prop_coins": (slab: Some("slabs/prop_coins.json"), layer: prop),
+    },
+    billboards: {
+        "entity_player": "tiles/entity_player.png",
+        "entity_vermin": "tiles/entity_vermin.png",
+        "entity_feral_animal": "tiles/entity_feral_animal.png",
+    },
+)

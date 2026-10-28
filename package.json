@@ -1,0 +1,14 @@
+{
+  "name": "cistern-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cistern HD-2D voxel diorama in the browser (three.js r160, TypeScript, no bundler)",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

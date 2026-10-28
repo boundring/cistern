@@ -1,0 +1,223 @@
+// Copy table (docs/spec/06 §3): copy key -> display text. No view literals;
+// copy keys resolve through here (docs/plan/04 §3 copy-table discipline).
+{
+    "move_blocked_edge": "The edge stops you.",
+    "move_blocked_wall": "A wall stops you.",
+    "move_blocked_occupied": "Something is in the way.",
+    "bump_blocked": "You bump into it.",
+
+    // Ecology valve lines (plan-03 §7): predator-prey valve decisions, all
+    // observable loads, no scripted schedules.
+    "ecology/fed": "The cat has fed; the valve eases.",
+    "ecology/starved": "A feral goes hungry out of sight; the valve tightens.",
+    "ecology/drank": "A feral drinks at the water; the valve eases.",
+    "ecology/eliminated": "A feral eliminates into the water; no trace stays.",
+
+    // World-start blurbs (open-world beat D2-O1): one title-menu line per
+    // start row; names ride the FORBIDDEN_VERBATIM lint like every other
+    // operator-facing string.
+    "start/journeyman-plumber": "Union card, dry boots, a demo quota to survive.",
+    "start/sump-stowaway": "You woke in the geothermal dark with nothing but the heat.",
+    "start/ghost-handed-ex-jacker": "The jack left marks; the marks still itch.",
+    "start/guild-surveyor": "The Guild wants the ladder measured, valve by valve.",
+    "start/moss-tender": "You keep the green patches alive where the grow-light fails.",
+    "start/wet-council-clerk": "Minutes, seals, and standing water in triplicate.",
+    "start/long-shaft-drifter": "One level a week, following the drip-lines down.",
+    "start/pipe-prophet": "The pipes speak, if you press your ear to the flange.",
+
+    // Vista lines (open-world beat D5-O1): imagery for the altitude bands,
+    // resolved through this table — no new tile kinds, no view literals.
+    "vista/orbital": "Far overhead, through shaft-glass, the docked hulks hang like dead lanterns.",
+    "vista/surface": "Green-white grow-light bleeds down the shaft; somewhere above, the park breathes.",
+    "vista/mid-deck": "The mid-deck hums around you; hab-stack corridors breathe in shifts.",
+    "vista/maintenance": "Pipe galleries stretch away in every direction, dripping in slow unison.",
+    "vista/sump": "Far below, the sump glows a dull geothermal red; the heat climbs the shaft like a tide.",
+    "servant/refused": "The servant declines; that is not yours to order.",
+    "servant/quit": "Unpaid, the servant hangs up its badge and walks.",
+
+    // Boot copy (docs/plan/04 §5.2, P12 S8): boot log and title menu lines
+    // resolve through the pack surface — no view literals.
+    "boot/power": "*  CISTERN  *",
+    "boot/os": "CISTERN OS v1",
+    "boot/skip": "Esc skips",
+    "boot/title": "CISTERN",
+    "boot/new": "New run",
+    "boot/continue": "Continue",
+    "boot/load": "Load",
+    "boot/options": "Options",
+    "boot/packs": "Content packs",
+    "boot/quit": "Quit",
+    "boot/starts": "World starts",
+    "boot/deferred": "not yet wired",
+    "boot/goal/power": "frame up",
+    "boot/goal/test": "gauge sweep",
+    "boot/goal/title": "choose",
+    "boot/gauge": "gauge 0 -> RED -> 0",
+    "boot/log/packs": "packs:",
+
+    // Trap tell lines (docs/plan/08 §1 L5): each trap's observed giveaway,
+    // surfaced via `Message` on the flavor channel (docs/plan/08 §6 Q2(c)).
+    "tell/pressure_jet": "A weeping wall joint scatters drips across the tile here.",
+    "tell/geyser_vent": "The grate below breathes a faint sulfur warmth.",
+    "tell/siphon_pit": "This grate does not echo when tapped.",
+    "tell/contam_sprayer": "A sweet-smelling crust rings the nozzle seam.",
+    "tell/alarm_whistle": "A brass whistle-valve stands proud of the tile, plain as a signature.",
+    "tell/flush_gate": "The ceiling-mounted toilet rocks on its collar; the whole cistern hangs by it.",
+    "trap_siphon_pit_hit": "The grate gives — loose things slide toward the sump.",
+    "trap_contam_sprayer_hit": "A sweet mist takes you; something starts a slow claim.",
+    "trap_alarm_whistle_hit": "The whistle screams — everything wet turns toward the sound.",
+    "trap_flush_gate_hit": "The collar lets go. The cistern collects you.",
+
+    // Terminal jack copy (P9 verdicts D6/D7): cyber/* rows sit under the
+    // allusion-not-copy lint. Voice guides per docs/plan/07 §5 — gibson
+    // bloc console-poetry, sterling bloc dry infrastructure, rucker bloc
+    // warm metabolics — allusion, never quotation.
+    "cyber/terminal_wall_jack": "A data jack, wired into the wall like an old wound. The carrier light is patient.",
+    "cyber/terminal_cafe_jack": "The cafe's public jack. Someone has taped a label over the port: HONEST NODE, MOSTLY.",
+    "cyber/ghost_log_wall_jack/1": "The log skips. Where a name should be there is only a routing number, and the routing number is your own.",
+    "cyber/ghost_log_wall_jack/2": "Hours of traffic collapse into one line: the deck reached in, and the city reached back.",
+    "cyber/ghost_log_cafe_jack/1": "Regulars jacked in from stool three for years. The log keeps their latency like a diary.",
+    "cyber/ghost_log_cafe_jack/2": "The last entry argues with itself about whether the far side of a port counts as a place.",
+    "cyber/clue": "Under the traffic you can read the pipes themselves: the water goes where it is told, and it is not told much.",
+    "cyber/door": "A seam in the wall you only see from inside the wire breathes open.",
+    "cyber/warning": "Something in the stack turns its attention on your body. Ice the deck. Breathe.",
+    "cyber/eject": "The third hit lands and the deck throws you out on the floor, gasping.",
+    "cyber/cast_fails": "The node refuses the cast. The carrier light goes flat.",
+
+    // Flourish secrets + break-away walls (docs/plan/08 §1 L3/L4): reveal
+    // copy per secret row, dig feedback per attempt.
+    "secret/hidden-door": "The wall gives at a seam — a door that was never drawn.",
+    "secret/alcove": "A shallow pocket opens behind the pipe collar.",
+    "dig/failed": "The crack widens a hair; the wall holds.",
+
+    // Oddity reveal lines (docs/plan/08 §1 L2): indirect homages only —
+    // structure, portmanteau, like-kind families; never verbatim titles or
+    // quotes from any canon work (§6 Q5 allusion-not-copy law).
+    "oddity/sector-map": "A folded printout of stairwells that continue past the page. Someone has circled a level labeled only 'lower'.",
+    "oddity/lunch-tin": "A tin of smoke-cooked dumplings, still warm, no vendor sticker. The inside lid carries one scratched word: 'share?'",
+    "oddity/salt-reliquary": "A salt-crusted box of medallions stamped with valve wheels. Pilgrims rub them for good pressure.",
+    "oddity/warden-stopcock": "A brass stopcock worn smooth by many hands. Legend says the Warden's own key turns somewhere deeper still.",
+    // F5b punch-clock (docs/plan/08 §4): reveal, opened, locked.
+    "oddity/punch-clock": "A wall-mounted punch-clock, card still jutting from its slot. The stamp window reads a shift long ended — or does it?",
+    "oddity/punch-clock/opened": "The card stamps clean. Somewhere below, the sump-gallery gate unbolts.",
+    "oddity/punch-clock/locked": "The stamp window flashes red — shift's over. The mechanism refuses the card.",
+    "oddity/sector-map/rumor-1": "A mapper's margin note: the second stair on the dry gallery does not match its survey. It was redrawn in a different hand.",
+    "oddity/sector-map/rumor-2": "Someone annotated the sump district as 'breathes at shift change'. The annotation is dated after the sector was sealed.",
+    "oddity/sector-map/rumor-3": "Three routes to the same junction are inked over each other. Only the crooked one has no wear marks.",
+    "oddity/warden-stopcock/rumor-1": "A maintenance log fragment: stopcocks answered to the Warden's key, and the key stayed below. No recall was ever filed.",
+    "oddity/warden-stopcock/rumor-2": "Pilgrims leave valve grease at the niche. The grease is always gone by morning, and the threads are always fresh.",
+    "oddity/warden-stopcock/rumor-3": "An inspector's footnote says the Warden's ledger lists one stopcock more than the plans do. It is not marked missing.",
+    "shrine/shelf-of-names": "A shelf of small clay name-tags, each one a name nobody here uses anymore. Someone keeps them dusted, and keeps them in order.",
+    "shrine/unstopped-clock": "A wall clock whose hands were nailed at one minute to some hour, long ago. offerings here are coins and small round sweets.",
+    "shrine/white-cistern": "A cistern whitewashed so many times its corners have gone soft. Chalk on the rim: 'the deep is not empty'.",
+    "shaft/dead": "The shaft stops here. The plaque beside it is blank — whatever it said left before the water did.",
+    "dig/cracked-wall": "The seam lets go — rubble spills into the gap.",
+
+    // F6 homage rows (docs/plan/08 §4 F6; verdicts D1–D5). Allusion-not-copy
+    // law (§6 Q5): indirect only, name play in copy text, never in ids.
+    // D1: vault rank flavor, picked display-side by hash of room identity
+    // and seed; the vault law (plan-03 §3.3) keeps the joke load-bearing.
+    "vault/lesser": "A lesser vault of the plumber-kings. The inventory tag still reads pending.",
+    "vault/greater": "A greater vault of the plumber-kings. Whatever was catalogued here once outranked the catalog.",
+    // D2: HLD-style text-absence murals as ambient rows — the mural itself
+    // shows no words; the copy describes the pictogram.
+    "mural/procession": "A tiled mural, no words in it: figures in a hardhat line, each handing one wrench to the next. The last figure holds nothing.",
+    "mural/descent": "A painted panel, wordless: stairs going down and down, each flight smaller than the last, until they are a single pixel of blue.",
+    "mural/hands": "A mural of overlapping handprints in dried sludge, no letters anywhere. One print near the edge has six fingers.",
+    // D3: DF-style static grime-history engravings (bare mode: no epoch
+    // events cited; the E0 epoch pass re-stamps event-citing rows later).
+    "engraving/strata": "Engraved here: the water line by year, tick by tick. The chisel stopped before the last line was finished.",
+    "engraving/crew": "Engraved here: a procession of plumbers, tools at their sides. The last one is looking back.",
+    "engraving/hand": "Engraved here: one hand traced twice, fingers spread. Below it a tally that ends mid-stroke.",
+    // P8 D4-O1 item pickup/drop status lines (plain reportorial register;
+    // descriptors, not lore — the items' own copy rides the pack rows).
+    "item/picked_up": "Taken.",
+    "item/dropped": "Set down.",
+    // P11 D2-O2 autopick fire lines (plain reportorial register); the
+    // destroy line rides the `item_destroyed` row.
+    "autopick/pickup": "Taken (autopick).",
+    "autopick/drop": "Autopick: marked for dropping.",
+    "autopick/destroy": "Destroyed (autopick).",
+    "autopick/paint": "Autopick: marked.",
+    "autopick/note": "Autopick: noted.",
+    // P11 D3-O1 travel status lines (plain reportorial register); interrupts
+    // ride warn, the rest info.
+    "travel/started": "Walking.",
+    "travel/arrived": "Arrived.",
+    "travel/blocked": "No known path there.",
+    "travel/cancelled": "Travel cancelled.",
+    "travel/interrupt-hostile": "Hostile in sight — travel stopped.",
+    "travel/interrupt-breach": "Breach alarm — travel stopped.",
+    "travel/interrupt-item": "Something new in sight — travel stopped.",
+    // P8 D3-O1 quest status lines (plain reportorial register).
+    "quest/offered": "A request is posted here.",
+    "quest/accepted": "Noted. The work is yours now.",
+    // TUI adapter-level Save verb (docs/spec/07 §2): same persist row the
+    // headless Save subcommand writes.
+    "tui/saved": "Run saved to saves/cistern.db.",
+    // Interact affordance hint (status slot, docs/spec/07 §2 verb name).
+    "hint/interact": "interact",
+    "quest/completed": "The terms are met.",
+    "quest/turned_in": "Settled. Your due rests at your feet.",
+    // P8 D5-O1/O2 shop lines (plain reportorial register).
+    "shop/bought": "Paid. The wares rest at your feet.",
+    "shop/sold": "Sold. The tally is yours.",
+    // P8 D6-O1 debate lines (plain reportorial register; the match log
+    // reports scores deadpan, docs/plan/07 §1.2).
+    "debate/won": "The floor sides with you. The tally says so.",
+    "debate/lost": "Out-argued. The tally says so.",
+    "debate/crowd": "The gallery murmurs, and drips.",
+    "item/pipe_rag": "A pipe rag, faintly oily. Someone always needs one.",
+    "item/brass_tap": "A brass tap, warm to the touch. It insists it was always yours.",
+    "item_none_here": "Nothing here to take.",
+    "item_none_held": "You are carrying nothing.",
+    "item_no_room": "Something already rests there.",
+    // D4: the janitor's cat — name and flavor copy only (verdict D4-O1);
+    // the no-unseen-deaths tracking promise is sim law for the creature
+    // slices, not this row.
+    "cat/name": "The janitor's cat is called Supervisor. She ignores the name, which the janitor cites as proof of seniority.",
+    "cat/seen": "A grey cat watches you wrangle a valve with the flat patience of middle management.",
+    "cat/whereabouts": "Asking after the cat is a standing item on the shift log. It has never once been closed.",
+    // D5/D6: Clock B cadence one-liners (plan-08 L8): flat reportorial
+    // register, display-side hash selection, sparse by design; silence is
+    // a valid state.
+    "clockb/1": "You have been at this a while now. The pipes have noticed.",
+    "clockb/2": "The dripping is on schedule. So are you.",
+    "clockb/3": "Nothing in the cistern has changed. The cistern has logged this.",
+    "clockb/4": "Somewhere above, a shift ended without you.",
+    "clockb/5": "The water table is holding. You are being held with it.",
+
+    // Voice register templates (docs/plan/07 §1.1): register_style selectors
+    // resolve here. Descriptors, not lines — the feeling lines live in the
+    // voice rows themselves.
+    "style/orwell": "plain declarative: short sentences, and the record speaks for itself",
+    "style/pkd": "paranoid querying: every fact re-checked, every check doubted",
+    "style/leonard": "lean crime colloquial: low heat, high stakes, no wasted words",
+    "style/adams": "bureaucratic absurd: form numbers for feelings",
+    "style/le-guin": "quiet ethnographic: the observed detail carries the weight",
+    "style/pratchett": "municipal-fantasy deadpan: the world takes itself very seriously",
+    "style/heinlein": "competent self-reliant: size it up, name the tool, move",
+    "style/niven": "hard-science playful: the laws of physics as stage directions",
+    "style/sturgeon": "gentle humanist: even the machinery has needs",
+    "style/ksr": "earnest clinical: the future as a field report",
+    "style/stephenson": "baroque techno: systems with owners, owners with moods",
+    "style/bester": "fleet vivid pulp: every wall is a headline",
+    "style/twain": "dry frontier deadpan: the joke arrives without a wink",
+    "style/sagan": "cosmic awe plain: small rooms, large consequences",
+    "style/farmer": "pulpy encyclopedic: everything already written down somewhere",
+    "style/chesterton": "genial paradox: the humble thing hiding the enormous thing",
+    "style/melville": "biblical grand questing: every level a sea",
+    "elevator_none_here": "No shaft here.",
+    "jack_none_here": "No jack here.",
+    "jack/in": "You jack in. The cistern's data layer blooms around you.",
+    "jack/out": "You jack out.",
+    "elevator_top": "This is the top of the shaft.",
+    "level/switch": "The elevator groans into motion.",
+    "coach/move": "Long halls walk themselves: T plans a route.",
+    "coach/pick_up": "rules.ron patterns can take items for you.",
+    "coach/travel": "o wanders the known map on its own.",
+    "tutorial/move": "[Move] Walk with the arrows or h/j/k/l — one press, one turn.",
+    "tutorial/pick_up": "[Pick up] g grabs what you stand on; rules.ron can too.",
+    "tutorial/travel": "[Travel] T then a spot plans a known route and walks it.",
+    "tutorial/descend": "[Descend] > takes the elevator down a floor.",
+}

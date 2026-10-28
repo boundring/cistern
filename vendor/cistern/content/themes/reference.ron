@@ -1,0 +1,118 @@
+// Reference UI theme (docs/spec/04 §5.1 field set; P10 D5-O1). One complete
+// theme ships as the theme-system exit-ramp proof (docs/plan/05-roadmap.md
+// §2 P10); more themes are content, later. Layering (pack default ← user
+// selection ← user override) is a P11 options-panel concern.
+//
+// Post/lighting fields are the spec-06 §5 chain rows 4–10 toggles (rows 5–10
+// individually user-toggleable; lighting row 3 is themeable, not
+// user-toggleable). The sunlight/fiberoptic parameters (P10 D6-O1) ride the
+// lighting + post blocks; greenery/conduit/stream multipliers light the P12
+// ecology tile rows through theme params — zero renderer changes per new
+// content.
+(
+    id: "reference",
+    display_name: "Reference — Cistern HD",
+    palette: (
+        bg: (8, 8, 10),
+        panel: (26, 26, 32),
+        panel_edge: (58, 58, 70),
+        accent: (198, 146, 62),
+        accent_hot: (232, 188, 106),
+        error: (178, 52, 44),
+        text: (212, 206, 188),
+    ),
+    fonts: (
+        main: "fonts/main.png",
+        mono: "fonts/mono.png",
+    ),
+    frames: (
+        bezel: "frames/bezel.png",
+        corner_px: 8,
+        squared_edges: true,
+    ),
+    grade: (
+        // Sunlight split-tone register (P10 D6-O1): baked 1D LUT strip.
+        lut: Some("themes/lut_sunlight.png"),
+        vignette_strength: 0.35,
+    ),
+    density: (
+        deco_density: 12.0,
+        // 2D TUI floor-dressing gate (#15): a few percent of visible floors
+        // carry the ambient glyph; remembered floors stay plain.
+        dressing_pct: 4.0,
+    ),
+    audio: (
+        // Trims only — cue wiring is post-first-playable (P10 D7 fence).
+        master: 1.0,
+        ambient: 1.0,
+        cues: 1.0,
+    ),
+    post: (
+        dof_band: Some(6.0),
+        // NG-P1-7 re-tune wave: +33% over the P10 placebo-era value — the fog
+        // differential is the probe-verified dominant stage (luminance 41→13
+        // in the hd data); magnitude PRE-DECISION, ratify on a renderer run.
+        fog_density: 0.016,
+        bloom: true,
+        tonemap: true,
+        lut: true,
+        vignette: true,
+        light_shaft_strength: 0.45,
+        light_shaft_intensity: 1.0,
+        // Filter stages (render-config D5): scanline / CRT curvature /
+        // paper grain, theme-toggled post passes.
+        scanline: false,
+        crt: false,
+        paper: false,
+    ),
+    lighting: (
+        // Underground fake directional at ⅕ strength (spec-06 §5 row 3).
+        directional_strength: 0.20,
+        sun_dir: (0.35, -0.5, 0.79),
+        greenery_mult: 1.0,
+        conduit_mult: 1.0,
+        stream_mult: 1.0,
+    ),
+    dice_tray: (
+        skin: "frames/dice_tray.png",
+        lift_height: 3.5,
+        flyout_time_s: 1.2,
+    ),
+    // Authored animation channels (render-config D2 `both-channels`): idle
+    // rows hash-phase with the turn count; trigger rows decay from the last
+    // resolution event. Display-only, never sim streams.
+    anim: (
+        channels: [
+            (
+                id: "wind",
+                subjects: ["grass", "stream_water"],
+                family: idle,
+                property: location,
+                rate: 0.06,
+                amplitude: 2.0,
+            ),
+            (
+                id: "hitflash",
+                subjects: ["entity_"],
+                family: trigger,
+                property: color,
+                rate: 0.25,
+                amplitude: 0.8,
+            ),
+        ],
+    ),
+    // Fixed draw buckets (terrain/fixture/entity/fx/overlay; order is
+    // renderer law) + the FIRST mask expression: the generalized cutaway
+    // cone (spec-06 §7, max 12 tiles, Bayer stipple dissolve).
+    layers: (
+        masks: [
+            (
+                id: "cutaway",
+                subjects: ["wall", "gate", "settlement"],
+                enabled: true,
+                steps: 12.0,
+                strength: 0.95,
+            ),
+        ],
+    ),
+)
