@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cistern — starter town diorama</title>
+<style>
+  :root {
+    /* Fallbacks; main.ts overwrites these from DONORS.theme.palette at runtime. */
+    --bg: #080a0e;
+    --panel: #1a1a20;
+    --panel-edge: #3a3a46;
+    --accent: #c6923e;
+    --text: #d4cebc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: var(--bg); overflow: hidden; }
+  #gl {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    display: block; touch-action: none; cursor: grab;
+  }
+  #panel {
+    position: fixed; top: 12px; right: 12px; width: 260px;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--panel-edge); border-radius: 6px;
+    padding: 12px 14px;
+    font: 13px/1.45 system-ui, sans-serif;
+  }
+  #panel[hidden] { display: none; }
+  #panel h2 {
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 6px;
+  }
+  #panel dt {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--panel-edge); margin-top: 8px;
+  }
+  #panel dd { margin: 1px 0 0; word-break: break-all; }
+  #panel img {
+    display: block; margin-top: 10px; width: 64px; height: 64px;
+    image-rendering: pixelated;
+    border: 1px solid var(--panel-edge); border-radius: 4px;
+  }
+  #panel img[hidden] { display: none; }
+  @media (max-width: 640px) {
+    #panel {
+      top: auto; right: 0; bottom: 0; left: 0; width: 100%;
+      border-radius: 10px 10px 0 0;
+      border-left: 0; border-right: 0; border-bottom: 0;
+    }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<aside id="panel" hidden>
+  <h2>Tile inspector</h2>
+  <dl>
+    <dt>tile</dt><dd data-slot="tile"></dd>
+    <dt>copy key</dt><dd data-slot="key"></dd>
+    <dt>text</dt><dd data-slot="text"></dd>
+  </dl>
+  <img data-slot="sprite" alt="tile sprite" hidden>
+</aside>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.min.js"
+  }
+}
+</script>
+<script type="module" src="./out/main.js"></script>
+</body>
+</html>

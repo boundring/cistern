@@ -5,8 +5,12 @@
   "type": "module",
   "description": "Cistern HD-2D voxel diorama in the browser (three.js r160, TypeScript, no bundler)",
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "tsc -p tsconfig.json"
+    "build:core": "tsc -p tsconfig.core.json",
+    "test": "npm run build:core && node --test tests/",
+    "bake": "node tools/bake-donors.mjs",
+    "smoke": "npm run build && node tools/smoke.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"
