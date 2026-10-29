@@ -9,7 +9,7 @@ const DIST_MAX = 60;
 export class OrbitCamera {
   yaw = -0.6;
   pitch = 0.7;
-  distance = 30;
+  distance = 36;
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,

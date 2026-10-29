@@ -204,6 +204,19 @@ try {
   await cmd("Network.enable");
   await cmd("Runtime.enable");
 
+  // Acceptance 5, enforcement half: hard-fail every non-local request at the
+  // network stack so "no runtime fetch" is enforced, not just observed.
+  const blocked = [];
+  browser.on("Fetch.requestPaused", (p) => {
+    if (p.request.url.startsWith(baseOrigin + "/")) {
+      cmd("Fetch.continueRequest", { requestId: p.requestId }).catch(() => {});
+    } else {
+      blocked.push(p.request.url);
+      cmd("Fetch.failRequest", { requestId: p.requestId, errorReason: "BlockedByClient" }).catch(() => {});
+    }
+  });
+  await cmd("Fetch.enable", { patterns: [{ urlPattern: "*", requestStage: "Request" }] });
+
   // Every request the page makes must be same-origin (acceptance 5).
   const requests = [];
   browser.on("Network.requestWillBeSent", (p) => requests.push(p.request.url));
@@ -302,6 +315,26 @@ try {
     fail(`runtime fetched cross-origin (acceptance 5): ${offOrigin.slice(0, 5).map((u) => u.href).join(", ")}`);
   }
   console.log(`smoke: network OK (${requests.length} requests, all same-origin)`);
+
+  // Acceptance 5, offline half: with the NIC emulated offline the game must
+  // keep playing -- zero runtime fetch dependency.
+  await cmd("Network.emulateNetworkConditions", {
+    offline: true,
+    latency: 0,
+    downloadThroughput: 0,
+    uploadThroughput: 0,
+  });
+  const off = JSON.parse(await evaluate(`JSON.stringify(window.game.dispatch({type:"inspect",x:0,y:0}))`));
+  if (!off.ok) fail("dispatch under offline emulation failed");
+  const offSel = JSON.parse(await evaluate("JSON.stringify(window.game.state().selection)"));
+  if (offSel?.text !== off.state.selection?.text) fail("state().selection differs under offline emulation");
+  const during = requests
+    .slice()
+    .filter((u) => !u.startsWith("about:") && !u.startsWith("devtools:") && !u.startsWith(baseOrigin + "/"));
+  if (during.length > 0 || blocked.length > 0) {
+    fail(`runtime fetch dependency (acceptance 5): blocked=[${blocked.slice(0, 3).join(", ")}] offline=[${during.slice(0, 3).join(", ")}]`);
+  }
+  console.log("smoke: offline OK (non-local requests hard-blocked; game plays with the NIC offline)");
 
   await cmd("Target.closeTarget", { targetId });
   browser.close();
