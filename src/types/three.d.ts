@@ -42,6 +42,8 @@ declare module "three" {
     lerp(v: Vector3, t: number): this;
     clone(): Vector3;
     applyMatrix4(m: Matrix4): this;
+    /** Projects this point into normalized device coordinates. */
+    project(camera: PerspectiveCamera): this;
   }
 
   export class Color {
@@ -289,6 +291,8 @@ declare module "three" {
     setClearColor(color: number | Color, alpha?: number): void;
     render(scene: Scene, camera: PerspectiveCamera): void;
     dispose(): void;
+    /** The live WebGL context (used to sample rendered pixels). */
+    getContext(): WebGLRenderingContext;
     info: { render: { triangles: number; calls: number } };
   }
 

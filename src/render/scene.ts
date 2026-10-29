@@ -4,7 +4,7 @@ import type { TownModel } from "../core/town.js";
 import type { SlabMesh } from "../core/slab.js";
 import { decodeSlab, meshSlab, plateSlab } from "../core/slab.js";
 import { ScatterHash, kindHash } from "../core/scatter.js";
-import { BillboardEntities } from "./billboards.js";
+import type { PixelProbe } from "../types/game.js";
 
 /**
  * Tile kinds absent from tiles.ron (rubble, grass, soil, stream_water,
@@ -30,6 +30,17 @@ interface PropSpot {
   gy: number;
   ox: number;
   oz: number;
+}
+
+/** Where the town diorama sits in the open world, and how far the fog reaches. */
+export interface TownSceneOptions {
+  /** Town origin in world cell coordinates (east, south). */
+  townOffsetX: number;
+  townOffsetZ: number;
+  /** World height of the town's walking surface (the village flat). */
+  townGroundY: number;
+  /** Fog density; the v3 world is four times the v2 footprint. */
+  fogDensity: number;
 }
 
 /** bake coords (x east, y north, z up) -> three.js (x, z, -y): the
@@ -109,20 +120,25 @@ function resolveAsset(donors: Donors, tileId: string): TileAsset {
 export class TownScene {
   /** Orbit target for the app's OrbitCamera (contract superset). */
   readonly camera: THREE.PerspectiveCamera;
+  /** The three.js scene: the world view and the figures are added to it. */
+  readonly scene = new THREE.Scene();
   readonly counts = { floor: 0, structure: 0, props: 0 };
-  /** Entity billboards (townsfolk), driven by the game layer. */
-  readonly entities = new BillboardEntities();
 
   private readonly renderer: THREE.WebGLRenderer;
-  private readonly scene = new THREE.Scene();
   private readonly meshes: THREE.InstancedMesh[] = [];
   private readonly raycaster = new THREE.Raycaster();
-  private readonly canvas: HTMLCanvasElement;
+  /** The canvas this scene renders into. */
+  readonly canvas: HTMLCanvasElement;
   private readonly town: TownModel;
   /** Terrain-top height per tile id, in world units (16 voxels = 1). */
   private readonly groundByKind = new Map<string, number>();
 
-  constructor(canvas: HTMLCanvasElement, town: TownModel, donors: Donors) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    town: TownModel,
+    donors: Donors,
+    options: TownSceneOptions,
+  ) {
     this.canvas = canvas;
     this.town = town;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -135,7 +151,7 @@ export class TownScene {
     const bgColor = new THREE.Color(bg[0] / 255, bg[1] / 255, bg[2] / 255);
     this.scene.background = bgColor;
     // The ambient Scene type narrows fog to Fog; FogExp2 is valid at runtime.
-    this.scene.fog = new THREE.FogExp2(bgColor, donors.theme.fogDensity) as unknown as THREE.Fog;
+    this.scene.fog = new THREE.FogExp2(bgColor, options.fogDensity) as unknown as THREE.Fog;
 
     const group = new THREE.Group();
     const material = new THREE.MeshBasicMaterial({
@@ -220,14 +236,21 @@ export class TownScene {
     }
 
     group.scale.setScalar(1 / VOXELS_PER_CELL); // 1 voxel = 1/16 world unit
+    // The town sits on the village flat: its walking surface lands exactly on
+    // the world's terrain height at the town origin.
+    const floorTop = this.groundByKind.get("floor") ?? 0;
+    group.position.set(
+      options.townOffsetX,
+      options.townGroundY - floorTop,
+      options.townOffsetZ,
+    );
     group.updateMatrixWorld(true);
     this.scene.add(group);
-    this.scene.add(this.entities.group);
 
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 300);
+    this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
   }
 
-  /** Terrain top under a cell, in world units -- the billboard ground line. */
+  /** Terrain top under a cell, in world units -- the figure ground line. */
   groundHeight(x: number, y: number): number {
     return this.groundByKind.get(this.town.tiles[y * this.town.width + x]) ?? 0;
   }
@@ -240,6 +263,44 @@ export class TownScene {
 
   render(): void {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Pixel statistics of a screen region, read back from a fresh render.
+   * Coordinates are CSS pixels with the origin at the canvas' top-left.
+   */
+  probePixels(x: number, y: number, w: number, h: number): PixelProbe | null {
+    const canvas = this.renderer.domElement;
+    const cssWidth = canvas.clientWidth;
+    if (cssWidth <= 0 || canvas.width <= 0) return null;
+    const dpr = canvas.width / cssWidth;
+    const gw = Math.max(1, Math.min(canvas.width, Math.round(w * dpr)));
+    const gh = Math.max(1, Math.min(canvas.height, Math.round(h * dpr)));
+    const gx = Math.max(0, Math.min(canvas.width - 1, Math.round(x * dpr)));
+    const gy = Math.max(0, Math.min(canvas.height - gh, canvas.height - Math.round((y + h) * dpr)));
+    this.render();
+    const gl = this.renderer.getContext();
+    const buf = new Uint8Array(gw * gh * 4);
+    gl.readPixels(gx, gy, gw, gh, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    let sum = 0;
+    let sumSq = 0;
+    let n = 0;
+    const seen = new Set<number>();
+    for (let i = 0; i < buf.length; i += 4) {
+      const l = 0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2];
+      sum += l;
+      sumSq += l * l;
+      n++;
+      seen.add((buf[i] >> 3 << 10) | (buf[i + 1] >> 3 << 5) | (buf[i + 2] >> 3));
+    }
+    if (n === 0) return null;
+    const mean = sum / n;
+    return {
+      mean,
+      variance: sumSq / n - mean * mean,
+      distinct: seen.size,
+      samples: n,
+    };
   }
 
   /** Map a pointer event to a town cell, or null when nothing is hit. */

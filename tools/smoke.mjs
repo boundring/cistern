@@ -247,6 +247,29 @@ try {
     return res.result?.value;
   };
 
+  // Wait for n rendered frames. Headless Chromium can stop compositing, so
+  // the rAF wait races a timeout instead of hanging the smoke.
+  const waitFrames = async (n) => {
+    const res = await cmd("Runtime.evaluate", {
+      expression: `new Promise((resolve) => {
+        let left = ${n};
+        const timer = setTimeout(() => resolve(false), 3000);
+        const step = () => {
+          if (--left <= 0) { clearTimeout(timer); resolve(true); return; }
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      })`,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    if (res.exceptionDetails) {
+      // No frame arrived (compositing stopped): proceed, the probes below
+      // assert on pixels and will fail loudly if the frame is stale.
+      return;
+    }
+  };
+
   // --- state assertions (charter: assert on state, never pixels)
   const state = JSON.parse(await evaluate("JSON.stringify(window.game.state())"));
   if (state.seed !== DONORS.constants.townSeed) fail(`state.seed ${state.seed} != baked townSeed ${DONORS.constants.townSeed}`);
@@ -260,6 +283,16 @@ try {
   }
   if (state.counts.floor + state.counts.structure !== 34 * 16) {
     fail(`counts floor(${state.counts.floor}) + structure(${state.counts.structure}) != 544`);
+  }
+  // --- v3: the open-world law must be wired into the state
+  const wb = state.world;
+  if (!wb) fail("state.world missing -- v3 open world not wired into GameState");
+  const wantWorld = {
+    playableW: 68, playableH: 32, footprintW: 136, footprintH: 64,
+    villageX: 34, villageY: 16, townX: 17, townY: 8, townW: 34, townH: 16,
+  };
+  for (const [k, v] of Object.entries(wantWorld)) {
+    if (wb[k] !== v) fail(`state.world.${k} = ${wb[k]}, expected ${v}`);
   }
   console.log(`smoke: state OK (seed ${state.seed}, 34x16 tiles match golden, counts floor=${state.counts.floor} structure=${state.counts.structure} props=${state.counts.props})`);
 
@@ -294,12 +327,84 @@ try {
   if (tfState.townsfolk.length !== spawnCount) {
     fail(`state townsfolk ${tfState.townsfolk.length} != ${spawnCount} (donor: never despawn)`);
   }
+  // --- v3: the world population (villagers) + scatter figures on top of the sim
+  const c3 = tfState.counts;
+  if (!(c3.figures >= c3.townsfolk + 1)) fail(`counts.figures ${c3.figures} < townsfolk ${c3.townsfolk} + player`);
+  if (!(c3.figures > c3.townsfolk)) fail(`counts.figures ${c3.figures} not > townsfolk ${c3.townsfolk} (world villagers missing)`);
+  if (!(c3.trees > 0)) fail("counts.trees is 0 -- no scatter trees");
+  if (!(c3.rocks > 0)) fail("counts.rocks is 0 -- no scatter rocks");
+  if (!(c3.items > 0)) fail("counts.items is 0 -- no scatter items");
   const evBefore = tfState.eventCount;
   const tick = JSON.parse(await evaluate(`JSON.stringify(window.game.dispatch({type:"tick",n:5}))`));
   if (!tick.ok) fail(`dispatch(tick n=5) failed: ${tick.error}`);
   if (tick.state.eventCount <= evBefore) fail("dispatch(tick) did not advance the sim event stream");
   if (tick.state.counts.townsfolk !== spawnCount) fail("townsfolk count changed over ticks (donor law: never despawn)");
   console.log(`smoke: townsfolk OK (${spawnCount} billboards == donor spawn count; ticks advanced events ${evBefore} -> ${tick.state.eventCount})`);
+
+  // Open-ground townsfolk (nearest the town centre) for the probe + close-up:
+  // a figure against a wall clips the close camera into geometry.
+  const centreTf = tfState.townsfolk.reduce((a, b) =>
+    (b.x - 17) ** 2 + (b.y - 8) ** 2 < (a.x - 17) ** 2 + (a.y - 8) ** 2 ? b : a);
+
+  // --- v3 acceptance: an NPC region must not read as a flat quad. Frame the
+  // A flat billboard over ground yields 2-3 distinct colours and low luminance
+  // variance; a shaded 3D voxel figure yields 6+ distinct and high variance.
+  for (const intent of [{ type: "orbit", pitch: 0.35 }, { type: "zoom", distance: 6 }]) {
+    const res = JSON.parse(await evaluate(`JSON.stringify(window.game.dispatch(${JSON.stringify(intent)}))`));
+    if (!res.ok) fail(`dispatch(${JSON.stringify(intent)}) failed: ${res.error}`);
+  }
+  await evaluate(`window.game.focus(${centreTf.x}, ${centreTf.y})`);
+  // let a frame render at the new framing (never hang: headless Chromium can
+  // stop compositing, and a bare rAF promise would never settle)
+  await waitFrames(2);
+  const probe = await evaluate(`(() => {
+    const id = ${centreTf.id};
+    const pos = window.game.entityScreenPos(id);
+    if (!pos) return { id, pos: null };
+    // Tight 32x48 box, feet-anchored: the figure is ~0.84 world units tall,
+    // ~60-100 px at orbit distance 6.
+    const W = window.innerWidth, H = window.innerHeight;
+    const bx = pos.x - 16, by = pos.y - 44;
+    const gx = bx + 32 + 24 <= W ? bx + 56 : bx - 56; // same-size ground-only box beside it
+    if (bx < 0 || by < 0 || bx + 32 > W || by + 48 > H || gx < 0 || gx + 32 > W || by + 48 > H) {
+      return { id, pos, W, H, onScreen: false };
+    }
+    return { id, pos, W, H, onScreen: true, fig: window.game.probePixels(bx, by, 32, 48), ground: window.game.probePixels(gx, by, 32, 48) };
+  })()`);
+  if (!probe || !probe.pos) fail("no on-screen townsfolk to probe (entityScreenPos returned nothing)");
+  if (!probe.onScreen) fail(`probe box for townsfolk ${probe.id} not fully on-screen at ${probe.W}x${probe.H} (screen pos ${probe.pos.x.toFixed(0)},${probe.pos.y.toFixed(0)})`);
+  console.log(`smoke: probe townsfolk ${probe.id} at (${probe.pos.x.toFixed(0)},${probe.pos.y.toFixed(0)}): figure samples=${probe.fig.samples} distinct=${probe.fig.distinct} variance=${probe.fig.variance.toFixed(0)} mean=${probe.fig.mean.toFixed(0)} | ground baseline distinct=${probe.ground.distinct} variance=${probe.ground.variance.toFixed(0)} mean=${probe.ground.mean.toFixed(0)}`);
+  if (!(probe.fig.samples > 0)) fail("probePixels returned no samples for the figure region");
+  if (!(probe.fig.distinct >= 5)) fail(`figure region distinct=${probe.fig.distinct} < 5 -- reads as a flat quad, not a 3D voxel figure`);
+  // Calibrated: figure region variance ~1542 vs a same-size ground-only
+  // baseline of ~168 (textured terrain) -- 500 is ~3x baseline, ~1/3 figure.
+  if (!(probe.fig.variance >= 500)) fail(`figure region variance=${probe.fig.variance.toFixed(0)} < 500 -- reads as a flat quad, not a 3D voxel figure`);
+  console.log("smoke: figure OK (NPC region is shaded 3D geometry, not a flat quad)");
+
+  // --- v3 info: average frame interval over ~2 s of animation (headless
+  // software GL is NOT representative of Firefox on the GPU -- information only).
+  const fpsRes = await cmd("Runtime.evaluate", {
+    awaitPromise: true,
+    returnByValue: true,
+    expression: `(async () => {
+    let n = 0;
+    const t0 = performance.now();
+    await Promise.race([
+      new Promise((res) => {
+        const f = () => { n++; performance.now() - t0 < 2000 ? requestAnimationFrame(f) : res(); };
+        requestAnimationFrame(f);
+      }),
+      new Promise((res) => setTimeout(res, 3000)),
+    ]);
+    return { frames: n, intervalMs: n > 0 ? (performance.now() - t0) / n : 0 };
+  })()`,
+  });
+  if (fpsRes.exceptionDetails || !fpsRes.result?.value) {
+    console.log("smoke: INFO frame-interval probe unavailable (best effort, not a gate)");
+  } else {
+    const fps = fpsRes.result.value;
+    console.log(`smoke: INFO frame interval ~${fps.intervalMs.toFixed(1)} ms (${fps.frames} rAF, headless software GL)`);
+  }
 
   // --- screenshots (human-facing evidence only; asserts stay on state)
   for (const shot of SHOTS) {
@@ -318,6 +423,48 @@ try {
     if (bytes.length < 10000) fail(`screenshot ${path} is only ${bytes.length} bytes -- likely blank`);
     console.log(`smoke: screenshot ${path} (${bytes.length} bytes)`);
   }
+
+  // --- v3 deliverable screenshots: the open world, the wide map, a close-up.
+  const grab = async (name) => {
+    await new Promise((r) => setTimeout(r, 500)); // let the renderer settle
+    const shot = await cmd("Page.captureScreenshot", { format: "png" });
+    if (!shot.data) fail(`Page.captureScreenshot returned no data for ${name}`);
+    const bytes = Buffer.from(shot.data, "base64");
+    const path = join(ROOT, `out/${name}.png`);
+    writeFileSync(path, bytes);
+    if (bytes.length < 10000) fail(`screenshot ${path} is only ${bytes.length} bytes -- likely blank`);
+    console.log(`smoke: screenshot ${path} (${bytes.length} bytes)`);
+  };
+  await cmd("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+  // The probe framed a townsfolk (reset only clears the selection, not the
+  // camera); restore the OrbitCamera construction defaults for v3-default.
+  await evaluate(`window.game.dispatch({type:"orbit",yaw:-0.6,pitch:0.7})`);
+  await evaluate(`window.game.dispatch({type:"zoom",distance:36})`);
+  await evaluate(`window.game.focus(17, 8)`); // the village-centre default target
+  await grab("v3-default"); // camera is at the default framing here (reset above)
+
+  const wide = JSON.parse(await evaluate(`JSON.stringify(window.game.dispatch({type:"zoom",distance:120}))`));
+  if (!wide.ok) fail(`dispatch(zoom 120) failed: ${wide.error}`);
+  await grab("v3-wide");
+
+  const tfClose = centreTf; // open plaza ground; the close camera must not clip a wall
+  for (const intent of [{ type: "reset" }, { type: "orbit", yaw: 0.6, pitch: 0.35 }, { type: "zoom", distance: 4 }]) {
+    const res = JSON.parse(await evaluate(`JSON.stringify(window.game.dispatch(${JSON.stringify(intent)}))`));
+    if (!res.ok) fail(`dispatch(${JSON.stringify(intent)}) failed: ${res.error}`);
+  }
+  // The sim auto-ticks, so the townsfolk wanders off a focused cell; re-focus
+  // its live cell until entityScreenPos puts it near frame centre.
+  let framed = null;
+  for (let i = 0; i < 10 && !framed; i++) {
+    const live = JSON.parse(await evaluate("JSON.stringify(window.game.state())"))
+      .townsfolk.find((t) => t.id === tfClose.id) ?? tfClose;
+    await evaluate(`window.game.focus(${live.x}, ${live.y})`);
+    await waitFrames(2);
+    const pos = await evaluate(`window.game.entityScreenPos(${tfClose.id})`);
+    if (pos && Math.abs(pos.x - 640) < 220 && Math.abs(pos.y - 400) < 220) framed = pos;
+  }
+  if (!framed) fail(`could not centre townsfolk ${tfClose.id} for v3-close within 10 focus attempts`);
+  await grab("v3-close");
 
   // --- no-fetch: every request same-origin
   const offOrigin = requests
