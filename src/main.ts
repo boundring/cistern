@@ -36,3 +36,8 @@ const frame = (): void => {
   window.requestAnimationFrame(frame);
 };
 window.requestAnimationFrame(frame);
+
+// Ambient pacing: the donor town is a living tick stream; one tick every
+// 400 ms keeps the population wandering for the human viewer. The agent
+// surface drives deterministic ticks via dispatch({type:"tick", n}).
+window.setInterval(() => game.dispatch({ type: "tick" }), 400);

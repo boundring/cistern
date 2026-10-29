@@ -4,6 +4,7 @@ import type { TownModel } from "../core/town.js";
 import type { SlabMesh } from "../core/slab.js";
 import { decodeSlab, meshSlab, plateSlab } from "../core/slab.js";
 import { ScatterHash, kindHash } from "../core/scatter.js";
+import { BillboardEntities } from "./billboards.js";
 
 /**
  * Tile kinds absent from tiles.ron (rubble, grass, soil, stream_water,
@@ -109,6 +110,8 @@ export class TownScene {
   /** Orbit target for the app's OrbitCamera (contract superset). */
   readonly camera: THREE.PerspectiveCamera;
   readonly counts = { floor: 0, structure: 0, props: 0 };
+  /** Entity billboards (townsfolk), driven by the game layer. */
+  readonly entities = new BillboardEntities();
 
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -116,6 +119,8 @@ export class TownScene {
   private readonly raycaster = new THREE.Raycaster();
   private readonly canvas: HTMLCanvasElement;
   private readonly town: TownModel;
+  /** Terrain-top height per tile id, in world units (16 voxels = 1). */
+  private readonly groundByKind = new Map<string, number>();
 
   constructor(canvas: HTMLCanvasElement, town: TownModel, donors: Donors) {
     this.canvas = canvas;
@@ -159,6 +164,7 @@ export class TownScene {
       const asset = resolveAsset(donors, id);
       const vol = decodeSlab(donors.slabs[asset.slab]);
       const plated = asset.layer === "floor" ? plateSlab(vol) : vol;
+      this.groundByKind.set(id, plated.dims[2] / VOXELS_PER_CELL);
       const slab = meshSlab(plated, asset.layer === "floor" ? { omitBottom: true } : undefined);
       const mesh = new THREE.InstancedMesh(slabGeometry(slab, donors.theme), material, cells.length);
       const base = meanColor(slab);
@@ -216,8 +222,14 @@ export class TownScene {
     group.scale.setScalar(1 / VOXELS_PER_CELL); // 1 voxel = 1/16 world unit
     group.updateMatrixWorld(true);
     this.scene.add(group);
+    this.scene.add(this.entities.group);
 
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 300);
+  }
+
+  /** Terrain top under a cell, in world units -- the billboard ground line. */
+  groundHeight(x: number, y: number): number {
+    return this.groundByKind.get(this.town.tiles[y * this.town.width + x]) ?? 0;
   }
 
   resize(w: number, h: number): void {

@@ -282,6 +282,25 @@ try {
   }
   console.log(`smoke: dispatch OK (inspect ${sx},${sy} -> "${sel.copyKey}"; orbit/zoom/reset ok)`);
 
+  // --- townsfolk (v2): the rendered billboards must match the donor event
+  // stream (placement count pinned by tests/golden/townsfolk.txt), ticks
+  // must advance the sim transcript, and nobody despawns.
+  const goldenTf = goldenLine("townsfolk.txt", "VECT_TOWNSFOLK ");
+  const spawnCount = goldenTf.place.filter((p) => p.kind === "townsfolk").length;
+  const tfState = JSON.parse(await evaluate("JSON.stringify(window.game.state())"));
+  if (tfState.counts.townsfolk !== spawnCount) {
+    fail(`rendered townsfolk ${tfState.counts.townsfolk} != ${spawnCount} spawns in the donor stream`);
+  }
+  if (tfState.townsfolk.length !== spawnCount) {
+    fail(`state townsfolk ${tfState.townsfolk.length} != ${spawnCount} (donor: never despawn)`);
+  }
+  const evBefore = tfState.eventCount;
+  const tick = JSON.parse(await evaluate(`JSON.stringify(window.game.dispatch({type:"tick",n:5}))`));
+  if (!tick.ok) fail(`dispatch(tick n=5) failed: ${tick.error}`);
+  if (tick.state.eventCount <= evBefore) fail("dispatch(tick) did not advance the sim event stream");
+  if (tick.state.counts.townsfolk !== spawnCount) fail("townsfolk count changed over ticks (donor law: never despawn)");
+  console.log(`smoke: townsfolk OK (${spawnCount} billboards == donor spawn count; ticks advanced events ${evBefore} -> ${tick.state.eventCount})`);
+
   // --- screenshots (human-facing evidence only; asserts stay on state)
   for (const shot of SHOTS) {
     await cmd("Emulation.setDeviceMetricsOverride", {

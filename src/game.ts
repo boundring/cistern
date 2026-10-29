@@ -5,11 +5,15 @@ import { copyForTile } from "./core/copy.js";
 import { TownScene } from "./render/scene.js";
 import { OrbitCamera } from "./render/camera.js";
 import { Inspector } from "./render/inspector.js";
+import { TownSim } from "./core/sim.js";
 import type { TownModel } from "./core/town.js";
 import type { GameApi, GameState, Intent, IntentResult, Selection } from "./types/game.js";
 
 const TAP_PIXELS = 6;
 const DRAG_SPEED = 0.005;
+/** dispatch({type:"tick", n}) upper bound: a runaway n must not freeze the
+ * render loop (fail closed at the API boundary). */
+const TICK_MAX = 10000;
 
 /** Single owner of GameState: builds the scene, camera and inspector, wires
  * pointer input, and implements the `window.game` agent test surface. */
@@ -17,6 +21,8 @@ export class Game implements GameApi {
   private readonly scene: TownScene;
   private readonly orbit: OrbitCamera;
   private readonly inspector: Inspector;
+  private readonly sim: TownSim;
+  private readonly spawned = new Set<number>();
   private selection: Selection | null = null;
 
   constructor(
@@ -31,6 +37,8 @@ export class Game implements GameApi {
     );
     this.orbit.apply();
     this.inspector = new Inspector(panel, DONORS);
+    this.sim = new TownSim(town);
+    this.syncEntities();
     this.wireInput(canvas);
   }
 
@@ -62,6 +70,15 @@ export class Game implements GameApi {
         this.orbit.set(undefined, undefined, intent.distance);
         return { ok: true, state: this.state() };
       }
+      case "tick": {
+        const n = intent.n ?? 1;
+        if (!(Number.isInteger(n) && n >= 0 && n <= TICK_MAX)) {
+          return { ok: false, error: `tick n must be an integer in 0..${TICK_MAX}` };
+        }
+        for (let i = 0; i < n; i++) this.sim.tick();
+        this.syncEntities();
+        return { ok: true, state: this.state() };
+      }
       case "reset": {
         this.selection = null;
         this.inspector.show(null);
@@ -77,19 +94,36 @@ export class Game implements GameApi {
       height: this.town.height,
       tiles: this.town.tiles.slice(),
       selection: this.selection ? { ...this.selection } : null,
+      townsfolk: this.sim.townsfolk(),
+      eventCount: this.sim.events.length,
       camera: {
         yaw: this.orbit.yaw,
         pitch: this.orbit.pitch,
         distance: this.orbit.distance,
       },
-      counts: { ...this.scene.counts },
+      counts: { ...this.scene.counts, townsfolk: this.scene.entities.count() },
     };
   }
 
   /** One frame: reposition the camera, then render. */
   frame(): void {
     this.orbit.apply();
+    this.scene.entities.faceCamera(this.scene.camera);
     this.scene.render();
+  }
+
+  /** Mirror the sim's townsfolk into the billboard layer: spawn on first
+   * sight, move afterwards (donor: entity_spawn / entity_moved). */
+  private syncEntities(): void {
+    for (const f of this.sim.townsfolk()) {
+      const ground = this.scene.groundHeight(f.x, f.y);
+      if (this.spawned.has(f.id)) {
+        this.scene.entities.moveEntity(f.id, f.x, f.y, ground);
+      } else {
+        this.scene.entities.spawn(f.id, "townsfolk", f.x, f.y, ground);
+        this.spawned.add(f.id);
+      }
+    }
   }
 
   resize(w: number, h: number): void {

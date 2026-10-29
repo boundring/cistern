@@ -41,6 +41,10 @@ export interface GameState {
   tiles: string[];
   /** Currently inspected cell, or null when nothing is selected. */
   selection: Selection | null;
+  /** Live ambient townsfolk, in sim actor order. */
+  townsfolk: { id: number; x: number; y: number; speed: number }[];
+  /** Length of the sim's canonical event transcript. */
+  eventCount: number;
   camera: CameraState;
   counts: {
     /** Cells drawn from a floor-layer slab (incl. fallbacks). */
@@ -49,6 +53,8 @@ export interface GameState {
     structure: number;
     /** Scattered prop instances. */
     props: number;
+    /** Rendered entity billboards. */
+    townsfolk: number;
   };
 }
 
@@ -57,6 +63,8 @@ export type Intent =
   | { type: "inspect"; x: number; y: number }
   | { type: "orbit"; yaw?: number; pitch?: number }
   | { type: "zoom"; distance: number }
+  /** Advance the ambient sim n ticks (default 1). */
+  | { type: "tick"; n?: number }
   | { type: "reset" };
 
 export type IntentResult =
