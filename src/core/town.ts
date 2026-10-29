@@ -12,6 +12,25 @@ import { GodotRng } from "./rng.js";
 export const TOWN_FLAVOR_KEY = (6 << 8) | 2;
 /** TownState.PINNED_SEED. */
 export const TOWN_SEED = 0xc1577eed;
+/** town_state.gd DEFAULT_SPEED: one action per tick at the act threshold. */
+export const DEFAULT_SPEED = 100;
+/** The Dir8 wire strings (intent.rs vocabulary). */
+export type Dir8 = "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
+/**
+ * town_state.gd DIR8: (dx, dy) on the tile grid, y grows south, keyed by
+ * the Dir8 wire string. The one piece of domain logic the wire vocabulary
+ * carries -- shared by the sim and the townsfolk wander.
+ */
+export const DIR8: Record<Dir8, readonly [number, number]> = {
+  n: [0, -1],
+  ne: [1, -1],
+  e: [1, 0],
+  se: [1, 1],
+  s: [0, 1],
+  sw: [-1, 1],
+  w: [-1, 0],
+  nw: [-1, -1],
+};
 /** town_map.gd TEMPLATE_SELECT_KEY — stream 1, town role 2. */
 const TEMPLATE_SELECT_KEY = (1 << 8) | 2;
 

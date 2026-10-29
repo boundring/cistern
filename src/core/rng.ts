@@ -48,6 +48,9 @@ export class GodotRng {
   /** pcg32_boundedrand_r with rejection sampling. */
   randiRange(from: number, to: number): number {
     if (from > to) throw new Error(`randi_range: from ${from} is greater than to ${to}`);
+    // Godot short-circuits from == to without consuming a draw (probed on
+    // 4.7.2: the next raw randi() is unchanged).
+    if (from === to) return from;
     const bound = to - from + 1;
     const threshold = ((0 - bound) >>> 0) % bound;
     for (;;) {
