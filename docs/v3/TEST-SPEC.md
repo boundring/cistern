@@ -44,16 +44,46 @@ npm run smoke
 `npm run smoke` builds it. A session implementing a render-side module should
 run `npm run build` before its test.
 
-The charter calls the pre-existing suite "13 golden tests"; the tree at HEAD
-actually carries **18** test cases across five files — `rng` 2, `scatter` 2,
-`slab` 4, `town` 5, `townsfolk` 5 — all green, and all of them must stay
-green. (The count discrepancy is a charter wording artefact, not a
-regression: nothing in `tests/` was deleted.)
+The charter calls the pre-existing suite "13 golden tests". That number is
+the v1 baseline: commit `28f382f` carried 13 cases across four files
+(`rng` 2, `scatter` 2, `slab` 4, `town` 5). The later townsfolk commit
+`fca2df7` added 5 more, so HEAD carries **18** cases across five files —
+`rng` 2, `scatter` 2, `slab` 4, `town` 5, `townsfolk` 5 — all green, and all
+of them must stay green. (The count difference is a charter wording
+artefact, not a regression: nothing in `tests/` was deleted.)
 
 The skeletons live under `docs/v3/skeleton/tests/`, so their relative import
 paths carry four `..` segments (`../../../../out/core/noise.js`). When a
 skeleton is promoted to `tests/<name>.test.mjs`, the path becomes the repo's
 house style, e.g. `import { FastNoiseLite } from "../out/core/noise.js";`.
+
+### Name reconciliation
+
+The canonical test names in this spec are authoritative, and the skeletons use
+them verbatim. Three modules already in `tests/` carry **different** case
+names from an earlier slice; promoting the skeletons over them means renaming
+those cases, not changing this spec:
+
+| Module | Canonical name (this spec) | Name currently in `tests/` |
+|---|---|---|
+| noise | `ported FastNoiseLite matches the donor probe bit-exact` | same |
+| noise | `the port is deterministic across repeated calls` | (folded into the bit-exact case as a per-row `Object.is` check) |
+| noise | `octave count changes the value` | (not present) |
+| noise | `seed changes the value` | (not present) |
+| noise | — | `golden parsed: 6 configs x 144 lattice samples` (extra) |
+| noise | — | `golden coordinates match the rebuilt lattice` (extra) |
+| world | `stepsAtCell matches the donor EXACTLY at every golden point` | `stepsAt matches the donor EXACTLY at every golden point` |
+| world | `the playable grid is 4.00x the authored town` | (not present) |
+| world | — | `golden coverage: the probe printed the full point set` (extra) |
+| walk | `walkPhase is distance * TAU / STRIDE` | `walkPhase(d) === d * TAU / STRIDE at fixed distances` |
+| walk | `walkPose derives swing and bob from the phase` | `walkPose(phase): swing = sin(phase), bob = |sin(phase)|, phase echoed` |
+| walk | `idlePose is a slow deterministic bob` | `idlePose deterministic, swing 0, |bob| <= IDLE_AMP` |
+| walk | `idlePose stays inside IDLE_AMP` | (folded into the idle case) |
+| walk | `the walk phase golden matches the recorded vector` | `golden walk vector matches` |
+| walk | — | `STRIDE is 1 and idle constants are sane` (extra) |
+
+The five modules with no landed counterpart (`voxel`, `figures`,
+`worldrender`, `camera`, `inspector`) are new files.
 
 ---
 
@@ -217,8 +247,8 @@ mountain [126,126,134], rim [98,98,108], village [150,126,96], shore
 | 1 | `the terrain mesh covers the whole footprint` | S06 | a rendered `WorldView` over the 68x32 playable grid with margins | `counts.cells === 8160` (= 136*64 - 34*16, the town hole excluded); the terrain geometry's bounding box reaches x -34..102, y 0.25..4, z -48..16 | frozen footprint arithmetic + the terrain builder |
 | 2 | `cells inside the town footprint are skipped` | S06 | the same mesh | zero vertices strictly inside the town rectangle (x 17..51, z -24..-8); the hole is gx 17..50, gy 8..23 | frozen town origin/size |
 | 3 | `the town edge gets a skirt` | S06 | the same mesh | 100 skirt quads; their 300 upper vertices sit at `villageHeight() = 0.8706156071791282` (stored as float32 0.8706156015396118) | frozen skirt rule (`bordersTown` + `villageHeight`) |
-| 4 | `vertex colours follow TERRAIN_COLOR and the baked lighting law` | S06 | the top quad of cell (0,0) (plains, h 0.75) and of cell (-34,-16) (water, h 0.25) | plains `(0.35384212241721785, 0.48382494289701217, 0.2744081765684546)` before the float32 attribute store; water `(0.25274437315515563, 0.37550592583051684, 0.33217831900391875)`; the stored float32 values are within 1e-6 of these | closed-form lighting law over `TERRAIN_COLOR` |
-| 5 | `side faces are shaded by TERRAIN_SIDE_SHADE` | S06 | the east face of the rim cell (-10,-10) | `(0.2084222526012927, 0.2084222526012927, 0.2296898365020752)` — the same law times `TERRAIN_SIDE_SHADE` | closed-form lighting law |
+| 4 | `vertex colours follow TERRAIN_COLOR and the baked lighting law` | S06 | the top quad of cell (0,0) (plains, h 0.75) and of cell (-34,-16) (water, h 0.25) | plains `(0.35384212241721785, 0.48382494289701217, 0.2744081765684546)` before the float32 attribute store and `(0.3538421094417572, 0.4838249385356903, 0.2744081914424896)` in it; water `(0.25274437315515563, 0.37550592583051684, 0.33217831900391875)` before the store and `(0.2527443766593933, 0.3755059242248535, 0.3321783244609833)` in it — the stored values are within 1e-6 of the law | closed-form lighting law over `TERRAIN_COLOR` |
+| 5 | `side faces are shaded by TERRAIN_SIDE_SHADE` | S06 | the east face of the rim cell (-10,-10): the vertical quad at x = -9, z in {9, 10}, y from the east neighbour's height 2 up to the cell's height 2.125 | `(0.2084222526012927, 0.2084222526012927, 0.2296898365020752)` before the float32 store and `(0.20842225849628448, 0.20842225849628448, 0.2296898365020752)` in it — the same law times `TERRAIN_SIDE_SHADE` | closed-form lighting law |
 | 6 | `water sits at tableHeight() and spans past the footprint` | S06 | the water mesh | a horizontal plane 336 x 264 (`FOOTPRINT_SPAN + 200`), centred on `(34.5, -16.5)`, at y = `tableHeight() = 0.5` | frozen footprint arithmetic + `tableHeight()` |
 | 7 | `water animation is deterministic in elapsedSeconds` | S06 | `update(t)` at t = 0 and t = 2.5 | `y = 0.5 + 0.02*sin(1.1t) + 0.012*sin(2.3t + 1.7)`, `x = 0.03*sin(0.63t)`, `z = 0.03*cos(0.47t)`; at t = 0 that is `(0, 0.5118999777254296, 0.03)`; two calls with the same t give the same surface height | frozen animation law (pure function of `elapsedSeconds`) |
 | 8 | `scatter counts follow the donor hash-scatter law` | S07 | a recount over the footprint using `ScatterHash` with floor identities 11 (trees), 14 (pines), 12 (rocks), 13 (items) and densities trees 0.16 on plains/hills/plateau/village, pines 0.12 on mountain/rim, rocks 0.14 on mountain/rim, items 0.05 on plains/desert/village | `counts.trees === 906` (broadleaf 428 + pine 478), `counts.rocks === 503`, `counts.items === 25` (crystal 8 + berry 6 + branch 11) — the recount reproduces the renderer's numbers exactly | the donor hash-scatter law over `src/core/scatter.ts` |

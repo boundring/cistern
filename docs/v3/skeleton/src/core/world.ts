@@ -37,9 +37,12 @@
  * so a float32 value re-read from the golden still differs from the port's
  * double by about half a float32 ULP (~1e-9 absolute on a 0..1 weight).
  * The ~5e-18 figure is the port value rounded to float32 against the
- * golden read as float32. So assert biome weights with a tolerance of
- * order 1e-7, not exact equality; the integer stepsAt points may still be
- * asserted exactly.
+ * golden read as float32. Until the rounding is applied, the honest
+ * assertion is a tolerance of 1e-5 for biomeWeights and 1e-6 for
+ * tectonicUplift and warpSample -- the residuals the current port actually
+ * shows (1.401e-6 and 3.329e-8) -- with exact equality for the integer
+ * stepsAt points. Order 1e-7 becomes available only after the rounding
+ * change lands.
  *
  * Signatures are verbatim from CONTRACT.md ("Frozen: slice B"); the real
  * source spells the constructor defaults as WORLD_W / WORLD_H.

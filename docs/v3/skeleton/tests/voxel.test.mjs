@@ -49,7 +49,8 @@ test("mergeBoxes shades sides and bottom darker than the top", { todo: "not impl
 
 test("broadleafModel is trunk plus three canopy boxes", { todo: "not implemented — S04" }, () => {
   // Four boxes -> 144 vertices; the bounding box is about 0.7 wide and 1.0
-  // tall; the model colour is LEAF.
+  // tall; the model's own colour field is LEAF, while the first box's vertex
+  // colour is TRUNK (the trunk is box 0, so the first 36 vertices are it).
   const actual = undefined; // TODO(S04): broadleafModel() geometry bounds and colour
   assert.equal(actual, 144, "vertices for the broadleaf");
 });
@@ -72,7 +73,9 @@ test("item models are small", { todo: "not implemented — S04" }, () => {
   // Every item model is well under a metre: crystal 4 boxes (144 vertices,
   // 0.185 x 0.345 x 0.145), berry 4 boxes (144 vertices, 0.22 x 0.225 x
   // 0.22), branch 3 boxes (108 vertices, 0.30 x 0.095 x 0.10). The largest
-  // single extent must not exceed 0.35.
+  // single extent must not exceed 0.35 (the crystal's 0.345 is the largest).
+  // The colour fields are CRYSTAL, BERRY and TRUNK respectively; the berry
+  // model's first box is the BUSH box, so its first vertex colour is BUSH.
   const actual = undefined; // TODO(S04): the bounding boxes of crystalModel, berryModel and branchModel
   assert.ok(actual <= 0.35, "largest item extent");
 });

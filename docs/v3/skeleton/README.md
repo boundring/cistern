@@ -91,6 +91,15 @@ docs/v3/skeleton/
   });
   ```
 
+  The tolerances are the ones the canonical test names state: 1e-5 for
+  `biomeWeights`, 1e-6 for `tectonicUplift` and `warpSample`, exact equality
+  for the integer relief steps (`stepsAtCell`) and for the noise golden
+  samples (the port is bit-exact against the donor). The 1e-5 / 1e-6
+  residuals are the donor's single-precision storage (see the precision
+  note in `src/core/world.ts`); tightening them to order 1e-7 is an
+  optional S02 refinement, available only after the world law rounds the
+  axis constants and the returned biome weights to float32.
+
   They import the compiled build through a **guarded dynamic import**
   (`await import("../../../../out/core/noise.js").catch(() => null)`),
   because `out/` is gitignored and absent in a fresh checkout -- a static

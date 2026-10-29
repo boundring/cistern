@@ -65,8 +65,11 @@ test("vertex colours follow TERRAIN_COLOR and the baked lighting law", { todo: "
   // colour = TERRAIN_COLOR[kind] / 255 * (0.62 + 0.38 * max(dot(n, sun), 0)).
   // e.g. the plains top quad of cell (0, 0) is
   // (0.35384212241721785, 0.48382494289701217, 0.2744081765684546) before
-  // the float32 attribute store, and the water top quad of cell (-34, -16)
-  // is (0.25274437315515563, 0.37550592583051684, 0.33217831900391875).
+  // the float32 attribute store and (0.3538421094417572, 0.4838249385356903,
+  // 0.2744081914424896) in it; the water top quad of cell (-34, -16) is
+  // (0.25274437315515563, 0.37550592583051684, 0.33217831900391875) before
+  // the store and (0.2527443766593933, 0.3755059242248535, 0.3321783244609833)
+  // in it.
   const actual = undefined; // TODO(S06): the baked colour of a known top quad
   assert.ok(Math.abs(actual - 0.35384212241721785) <= 1e-6, "plains top colour");
 });
@@ -74,7 +77,9 @@ test("vertex colours follow TERRAIN_COLOR and the baked lighting law", { todo: "
 test("side faces are shaded by TERRAIN_SIDE_SHADE", { todo: "not implemented — S06" }, () => {
   // A side face uses the same lighting law multiplied by TERRAIN_SIDE_SHADE
   // 0.72, e.g. the east face of the rim cell (-10, -10) is
-  // (0.2084222526012927, 0.2084222526012927, 0.2296898365020752).
+  // (0.2084222526012927, 0.2084222526012927, 0.2296898365020752) before the
+  // float32 attribute store and (0.20842225849628448, 0.20842225849628448,
+  // 0.2296898365020752) in it.
   const actual = undefined; // TODO(S06): the baked colour of a known side face
   assert.ok(Math.abs(actual - 0.2084222526012927) <= 1e-6, "rim east face colour");
 });

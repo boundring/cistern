@@ -73,7 +73,7 @@ test("the garment palette matches the donor billboard palette", { todo: "not imp
 });
 
 test("spawn adds a figure and moveTo retargets it", { todo: "not implemented — S05" }, () => {
-  // count() goes 0 -> 1 on spawn, and moveTo(id, x, y, z) sets the new
+  // count() goes 0 -> 1 on spawn, and moveTo(id, x, y, ground) sets the new
   // destination; the figure's position then advances along that segment.
   const actual = undefined; // TODO(S05): count() before/after spawn, then moveTo
   assert.equal(actual, 1, "figure count after spawn");
