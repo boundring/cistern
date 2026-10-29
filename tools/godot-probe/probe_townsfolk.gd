@@ -8,8 +8,18 @@ extends SceneTree
 ## townsfolk stream; they are out of the web's v2 scope).
 ##
 ## Regenerate (deliberately, never casually):
-##   copy scripts/{sim,protocol} closure into /tmp/gp-v2 (donor repo stays
-##   read-only), then
+##   build a scratch Godot project (donor repo stays read-only):
+##     <scratch>/project.godot          -- config_version=5, app name "probe"
+##     <scratch>/scripts/sim/           -- town_map.gd town_state.gd
+##                                         townsfolk.gd shop_stock.gd
+##                                         servant_job_executor.gd
+##     <scratch>/scripts/protocol/      -- sim_intent.gd
+##     <scratch>/probe_townsfolk.gd     -- this file
+##   (six .gd files total: the full closure -- town_state.gd preloads
+##   townsfolk.gd/shop_stock.gd by res:// path, the rest resolve via
+##   class_name; nothing reads content/.)
+##   then let Godot build the class cache and run the probe:
+##     godot --headless --path <scratch> --import
 ##   godot --headless --path /tmp/gp-v2 -s probe_townsfolk.gd \
 ##     > tests/golden/townsfolk.txt
 
