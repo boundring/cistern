@@ -1,0 +1,24 @@
+CISTERN — SECTOR-7 — v3.0.0-dev  TICK 51   ALLOY 27   POP 5/8   CONTAM 3/20   SEED 2072944688
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  · pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓···········▓····················▓
+▓··+20─▣······▓····················▓
+▓··α········▓····················▓
+▓···········▓··················◆·▓
+▓·····▒δ····▓····················▓
+▓····▒γ····ε···················◆·▓
++······▒β···▓····················▓
+▓···········+····················▓
+▓···········+·▓+▓▓▓▓▓▓▓▓▓········▓
+▓···········▓····················▓
+▓···········▓····················▓
+▓···········▓····················▓
+▓···········▓····················▓
+▓···········▓····················▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+CURSOR (5,2): TANK — LOAD 10/60 — PURGE WITH x (pays 1 alloy per 3)
+LINES NOMINAL — THE STRUCTURE DOES NOT CARE
+BREACH — CREATOR #2 OVERFLOWED AT (5,6)
+BREACH — CREATOR #3 OVERFLOWED AT (6,5)
+CREATOR RELIEVED AT (3,3)

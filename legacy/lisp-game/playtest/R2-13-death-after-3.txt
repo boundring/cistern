@@ -1,0 +1,26 @@
+CISTERN — SECTOR-7  TICK 1  ALLOY 20  POP 4/8  CONTAM 20/20  SCORE 0  GOALS 0/2  REP 0   !! SECTOR CONDEMNED — CONTAMINATION LIMIT
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit  t/p/K arm — click to place
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  ╌ dead pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓···················▓············▓
+▓··┌─▣··············▓············▓
+▓··Ω················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓···········βα··δ···▓············▓
++···················+············▓
+▓···················▓····◆·······▓
+▓···········γ·▓▓+▓▓▓▓▓▓▓▓········▓
+▓···················+··········◆·▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+SECTOR CONDEMNED — CONTAMINATION LIMIT / TICKS 1 · RELIEVES 0 · SCORE 0 / PRESS n TO RESTART
+CURSOR (3,6): FLOOR — toilet Ω 3 north, tank ▣ 2 east, 4 north
+SECTOR CONDEMNED — PRESS n TO RESTART
+TUTORIAL 1/3: MOVE THE CURSOR ONTO A WORKER  (T skips)
+BREACH — CREATOR β OVERFLOWED AT (12,6)
+SECTOR CONDEMNED — CONTAMINATION LIMIT
+SECTOR CONDEMNED — PRESS n FOR NEW GAME

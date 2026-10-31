@@ -1,0 +1,33 @@
+01-cold: tick=0 alloy=20 contam=0 cursor=(3,6) armed=nil relieves=0 score=nil rep=0 trophies=nil
+DUMP SCREEN-01-cold-start.txt
+02-cursor (state): tick=0 alloy=20 contam=0 cursor=(6,4) armed=nil relieves=0 score=nil rep=0 trophies=nil
+02: inspector tracks cursor: (6 . 4) (state cursor (6 . 4))
+DUMP SCREEN-02-cursor-moved.txt
+03-ticks: tick=3 alloy=20 contam=0 cursor=(6,4) armed=nil relieves=0 score=nil rep=0 trophies=nil
+DUMP SCREEN-03-after-3-ticks.txt
+04a: toilet at (1 . 1) alloy 20->10 tick 3
+DUMP SCREEN-04-built-toilet.txt
+04b: pipe at (2 . 1) alloy 10->8 tick 3
+DUMP SCREEN-05-built-pipe.txt
+04c: tank at (1 . 1) alloy 20->5 tick 0
+DUMP SCREEN-06-built-tank.txt
+05a: unarmed click at (1 . 1) -> cursor (1 . 1) tick 0 (expect moved, +0)
+DUMP SCREEN-07-click-unarmed.txt
+05b: armed click at (1 . 1) -> alloy 20->18 tick 1 (expect -2, +1)
+DUMP SCREEN-08-click-armed.txt
+06: demolish pipe at (1 . 1) alloy 18->16 tick 1->1 particles=0
+DUMP SCREEN-09-demolished.txt
+07: purge tank at (5 . 2) alloy 16->26 load now 0
+DUMP SCREEN-10-purged-tank.txt
+08: goal card set; ticking until 3 relieves (starter map)
+08: relieve at tick 51 (total 1)
+DUMP SCREEN-11-relief-1.txt
+08: relieve at tick 82 (total 2)
+DUMP SCREEN-12-relief-2.txt
+08: MAP COMPLETED at tick 82 trophies=(70219520) particles=64
+DUMP SCREEN-13-map-completed.txt
+09: auto-run on -> timer [nil 0 0 200000 nil cistern-input--auto-run-callback nil idle 0 nil]
+09: auto-run off -> timer nil
+DUMP SCREEN-15-auto-run-toggled.txt
+10-new-game: tick=0 alloy=20 contam=0 cursor=(3,6) armed=nil relieves=0 score=nil rep=0 trophies=nil
+DUMP SCREEN-16-new-game-variety.txt

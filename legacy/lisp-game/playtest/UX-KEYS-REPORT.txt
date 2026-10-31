@@ -1,0 +1,23 @@
+T1a build-on-wall: 10 presses total; visible log tail: #("LINES NOMINAL — THE STRUCTURE DOES NOT CARE
+SECTOR-7 ONLINE — KEEP THE WATER MOVING
+CANNOT BUILD THERE
+" 0 44 (face cistern-dim) 44 83 (face cistern-dim) 84 102 (face cistern-dim)); armed-verb now: toilet
+T1b insufficient-alloy: 47 presses; inspector=#("CURSOR (32,14): FLOOR" 0 21 (face cistern-dim))
+T2 toilet+5-pipe at (32,14): travel 0 + 6 build presses = 6; armed=nil
+    log tail: #("TOILET PLACED AT (32,14) — 10 ALLOY
+CANNOT BUILD THERE
+PIPE PLACED AT (31,14) — 2 ALLOY
+" 0 35 (face cistern-dim) 36 54 (face cistern-dim) 55 87 (face cistern-dim))
+T3 purge full tank: travel 35 + 1 = 36 presses; log tail: #("CANNOT BUILD THERE
+PIPE PLACED AT (31,14) — 2 ALLOY
+TANK PURGED — RECOVERED 20 ALLOY
+" 0 18 (face cistern-dim) 19 51 (face cistern-dim) 52 84 (face cistern-dim))
+    pressure line via inspector: #("CURSOR (5,2): TANK — LOAD 0/60 — PURGE WITH x (pays 1 alloy per 3)" 0 66 (face cistern-dim))
+T4 no hazard on map
+T5 misplace+take-back: 40 presses; alloy 100→96; log: #("TANK PURGED — RECOVERED 20 ALLOY
+PIPE PLACED AT (32,13) — 2 ALLOY
+DEMOLISHED PIPE AT (32,13) — 3 ALLOY — 1 REFUND
+" 0 32 (face cistern-dim) 33 65 (face cistern-dim) 66 113 (face cistern-dim))
+T6 after arming tank: header 3 lines=#("CISTERN — SECTOR-7 — v3.0.0-dev  TICK 1   ALLOY 81   POP 4/8   CONTAM 0/20   SEED 2106394178
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  · pipe  Ω toilet  ▣ tank  α worker" 0 93 (face cistern-header) 93 234 (face cistern-dim) 234 331 (face cistern-dim)) — any armed indicator? 142

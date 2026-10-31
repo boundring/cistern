@@ -1,0 +1,24 @@
+CISTERN — SECTOR-7 — v3.0.0-dev  TICK 3   ALLOY 8   POP 4/8   CONTAM 0/20   SEED 1535244752
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  · pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓Ω··················▓············▓
+▓··┌─▣··············▓············▓
+▓··Ω················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓··············α··δ·▓············▓
++················β··+············▓
+▓···················▓····◆·······▓
+▓·············▓▓+▓▓▓▓▓▓▓▓········▓
+▓············γ······+··········◆·▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+CURSOR (2,1): PIPE — the only wire; keep it short
+PRESSURE CRITICAL — TOILETS BACKED UP / PURGE THE TANKS
+SECTOR-7 ONLINE — KEEP THE WATER MOVING
+TOILET PLACED AT (1,1) — 10 ALLOY
+PIPE PLACED AT (2,1) — 2 ALLOY

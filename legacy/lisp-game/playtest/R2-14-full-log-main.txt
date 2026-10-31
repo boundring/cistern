@@ -1,0 +1,24 @@
+CISTERN — SECTOR-7  TICK 30  ALLOY 22  POP 4/8  CONTAM 0/20  SCORE 0  GOALS 1/2  REP 0
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit  t/p/K arm — click to place
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  ╌ dead pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓···················▓············▓
+▓··┌─▣··············▓············▓
+▓··Ω················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
++········α······δ···+··β·········▓
+▓···················▓····◆·······▓
+▓·············▓▓+▓▓▓▓▓▓▓▓········▓
+▓··············γ····+··········◆·▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓···················▓············▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+CURSOR (3,6): FLOOR — toilet Ω 3 north, tank ▣ 2 east, 4 north
+LINES NOMINAL — THE STRUCTURE DOES NOT CARE
+TUTORIAL 1/3: MOVE THE CURSOR ONTO A WORKER  (T skips)
+SECTOR-7 ONLINE — KEEP THE WATER MOVING

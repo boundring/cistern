@@ -1,0 +1,26 @@
+CISTERN — SECTOR-7  TICK 15  ALLOY 46  POP 4/8  CONTAM 0/20  SCORE 70  GOALS 2/2  REP 5
+[arrows/mouse] cursor  [t]oilet 10  [p]ipe 2  [K]tank 15  [d]emolish 3  [c]decon 3  [x]purge  [SPC]tick  [r]auto-run  [n]ew  [?]help  [q]uit  t/p/K arm — click to place
+GLYPHS:  · floor  ▓ wall  + gate  ◆ ore vein  ▒ contamination  ╌ dead pipe  Ω toilet  ▣ tank  α worker
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓···········§···!·!·▓·····§······▓
+▓*·┌─▣·§············▓!···········▓
+▓··α··········*·····▓············▓
+▓··········!········▓········*·!·▓
+▓·········§·*·····§·▓············▓
+▓*·····!···!·····§··▓······!·····▓
++···········§·······+·*δ*·····*·!▓
+▓····§·····§········▓····β···!···▓
+▓·*·······!···▓▓+▓▓▓▓▓▓▓▓·····*··▓
+▓····*·*············+····γ·····◆·▓
+▓···*·····§·······*·▓·······!···!▓
+▓··§·§·*············▓··*·§···*···▓
+▓···········*·······▓·········!··▓
+▓!···§·······§·····!▓········§···▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+MILESTONE — BIG CISTERN ONLINE
+CURSOR (3,6): FLOOR — toilet Ω 3 north, tank ▣ 2 east, 4 north
+LINES NOMINAL — THE STRUCTURE DOES NOT CARE
+TUTORIAL 1/3: MOVE THE CURSOR ONTO A WORKER  (T skips)
+CREATOR RELIEVED AT (3,3)
+MILESTONE — BIG CISTERN ONLINE
+TANK PURGED — RECOVERED 3 ALLOY
