@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build:core": "tsc -p tsconfig.core.json",
-    "test": "npm run build:core && node --test tests/",
+    "test": "npm run build && node --test tests/",
     "bake": "node tools/bake-donors.mjs",
     "smoke": "npm run build && node tools/smoke.mjs"
   },
