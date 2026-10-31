@@ -61,6 +61,18 @@ const VILLAGE_FLAT_CORE = 6.0;
 const RIVER_CARVE = 5.0; // valley half-width, cell units
 const TECTONIC_AXIS = { x: 0.6, y: -0.8 };
 const AXIS_PERP = { x: 0.8, y: 0.6 };
+/**
+ * The donor keeps both axes in a Vector2, which is single precision in a
+ * standard Godot build: 0.6 is stored as 0.6000000238418579 and 0.8 as
+ * 0.800000011920929. The biome mask samples its noise on that frame and
+ * the smoothstep on the mountain mask amplifies the difference, so the
+ * mask reads the donor's own float32 axes -- the WBIOME residual drops
+ * from 1.4009e-6 to 1.5158e-8. The shared constants above stay double:
+ * frounding them moves the village base (macroSteps) by 4.16e-9 and breaks
+ * the canonical village-base value.
+ */
+const TECTONIC_AXIS_F32 = { x: Math.fround(TECTONIC_AXIS.x), y: Math.fround(TECTONIC_AXIS.y) };
+const AXIS_PERP_F32 = { x: Math.fround(AXIS_PERP.x), y: Math.fround(AXIS_PERP.y) };
 const AXIS_ANISO_U = 0.55; // freq multiplier ALONG the axis
 const AXIS_ANISO_V = 1.2; // freq multiplier ACROSS the axis
 const BASIN_ASPECT = 1.7;
@@ -225,8 +237,8 @@ export class WorldHeightmap {
     const wx = fx + 34.0 * w1;
     const wz = fz + 34.0 * w2;
     // Anisotropic sample frame: chains elongate along the tectonic axis.
-    const u = wx * TECTONIC_AXIS.x + wz * TECTONIC_AXIS.y;
-    const v = wx * AXIS_PERP.x + wz * AXIS_PERP.y;
+    const u = wx * TECTONIC_AXIS_F32.x + wz * TECTONIC_AXIS_F32.y;
+    const v = wx * AXIS_PERP_F32.x + wz * AXIS_PERP_F32.y;
     const m01 = (this.mtn.getNoise2D(u * AXIS_ANISO_U, v * AXIS_ANISO_V) + 1.0) * 0.5;
     const p01 = (this.plateau.getNoise2D(wx, wz) + 1.0) * 0.5;
     let wM = smoothstep(0.52, 0.88, m01);

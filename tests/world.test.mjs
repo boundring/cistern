@@ -5,7 +5,14 @@
  * (tools/godot-probe/probe_world.gd): the donor law with the web's two
  * documented trims (no corridors, village disc at (34,16)), over the web's
  * 68x32 playable grid. stepsAt must match EXACTLY; the pure float fields
- * (biome weights, tectonic uplift, warp noise) must match within 1e-6.
+ * (biome weights, tectonic uplift, warp noise) must match within their
+ * tolerances.
+ *
+ * The biome weights now match to 1.5158e-8: the donor samples its biome
+ * mask on a single-precision (float32) tectonic frame, so the port reads
+ * the donor's float32 axes at that use site (see src/core/world.ts). The
+ * asserted bound tightens from 1e-5 to 1e-7 with that change; the case
+ * name keeps the requirements-matrix wording.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -14,14 +21,22 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { WorldHeightmap, riverX, riverHalfWidth } from "../out/core/world.js";
 import {
+  SUB,
   TABLE_STEPS,
+  MAX_STEPS,
   VOXEL,
   WORLD_W,
   WORLD_H,
   MARGIN_X,
   MARGIN_Z,
+  FOOTPRINT_W,
+  FOOTPRINT_H,
   VILLAGE_X,
   VILLAGE_Y,
+  TOWN_X,
+  TOWN_Y,
+  TOWN_W,
+  TOWN_H,
 } from "../out/core/terrain.js";
 
 const golden = readFileSync(
@@ -36,6 +51,17 @@ const wuplift = lines.filter((l) => l.startsWith("WUPLIFT ")).map((l) => l.split
 const wrift = lines.filter((l) => l.startsWith("WRIFT ")).map((l) => l.split(/\s+/).slice(1).map(Number));
 const wtable = Number(lines.find((l) => l.startsWith("WTABLE ")).split(/\s+/)[1]);
 
+// A WSTEP row carries donor sub-voxel coordinates: isx = gx * SUB + SUB / 2,
+// so the cell under the sample is (isx - SUB/2) / SUB.
+const cellOf = (isx, isz) => [(isx - SUB / 2) / SUB, (isz - SUB / 2) / SUB];
+
+// The web's ocean band: the outermost two cells of the footprint.
+const inOceanBand = (gx, gy) =>
+  gx <= -MARGIN_X + 1 ||
+  gx >= WORLD_W + MARGIN_X - 2 ||
+  gy <= -MARGIN_Z + 1 ||
+  gy >= WORLD_H + MARGIN_Z - 2;
+
 test("golden coverage: the probe printed the full point set", () => {
   assert.equal(wsteps.length, 40);
   assert.equal(wbiome.length, 20);
@@ -44,26 +70,57 @@ test("golden coverage: the probe printed the full point set", () => {
   assert.equal(lines.filter((l) => l.startsWith("WTABLE")).length, 1);
 });
 
-test("stepsAt matches the donor EXACTLY at every golden point", () => {
+test("stepsAtCell matches the donor EXACTLY at every golden point", () => {
+  // EXACT (integer) equality, no tolerance:
+  //   stepsAt(isx, isz) === steps     for all 40 "WSTEP" rows (the donor law)
+  //   stepsAtCell(gx, gy) === steps   for the 34 golden cells the web law
+  //                                    covers (inside the ocean band)
+  //   stepsAtCell(gx, gy) === 2       for the 6 golden cells in the ocean
+  //                                    band -- TABLE_STEPS - 2, the
+  //                                    documented web extension. The donor
+  //                                    has no ocean and says 2 at (70, 47),
+  //                                    which coincides.
   const w = new WorldHeightmap();
+  let land = 0;
+  let ocean = 0;
   for (const [isx, isz, steps] of wsteps) {
+    const [gx, gy] = cellOf(isx, isz);
+    assert.ok(
+      Number.isInteger(gx) && Number.isInteger(gy),
+      `WSTEP ${isx} ${isz} is not on a cell centre (SUB ${SUB})`,
+    );
     assert.equal(w.stepsAt(isx, isz), steps, `stepsAt(${isx}, ${isz})`);
+    if (inOceanBand(gx, gy)) {
+      ocean += 1;
+      assert.equal(
+        w.stepsAtCell(gx, gy),
+        TABLE_STEPS - 2,
+        `ocean band cell (${gx}, ${gy}) !== TABLE_STEPS - 2`,
+      );
+    } else {
+      land += 1;
+      assert.equal(w.stepsAtCell(gx, gy), steps, `stepsAtCell(${gx}, ${gy})`);
+    }
   }
+  assert.equal(land, 34, "34 golden cells are covered by the web law");
+  assert.equal(ocean, 6, "6 golden cells sit in the web's ocean band");
 });
 
-// The biome weights are the donor's float fields, but they amplify the
-// golden's printed precision: the domain warp scales a noise sample by 34
-// and the smoothstep derivative is up to 4.2, so a 5e-10 print residue
-// lands as ~1.4e-6. The integer relief (stepsAt) is the exact contract.
+// The biome weights are the donor's float fields. The donor samples its
+// biome mask on a single-precision tectonic frame (a Vector2), so the port
+// reads the donor's float32 axes at that use site: the residual collapses
+// from 1.4009e-6 to 1.5158e-8 and the bound tightens from 1e-5 to 1e-7.
+// (The case name keeps the requirements-matrix wording; the assertion is
+// the tight bound.)
 test("biomeWeights matches the donor within 1e-5", () => {
   const w = new WorldHeightmap();
   let maxErr = 0;
   for (const [fx, fz, m, p, r] of wbiome) {
     const bw = w.biomeWeights(fx, fz);
     maxErr = Math.max(maxErr, Math.abs(bw.mtn - m), Math.abs(bw.plateau - p), Math.abs(bw.rim - r));
-    assert.ok(Math.abs(bw.mtn - m) < 1e-5, `mtn at (${fx},${fz})`);
-    assert.ok(Math.abs(bw.plateau - p) < 1e-5, `plateau at (${fx},${fz})`);
-    assert.ok(Math.abs(bw.rim - r) < 1e-5, `rim at (${fx},${fz})`);
+    assert.ok(Math.abs(bw.mtn - m) < 1e-7, `mtn at (${fx},${fz})`);
+    assert.ok(Math.abs(bw.plateau - p) < 1e-7, `plateau at (${fx},${fz})`);
+    assert.ok(Math.abs(bw.rim - r) < 1e-7, `rim at (${fx},${fz})`);
   }
   console.log(`biomeWeights max abs error: ${maxErr.toExponential(3)}`);
 });
@@ -150,6 +207,44 @@ test("web extension: classification is deterministic and ordered", () => {
   }
 });
 
+// The desert band is a web extension, so it has no donor golden -- but it
+// must exist and lie where its rule says, not merely be a legal kind word.
+// The rule (src/core/world.ts): warpSample >= 0.25, stepsAtCell in 6..9, and
+// at least 30 cells from the village centre.
+test("web extension: the desert band exists and obeys its rule", () => {
+  const w = new WorldHeightmap();
+  const desert = [];
+  for (let gy = -MARGIN_Z; gy < WORLD_H + MARGIN_Z; gy++) {
+    for (let gx = -MARGIN_X; gx < WORLD_W + MARGIN_X; gx++) {
+      const steps = w.stepsAtCell(gx, gy);
+      const fx = gx + 0.5;
+      const fz = gy + 0.5;
+      const rule =
+        w.warpSample(fx, fz) >= 0.25 &&
+        steps >= 6 &&
+        steps <= 9 &&
+        Math.hypot(fx - VILLAGE_X, fz - VILLAGE_Y) >= 30;
+      // The rule and the classification agree, cell for cell.
+      assert.equal(w.kindAt(gx, gy) === "desert", rule, `desert rule at (${gx},${gy})`);
+      if (rule) desert.push([gx, gy]);
+    }
+  }
+  // 133 desert cells over the 136x64 footprint: a north-south strip on the
+  // west edge, a patch west of the river, and east-bank patches.
+  assert.equal(desert.length, 133, "desert cells over the footprint");
+  const westBand = desert.filter(([gx]) => gx < 0);
+  assert.equal(westBand.length, 83, "the west band");
+  assert.ok(
+    desert.every(
+      ([gx, gy]) => Math.hypot(gx + 0.5 - VILLAGE_X, gy + 0.5 - VILLAGE_Y) >= 30,
+    ),
+    "every desert cell is at least 30 cells from the village centre",
+  );
+  // The starter area stays buildable: no desert around the village disc.
+  assert.equal(w.kindAt(VILLAGE_X, VILLAGE_Y), "village");
+  assert.equal(w.kindAt(VILLAGE_X - 5, VILLAGE_Y + 4), "village");
+});
+
 test("villageHeight is the donor's clamped village base", () => {
   const w = new WorldHeightmap();
   assert.equal(
@@ -176,4 +271,31 @@ test("the law is a pure function of the grid", () => {
   const c = new WorldHeightmap(96, 96);
   const d = new WorldHeightmap(96, 96);
   assert.equal(c.stepsAt(400, 400), d.stepsAt(400, 400));
+});
+
+test("the playable grid is 4.00x the authored town", () => {
+  // WORLD_W * WORLD_H = 68 * 32 = 2176 = 4.00 * (TOWN_W * TOWN_H = 34 * 16 = 544)
+  // FOOTPRINT_W * FOOTPRINT_H = 136 * 64 = 8704
+  // the town sits centred on the village disc: TOWN_X + TOWN_W/2 = 34 = VILLAGE_X,
+  // TOWN_Y + TOWN_H/2 = 16 = VILLAGE_Y
+  assert.equal(WORLD_W * WORLD_H, 2176, "68 * 32");
+  assert.equal(TOWN_W * TOWN_H, 544, "34 * 16");
+  assert.equal((WORLD_W * WORLD_H) / (TOWN_W * TOWN_H), 4, "2176 / 544 === 4.00");
+  assert.equal(FOOTPRINT_W * FOOTPRINT_H, 8704, "136 * 64");
+  assert.equal(FOOTPRINT_W, WORLD_W + MARGIN_X * 2, "the footprint spans the grid plus both margins");
+  assert.equal(FOOTPRINT_H, WORLD_H + MARGIN_Z * 2, "the footprint spans the grid plus both margins");
+  assert.equal(TOWN_X + TOWN_W / 2, VILLAGE_X, "the town is centred on the village disc in x");
+  assert.equal(TOWN_Y + TOWN_H / 2, VILLAGE_Y, "the town is centred on the village disc in z");
+  assert.equal(VILLAGE_X, 34, "the village disc sits at x = 34");
+  assert.equal(VILLAGE_Y, 16, "the village disc sits at y = 16");
+
+  // The law is instantiated on that grid: the village disc the town sits on
+  // is at (34, 16) in the model's own grid.
+  const w = new WorldHeightmap();
+  assert.equal(
+    w.kindAt(VILLAGE_X, VILLAGE_Y),
+    "village",
+    "the village disc sits at the frozen (34, 16) in the model's grid",
+  );
+  assert.ok(MAX_STEPS >= TABLE_STEPS, "the relief clamp is above the water table");
 });
