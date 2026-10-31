@@ -47,7 +47,7 @@ const { OrbitCamera } = await import(moduleUrl);
 const EPS = 1e-9;
 const near = (a, b, eps = EPS) => Math.abs(a - b) <= eps;
 
-/** A camera + orbit pair with the frozen class defaults. */
+/** A camera + orbit pair with the class defaults. */
 function orbitAt(x, y, z) {
   const camera = new THREE.PerspectiveCamera();
   const target = new THREE.Vector3(x, y, z);
@@ -57,7 +57,7 @@ function orbitAt(x, y, z) {
 test("distance is clamped to the allowed range", () => {
   const { orbit } = orbitAt(1, 2, 3);
 
-  assert.equal(orbit.distance, 36, "default distance");
+  assert.equal(orbit.distance, 60, "default distance");
 
   orbit.set(undefined, undefined, 1000);
   assert.equal(orbit.distance, 140, "clamped to DIST_MAX");
@@ -72,7 +72,7 @@ test("distance is clamped to the allowed range", () => {
 test("pitch is clamped", () => {
   const { orbit } = orbitAt(1, 2, 3);
 
-  assert.equal(orbit.pitch, 0.7, "default pitch");
+  assert.equal(orbit.pitch, 0.72, "default pitch");
 
   orbit.set(undefined, 5);
   assert.equal(orbit.pitch, 1.35, "clamped to PITCH_MAX");
@@ -98,16 +98,16 @@ test("apply points the camera at the target", () => {
 
   orbit.apply();
 
-  // the camera sits exactly the orbit distance (36) from the target
+  // the camera sits exactly the orbit distance (60) from the target
   assert.ok(
-    near(camera.position.distanceTo(target), 36),
+    near(camera.position.distanceTo(target), 60),
     "camera distance to the target",
   );
 
-  // the documented placement for the default orbit (yaw -0.6, pitch 0.7)
-  assert.ok(near(camera.position.x, -6.547045837866568), "camera position x");
-  assert.ok(near(camera.position.y, 31.191836740556877), "camera position y");
-  assert.ok(near(camera.position.z, 29.72505389024704), "camera position z");
+  // the documented placement for the default orbit (yaw -0.6, pitch 0.72)
+  assert.ok(near(camera.position.x, -16.470086784880383), "camera position x");
+  assert.ok(near(camera.position.y, 47.563080318288385), "camera position y");
+  assert.ok(near(camera.position.z, 44.22952262518719), "camera position z");
 
   // and it looks straight at the target
   const forward = camera.getWorldDirection(new THREE.Vector3());

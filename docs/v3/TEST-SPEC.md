@@ -75,6 +75,7 @@ those cases, not changing this spec:
 | world | `stepsAtCell matches the donor EXACTLY at every golden point` | `stepsAt matches the donor EXACTLY at every golden point` |
 | world | `the playable grid is 4.00x the authored town` | (not present) |
 | world | — | `golden coverage: the probe printed the full point set` (extra) |
+| world | — | `web extension: the ocean band is exactly two cells wide on every side` (extra) |
 | walk | `walkPhase is distance * TAU / STRIDE` | `walkPhase(d) === d * TAU / STRIDE at fixed distances` |
 | walk | `walkPose derives swing and bob from the phase` | `walkPose(phase): swing = sin(phase), bob = |sin(phase)|, phase echoed` |
 | walk | `idlePose is a slow deterministic bob` | `idlePose deterministic, swing 0, |bob| <= IDLE_AMP` |
@@ -257,8 +258,9 @@ mountain [126,126,134], rim [98,98,108], village [150,126,96], shore
 ## 7. `tests/camera.test.mjs` — session S08
 
 Source: `src/render/camera.ts`. Frozen: `DIST_MIN 3`, `DIST_MAX 140`,
-`PITCH_MIN 0.18`, `PITCH_MAX 1.35`, default orbit yaw -0.6, pitch 0.7,
-distance 36.
+`PITCH_MIN 0.18`, `PITCH_MAX 1.35`, default orbit yaw -0.6, pitch 0.72,
+distance 60 (the one default set: `DEFAULT_PITCH` / `DEFAULT_DISTANCE`, which
+both the class fields and `Game` use).
 
 Placement: `position = target + distance * (cos(pitch)*sin(yaw), sin(pitch),
 cos(pitch)*cos(yaw))`, then `lookAt(target)`.
@@ -268,7 +270,7 @@ cos(pitch)*cos(yaw))`, then `lookAt(target)`.
 | 1 | `distance is clamped to the allowed range` | `set(undefined, undefined, 1000)` / `(..., 0.5)` / `(..., 36)` | distance 140 (DIST_MAX) / 3 (DIST_MIN) / 36 unchanged | frozen clamps |
 | 2 | `pitch is clamped` | `set(undefined, 5)` / `(undefined, -3)` | pitch 1.35 (PITCH_MAX) / 0.18 (PITCH_MIN) | frozen clamps |
 | 3 | `setTarget moves the orbit focus` | `setTarget(new Vector3(9, 8, 7))` on a target of (1, 2, 3) | the target reads (9, 8, 7) and the same `Vector3` object is mutated in place (held references stay valid) | frozen `setTarget` semantics |
-| 4 | `apply points the camera at the target` | `apply()` with the default orbit | the camera sits exactly `distance` (36) from the target and looks straight at it; with the target at (1, 2, 3) the position is `(-6.547045837866568, 31.191836740556877, 29.72505389024704)` | closed-form placement identity |
+| 4 | `apply points the camera at the target` | `apply()` with the default orbit | the camera sits exactly `distance` (60) from the target and looks straight at it; with the target at (9, 8, 7) the position is `(-16.470086784880383, 47.563080318288385, 44.22952262518719)` | closed-form placement identity |
 
 ## 8. `tests/inspector.test.mjs` — session S09
 

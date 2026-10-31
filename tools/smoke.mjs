@@ -437,9 +437,11 @@ try {
   };
   await cmd("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   // The probe framed a townsfolk (reset only clears the selection, not the
-  // camera); restore the OrbitCamera construction defaults for v3-default.
-  await evaluate(`window.game.dispatch({type:"orbit",yaw:-0.6,pitch:0.7})`);
-  await evaluate(`window.game.dispatch({type:"zoom",distance:36})`);
+  // camera); restore the OrbitCamera defaults for v3-default. The restore
+  // must stay: earlier intents moved the camera, so without it this shot
+  // would be a close-up instead of the default framing.
+  await evaluate(`window.game.dispatch({type:"orbit",yaw:-0.6,pitch:0.72})`);
+  await evaluate(`window.game.dispatch({type:"zoom",distance:60})`);
   await evaluate(`window.game.focus(17, 8)`); // the village-centre default target
   await grab("v3-default"); // camera is at the default framing here (reset above)
 

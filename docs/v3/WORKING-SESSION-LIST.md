@@ -212,9 +212,10 @@ rows, integer relief, exact equality),
 `the law is a pure function of the grid`,
 `the playable grid is 4.00x the authored town`.
 
-**Note — operator ruling still required on the ocean band, but the asymmetry
-named in the brief is no longer in the tree.** `src/core/world.ts:340-345`
-currently reads
+**Note — the ocean band is ruled (2026-10-31): margin arithmetic stays, two
+cells per side, and the contract prose was amended to match.** The asymmetry
+named in the brief is no longer in the tree. `src/core/world.ts:352-356`
+reads
 
 ```
 gx <= -MARGIN_X + 1 || gx >= WORLD_W + MARGIN_X - 2 ||
@@ -223,21 +224,21 @@ gy <= -MARGIN_Z + 1 || gy >= WORLD_H + MARGIN_Z - 2
 
 — a symmetric two-cell band on every side. The earlier `-MARGIN_X+2` /
 `-MARGIN_Z+2` form gave three cells on the west and south against two on the
-east and north; that asymmetry was removed by an orchestrator edit, not by a
-ruling. Two things still need an operator ruling:
+east and north; that asymmetry was removed by an orchestrator edit, and the
+ruling now confirms the symmetric form. The ruling settled both questions:
 
-1. **Mechanism.** `CONTRACT.md` describes the ocean as "cells whose
-   `edge_norm` (the donor's own formula) is at the footprint edge sink below
-   the water table". The implementation uses margin arithmetic instead, and
-   the two are not the same rule.
-2. **Width.** Two cells per side as implemented, or the contract's `edge_norm`
-   formulation.
+1. **Mechanism.** Margin arithmetic, as implemented. The contract's ocean
+   bullet now says "the outermost two cells of the footprint on every side",
+   with a note that `edge_norm` names the band's *purpose* (the rim it must
+   not drown), not the predicate that selects it.
+2. **Width.** Two cells per side, as implemented.
 
-No golden pins the band. The only coverage is the four-corner check in
-`tests/world.test.mjs` (`web extension: the ocean band renders below the water
-table`), which passes under any band width of two or three cells, so the
-current green suite does not settle it either way. Until the ruling lands, the
-band is unpinned.
+No golden pins the band (the donor probe deliberately excludes the web-only
+extension), so the width is pinned by a unit case instead:
+`tests/world.test.mjs` (`web extension: the ocean band is exactly two cells
+wide on every side`) asserts that every cell within one cell of the footprint
+edge is ocean floor and that every deeper cell is the unmodified donor law. A
+three-cell band fails it.
 
 **Note — the `biomeWeights` residual is single-precision donor storage, not
 port drift.** The donor keeps its tectonic axis in a `Vector2` (single

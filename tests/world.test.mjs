@@ -177,6 +177,37 @@ test("web extension: the ocean band renders below the water table", () => {
   assert.equal(w.tableHeight(), TABLE_STEPS * VOXEL);
 });
 
+test("web extension: the ocean band is exactly two cells wide on every side", () => {
+  const w = new WorldHeightmap();
+  // The band is the outermost two cells of the footprint on every side: they
+  // render as ocean floor, and nothing deeper is touched by it -- a cell one
+  // row further in is the donor law, unmodified. This pins the width without
+  // restating the band's predicate: the depth is measured from the footprint
+  // edge, so a band of three cells per side leaves a banded cell at depth 2.
+  const xMin = -MARGIN_X;
+  const xMax = WORLD_W + MARGIN_X - 1;
+  const yMin = -MARGIN_Z;
+  const yMax = WORLD_H + MARGIN_Z - 1;
+  for (let gx = xMin; gx <= xMax; gx++) {
+    for (let gy = yMin; gy <= yMax; gy++) {
+      const depth = Math.min(gx - xMin, xMax - gx, gy - yMin, yMax - gy);
+      if (depth <= 1) {
+        assert.equal(
+          w.stepsAtCell(gx, gy),
+          TABLE_STEPS - 2,
+          `band cell (${gx},${gy}) at depth ${depth} is ocean floor`,
+        );
+      } else {
+        assert.equal(
+          w.stepsAtCell(gx, gy),
+          w.stepsAt(gx * SUB + SUB / 2, gy * SUB + SUB / 2),
+          `cell (${gx},${gy}) at depth ${depth} is outside the band`,
+        );
+      }
+    }
+  }
+});
+
 test("web extension: classification is deterministic and ordered", () => {
   const w = new WorldHeightmap();
   // The village centre is village ground.

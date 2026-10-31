@@ -258,12 +258,16 @@ what that costs and what closing the gap would buy.
 
 ### Web-side extensions (on top of the law, never inside it)
 
-- **Ocean band.** The outermost cells of the vista footprint render as ocean
-  floor: `stepsAtCell` returns `TABLE_STEPS - 2` there, so the sea meets the
-  rim mountains and the rim belt itself stays above water. The band is
-  implemented as explicit margin arithmetic on the footprint edges, not as an
-  `edgeNorm` threshold (the donor's `edge_norm` formula is present in the
-  module and is what drives the rim weight).
+- **Ocean band.** The outermost two cells of the vista footprint on every side
+  render as ocean floor: `stepsAtCell` returns `TABLE_STEPS - 2` there, so the
+  sea meets the rim mountains and the rim belt itself stays above water. The
+  band is implemented as explicit margin arithmetic on the footprint edges, not
+  as an `edgeNorm` threshold (the donor's `edge_norm` formula is present in
+  the module and is what drives the rim weight). The contract's `edge_norm`
+  sentence states the band's *purpose* — the rim it must not drown — not the
+  predicate that selects it. The width is pinned by
+  `tests/world.test.mjs` (`web extension: the ocean band is exactly two cells
+  wide on every side`).
 - **Desert band.** A dry band where the donor's warp noise is high, the relief
   is low and the cell is far from the village: `warpSample >= 0.25`,
   `stepsAtCell <= 9`, and the cell centre at least 30 cells from (34, 16). The
@@ -340,11 +344,12 @@ Framing:
 - **Default.** `Game` constructs the orbit at yaw -0.6, pitch 0.72 and
   distance 60, targeting the village centre at `(VILLAGE_X, villageHeight +
   0.5, -VILLAGE_Y)`. That distance is the framing that shows the 68x32
-  playable grid together with its margin ring.
+  playable grid together with its margin ring. There is one default set:
+  `src/render/camera.ts` exports `DEFAULT_PITCH` (0.72) and `DEFAULT_DISTANCE`
+  (60), the class fields take them, and `Game` applies the same pair.
 - **Close-up.** Distance 4 on a focused townsfolk gives the head-and-shoulders
   view; the smoke uses distance 4 for the close screenshot and distance 6 for
-  the pixel probe. (The camera class's own field defaults are yaw -0.6, pitch
-  0.7, distance 36 — see section 8.)
+  the pixel probe.
 
 ### Inspector
 
@@ -446,35 +451,32 @@ A null selection hides the panel.
    that order would still pass. The integer relief (`stepsAt`) is not
    exposed to any of this — all 40 golden step points match the donor
    exactly, because the integer clamp absorbs differences this small.
-3. **The ocean band's width is pinned by nothing — not by the contract, not
-   by a golden.** The contract describes the extension only in prose ("cells
-   whose `edge_norm` is at the footprint edge sink below the water table"),
-   which fixes neither the width nor the mechanism. The world-law slice was
-   handed explicit inequalities that were asymmetric — `gx <= -MARGIN_X+2` /
-   `gy <= -MARGIN_Z+2` gave three ocean cells on the west and south while
-   `WORLD_W+MARGIN_X-2` gave two on the east and north — and flagged it; the
-   orchestrator then corrected the source to `-MARGIN_X + 1` / `-MARGIN_Z + 1`
-   on the low sides, which makes the band symmetric at two cells per side
-   (measured on the built law: 128 cells west, 128 east, 272 south, 272
-   north). Two residual risks remain: no golden pins the band — the donor
-   probe deliberately excludes the web-only ocean extension, because the
-   golden pins the donor's law, not the web's extensions — and the
-   implementation uses explicit margin arithmetic rather than the `edgeNorm`
-   threshold the contract's wording implies. A future edit to either side
-   would silently move the coastline with no test to catch it.
+3. **The ocean band's width is now pinned, but only by a unit test — not by
+   the contract, not by a golden.** The operator ruling (2026-10-31) keeps the
+   margin arithmetic and fixes the width at two cells per side; the contract's
+   prose was amended to say so, and its `edge_norm` sentence is now recorded
+   as naming the band's purpose rather than its predicate. The golden still
+   does not cover the band — the donor probe deliberately excludes the
+   web-only ocean extension, because the golden pins the donor's law, not the
+   web's extensions — so the coverage is
+   `tests/world.test.mjs` (`web extension: the ocean band is exactly two cells
+   wide on every side`), which asserts the band floor for every cell within
+   one cell of the footprint edge and asserts that every deeper cell is the
+   unmodified donor law. A band of three cells per side fails that case.
 4. **Figure height: 0.84 versus the contract's "~0.75".** The frozen part
    sizes (legs 0.30, torso 0.32, head 0.22) sum to 0.84 world units. The
    contract's prose says a figure is ~0.75 tall. The sizes are frozen and the
    implementation keeps them, so the discrepancy is in the prose, not the
    build; the smoke's pixel probe and its 32x48 box were calibrated against
    the real 0.84 figure.
-5. **Two different "default" camera framings.** `OrbitCamera`'s field
-   defaults are yaw -0.6, pitch 0.7, distance 36, while `Game` immediately
-   overrides them with pitch 0.72 and distance 60 for the world framing. The
-   smoke restores the *class* defaults (yaw -0.6, pitch 0.7, distance 36) for
-   the `v3-default` screenshot, so that screenshot is not the framing a user
-   sees on load. The "whole playable grid plus margin ring" framing is the
-   distance-60 one.
+5. **One camera default set (resolved 2026-10-31).** `OrbitCamera` used to
+   carry yaw -0.6, pitch 0.7, distance 36 while `Game` immediately overrode
+   pitch and distance to 0.72 and 60, so two "defaults" existed and the
+   `v3-default` screenshot showed a framing no user ever saw. There is now one
+   set: `src/render/camera.ts` exports `DEFAULT_PITCH` (0.72) and
+   `DEFAULT_DISTANCE` (60), the class fields take them, `Game` applies the
+   same pair, and the smoke restores those values for the `v3-default`
+   screenshot — which is therefore the load framing.
 6. **Inspector strings: the wet row's kind is literal.** The wet branch
    renders the literal `water`, not the selection's `kind` field; the dry
    branch renders `<kind>` from the field. The two agree in practice because a

@@ -39,8 +39,8 @@ import site uses `import * as THREE from "three"`.
 | `InstancedMesh` | `src/render/scene.ts:185,222`, `src/render/world.ts:327` | One instance buffer per tile kind, per prop kind and per scatter model. `setMatrixAt(index, m)` positions an instance; `setColorAt(index, c)` tints it; `instanceMatrix.needsUpdate = true` and `instanceColor.needsUpdate = true` upload the buffers. `instanceColor` is nullable, so the code guards it. |
 | `Matrix4.makeTranslation` | `src/render/scene.ts:191,225`, `src/render/world.ts:334` | The only matrix operation the build performs — a translation per instance. |
 | `Euler` / `rotation` | `src/render/figures.ts:223,239,246-249`, `src/render/world.ts:251` | The `Euler` **class** is never constructed; only `Object3D.rotation` is read and written (`rotation.y` for facing, `rotation.x` for the limb swing and the water plane). |
-| `Vector3` | `src/game.ts:95,201`, `src/render/camera.ts:14,18,24`, `src/render/figures.ts:253` | The orbit target, the figure world position returned by `positionOf`, and the projection source for `entityScreenPos`. |
-| `MathUtils.clamp` | `src/render/camera.ts:30-31` | The only `MathUtils` member called: clamps pitch and distance. |
+| `Vector3` | `src/game.ts:92,198`, `src/render/camera.ts:18,22,28`, `src/render/figures.ts:253` | The orbit target, the figure world position returned by `positionOf`, and the projection source for `entityScreenPos`. |
+| `MathUtils.clamp` | `src/render/camera.ts:34-35` | The only `MathUtils` member called: clamps pitch and distance. |
 | `PerspectiveCamera` | `src/render/scene.ts`, `src/render/camera.ts`, `src/render/figures.ts` | The orbit camera; `updateProjectionMatrix()` is called on resize; `lookAt` is called by `OrbitCamera.apply()`. |
 | `Scene` | `src/render/scene.ts` | Holds the background colour and the fog; `scene.add(...)` receives the world group and the figures group. |
 | `WebGLRenderer` | `src/render/scene.ts:144-148,259,265,282` | Constructed with `{ canvas, antialias: true }`; `setPixelRatio(min(devicePixelRatio, 2))`; `setSize(w, h)` on resize; `render(scene, camera)` per frame; `getContext()` for the pixel probe. |

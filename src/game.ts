@@ -3,7 +3,7 @@ import { DONORS } from "./generated/donors.js";
 import { TOWN_SEED } from "./core/town.js";
 import { copyForTile } from "./core/copy.js";
 import { TownScene } from "./render/scene.js";
-import { OrbitCamera } from "./render/camera.js";
+import { OrbitCamera, DEFAULT_PITCH, DEFAULT_DISTANCE } from "./render/camera.js";
 import { Inspector } from "./render/inspector.js";
 import { TownSim } from "./core/sim.js";
 import { WorldHeightmap } from "./core/world.js";
@@ -35,9 +35,6 @@ const TICK_MAX = 10000;
 /** The v3 open world is four times the v2 footprint: the donor's fog density
  * (0.016) would swallow the whole map, so the world reads at its own scale. */
 const WORLD_FOG_DENSITY = 0.0065;
-/** Default orbit framing: the whole playable grid plus its margin ring. */
-const DEFAULT_DISTANCE = 60;
-const DEFAULT_PITCH = 0.72;
 /** Ambient world villagers: the donor's hash-scatter law, floor identity 21. */
 const VILLAGER_SCATTER_ID = 21;
 const VILLAGER_DENSITY = 0.02;
