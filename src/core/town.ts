@@ -232,3 +232,101 @@ export function dressedTown(donors: Donors, seed: number = TOWN_SEED): TownModel
   }
   return m;
 }
+
+export type CisternKind = "pipe" | "toilet" | "tank" | "manifold" | "ore";
+export interface CisternGrid {
+  readonly width: number;
+  readonly height: number;
+  readonly cells: readonly (CisternKind | null)[];
+}
+export const CISTERN_NETWORK_KINDS: readonly CisternKind[] = ["pipe", "toilet", "tank"];
+
+export function cisternCellAt(grid: CisternGrid, x: number, y: number): CisternKind | null {
+  if (x < 0 || x >= grid.width || y < 0 || y >= grid.height) {
+    return null;
+  }
+  const index = y * grid.width + x;
+  return grid.cells[index];
+}
+
+export function cisternNeighbours(x: number, y: number): ReadonlyArray<readonly [number, number]> {
+  // Order: east, west, south, north
+  return [
+    [x + 1, y],
+    [x - 1, y],
+    [x, y + 1],
+    [x, y - 1],
+  ];
+}
+
+export function cisternHasOre(grid: CisternGrid, x: number, y: number): boolean {
+  const kind = cisternCellAt(grid, x, y);
+  return kind === "ore";
+}
+
+export function cisternFlood(grid: CisternGrid, x: number, y: number): Map<string, number> {
+  const flood: Map<string, number> = new Map();
+  const queue: [number, number][] = [];
+  const startKey = `${x},${y}`;
+
+  flood.set(startKey, 0);
+  queue.push([x, y]);
+
+  const networkSet = new Set(CISTERN_NETWORK_KINDS);
+
+  let head = 0;
+  while (head < queue.length) {
+    const [cx, cy] = queue[head++];
+    const currentDist = flood.get(`${cx},${cy}`)!;
+
+    for (const [nx, ny] of cisternNeighbours(cx, cy)) {
+      const nextKind = cisternCellAt(grid, nx, ny);
+      const nextKey = `${nx},${ny}`;
+
+      if (!flood.has(nextKey) && nextKind && networkSet.has(nextKind)) {
+        flood.set(nextKey, currentDist + 1);
+        queue.push([nx, ny]);
+      }
+    }
+  }
+  return flood;
+}
+
+export function cisternConnectedTanks(grid: CisternGrid, x: number, y: number): Array<readonly [number, number]> {
+  const flood = cisternFlood(grid, x, y);
+  const tanks: Array<[number, number]> = [];
+
+  for (const key of flood.keys()) {
+    const [sx, sy] = key.split(',').map(Number);
+    const kind = cisternCellAt(grid, sx, sy);
+    if (kind === "tank") tanks.push([sx, sy]);
+  }
+
+  // Sort by x then y ascending
+  tanks.sort((a, b) => (a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1]));
+  return tanks;
+}
+
+export function cisternManifoldLive(grid: CisternGrid, x: number, y: number): boolean {
+  const flood = cisternFlood(grid, x, y);
+
+  for (const key of flood.keys()) {
+    const [cx, cy] = key.split(',').map(Number);
+    const kind = cisternCellAt(grid, cx, cy);
+
+    if (kind === "pipe") {
+      // Check orthogonal neighbours for "manifold"
+      for (const [nx, ny] of cisternNeighbours(cx, cy)) {
+        const neighborKind = cisternCellAt(grid, nx, ny);
+        if (neighborKind === "manifold") return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function cisternPipeLive(grid: CisternGrid, x: number, y: number): boolean {
+  const tanks = cisternConnectedTanks(grid, x, y);
+  const manifoldLive = cisternManifoldLive(grid, x, y);
+  return tanks.length > 0 || manifoldLive;
+}

@@ -19,6 +19,54 @@ export const TOWNSFOLK_SLOW_ONE_IN = 2;
 export const PLACEMENT_KEY = (4 << 8) | 2;
 export const WANDER_KEY = (4 << 8) | 3;
 
+export const TOWNSFOLK_BLIADER_START: number = 20;
+export const TOWNSFOLK_BLIADER_RATE: number = 2;
+export const TOWNSFOLK_BLIADER_SEEK: number = 60;
+export const TOWNSFOLK_BLIADER_BURST: number = 120;
+export const TOWNSFOLK_SICK_TICKS: number = 30;
+
+export interface TownsfolkNeeds {
+  bladder: number;
+  sick: number;
+}
+
+export function initialTownsfolkNeeds(): TownsfolkNeeds {
+  return { bladder: TOWNSFOLK_BLIADER_START, sick: 0 };
+}
+
+const clamp = (num: number, min: number, max: number): number => Math.max(min, Math.min(max, num));
+
+export function townsfolkSeekThreshold(nerveMod: number): number {
+  return clamp(60 - 5 * nerveMod, 50, 68);
+}
+
+export function townsfolkSickDuration(gritMod: number): number {
+  return clamp(30 - 4 * gritMod, 18, 42);
+}
+
+export function townsfolkMineRate(flowMod: number, hurt: boolean, sick: boolean): number {
+  let rate = clamp(3 - flowMod, 2, 6);
+  if (hurt) rate += 1;
+  if (sick) rate *= 2;
+  return rate;
+}
+
+export function advanceTownsfolkNeeds(needs: TownsfolkNeeds): { needs: TownsfolkNeeds; urge: "none" | "seek_toilet" | "burst" } {
+  let newBladder = needs.bladder + TOWNSFOLK_BLIADER_RATE;
+  let newSick = Math.max(0, needs.sick - 1);
+
+  let urge: "none" | "seek_toilet" | "burst" = "none";
+
+  // Urge determined based on base seek threshold (60)
+  if (newBladder >= TOWNSFOLK_BLIADER_BURST) {
+    urge = "burst";
+  } else if (newBladder >= TOWNSFOLK_BLIADER_SEEK) {
+    urge = "seek_toilet";
+  }
+
+  return { needs: { bladder: newBladder, sick: newSick }, urge };
+}
+
 const AXIS_DIRS = ["n", "e", "s", "w"] as const;
 export type AxisDir = (typeof AXIS_DIRS)[number];
 
