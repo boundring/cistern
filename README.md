@@ -32,7 +32,7 @@ python3 -m http.server 8000   # serve the repo root, then open http://127.0.0.1:
 ## Test it
 
 ```sh
-npm test             # build + node --test tests/  -> 64/64
+npm test             # build + node --test tests/  -> 124/124
 ```
 
 The suite is headless, no display, no wall-clock: golden vectors in
