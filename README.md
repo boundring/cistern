@@ -4,7 +4,7 @@
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178c6)](package.json)
 [![three.js](https://img.shields.io/badge/three.js-r160%20vendored-8a4fbe)](vendor/three.module.min.js)
-[![Tests](https://img.shields.io/badge/tests-64%2F64%20node--test-2ea043)](tests/)
+[![Tests](https://img.shields.io/badge/tests-124%2F124%20node--test-2ea043)](tests/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-39413A)](LICENSE)
 
 Two generations of Cistern live in this repository. The **current** generation
@@ -116,5 +116,22 @@ direction. The operator retains all creative control: every design decision,
 prompt and accepted change passes through their hand. Contributions are
 welcome on the same terms; issues and patches are reviewed and shaped by the
 operator before they land.
+
+Six modules in `src/core/` were written by a local model rather than by hand,
+each under a spec that named the donor file and the expected values, and each
+with its own suite in `tests/`:
+
+| Module | Model | Attempts |
+|---|---|---|
+| `src/core/town.ts` | Nemotron-3.5-Bolt-E4B | 1 |
+| `src/core/townsfolk.ts` | Nemotron-3.5-Bolt-E4B | 1 |
+| `src/core/job-executor.ts` | Nemotron-3.5-Bolt-E4B | 2 |
+| `src/core/sim.ts` | Qwen-AgentWorld-35B-A3B | 3 |
+| `src/core/shop-stock.ts` | Qwen-AgentWorld-35B-A3B | 3 |
+| `src/core/game-actions.ts` | Qwen-AgentWorld-35B-A3B | 3 |
+
+Every one of them was reviewed before it landed, and the `src/core/town.ts`
+and `src/core/townsfolk.ts` changes are pure insertions — nothing shipped was
+removed.
 
 Licensed **AGPL-3.0-or-later** ([LICENSE](LICENSE)), matching the hngh project.
