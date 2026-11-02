@@ -123,12 +123,12 @@ with its own suite in `tests/`:
 
 | Module | Model | Attempts |
 |---|---|---|
-| `src/core/town.ts` | Nemotron-3.5-Bolt-E4B | 1 |
-| `src/core/townsfolk.ts` | Nemotron-3.5-Bolt-E4B | 1 |
-| `src/core/job-executor.ts` | Nemotron-3.5-Bolt-E4B | 2 |
-| `src/core/sim.ts` | Qwen-AgentWorld-35B-A3B | 3 |
-| `src/core/shop-stock.ts` | Qwen-AgentWorld-35B-A3B | 3 |
-| `src/core/game-actions.ts` | Qwen-AgentWorld-35B-A3B | 3 |
+| `src/core/town.ts` | `unsloth/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF` | 1 |
+| `src/core/townsfolk.ts` | `unsloth/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF` | 1 |
+| `src/core/job-executor.ts` | `unsloth/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF` | 2 |
+| `src/core/sim.ts` | `unsloth/Qwen-AgentWorld-35B-A3B-GGUF` | 3 |
+| `src/core/shop-stock.ts` | `unsloth/Qwen-AgentWorld-35B-A3B-GGUF` | 3 |
+| `src/core/game-actions.ts` | `unsloth/Qwen-AgentWorld-35B-A3B-GGUF` | 3 |
 
 Every one of them was reviewed before it landed, and the `src/core/town.ts`
 and `src/core/townsfolk.ts` changes are pure insertions — nothing shipped was
