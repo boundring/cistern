@@ -4,7 +4,7 @@
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178c6)](package.json)
 [![three.js](https://img.shields.io/badge/three.js-r160%20vendored-8a4fbe)](vendor/three.module.min.js)
-[![Tests](https://img.shields.io/badge/tests-124%2F124%20node--test-2ea043)](tests/)
+[![Tests](https://img.shields.io/badge/tests-93%2F93%20node--test-2ea043)](tests/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-39413A)](LICENSE)
 
 Two generations of Cistern live in this repository. The **current** generation
@@ -32,7 +32,7 @@ python3 -m http.server 8000   # serve the repo root, then open http://127.0.0.1:
 ## Test it
 
 ```sh
-npm test             # build + node --test tests/  -> 124/124
+npm test             # build + node --test tests/  -> 93/93
 ```
 
 The suite is headless, no display, no wall-clock: golden vectors in
@@ -117,7 +117,7 @@ prompt and accepted change passes through their hand. Contributions are
 welcome on the same terms; issues and patches are reviewed and shaped by the
 operator before they land.
 
-Six modules in `src/core/` were written by a local model rather than by hand,
+Four modules in `src/core/` were written by a local model rather than by hand,
 each under a spec that named the donor file and the expected values, and each
 with its own suite in `tests/`:
 
@@ -127,11 +127,11 @@ with its own suite in `tests/`:
 | `src/core/townsfolk.ts` | `unsloth/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF` | 1 |
 | `src/core/job-executor.ts` | `unsloth/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF` | 2 |
 | `src/core/sim.ts` | `unsloth/Qwen-AgentWorld-35B-A3B-GGUF` | 3 |
-| `src/core/shop-stock.ts` | `unsloth/Qwen-AgentWorld-35B-A3B-GGUF` | 3 |
-| `src/core/game-actions.ts` | `unsloth/Qwen-AgentWorld-35B-A3B-GGUF` | 3 |
 
-Every one of them was reviewed before it landed, and the `src/core/town.ts`
-and `src/core/townsfolk.ts` changes are pure insertions — nothing shipped was
-removed.
+Every one of them was reviewed before it landed. Two further modules from the
+same batch — `src/core/shop-stock.ts` and `src/core/game-actions.ts` — were
+removed on 2026-11-03: they were a second, parallel implementation of the
+donor's economy, with no production importer. The donor GDScript is the single
+economy authority; browser economy arrives through the donor gateway.
 
 Licensed **AGPL-3.0-or-later** ([LICENSE](LICENSE)), matching the hngh project.

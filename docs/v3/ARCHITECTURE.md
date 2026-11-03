@@ -122,8 +122,8 @@ Frozen part sizes (world units):
 | Arms | 0.12 x 0.30 x 0.12 |
 | Total height | 0.30 + 0.32 + 0.22 = 0.84 |
 
-The contract describes a figure as "~0.75 tall"; the frozen sizes sum to 0.84.
-The sizes are the frozen part, so the number stands (see section 8).
+The figure is 0.84 tall (legs 0.30 + torso 0.32 + head 0.22); the sizes are the
+frozen part and the contract's prose now says the same (see section 8).
 
 Palette (donor billboard palette, plus the world-side villager):
 
@@ -284,7 +284,7 @@ what that costs and what closing the gap would buy.
 `plains`.
 
 The `rim` step height condition is an addition of the world-law slice; the
-contract lists rim by weight alone (section 8).
+contract's prose now carries it too (section 8).
 
 **The law must remain a pure function of grid coordinates plus pinned seeds.**
 Two `WorldHeightmap` instances over the same grid return identical values, and
@@ -426,31 +426,33 @@ A null selection hides the panel.
    golden must be baked at round-tripping precision, and a bit-exactness
    failure should be diagnosed against the golden's format before the port is
    re-derived.
-2. **The biome weights and the tectonic uplift are computed in double
-   precision where the donor computes in single.** The residual is real but
-   its cause is *not* the noise port. Measured against the donor's own
-   `tests/golden/world.txt`: the worst biome-weight deviation is **1.401e-6**
-   (at (15, 75): the donor reports `mtn = 0.38492926955223083`, the port
-   `0.38493067049795376`) and the worst tectonic-uplift deviation is
-   **3.329e-8**, while the warp sample agrees to 7.1e-29. The cause is that
-   the donor's GDScript stores `TECTONIC_AXIS` and `AXIS_PERP` in a
-   `Vector2` — whose components are single-precision in a standard Godot
-   build (`0.6000000238418579` for 0.6, confirmed by a donor probe) — and
-   returns `biome_weights` in a `Vector3`, also single-precision; the port
-   uses JavaScript doubles for all of it. The domain warp amplifies the
-   difference because the axis constants scale the sample coordinates before
-   two smoothsteps shape the result. Reproducing the donor's storage
-   precision — round the axis constants to float32, and round the returned
-   biome weights to float32 at the `Vector3` boundary — drops the worst
-   biome-weight error to **4.99e-18** and the uplift error to **4.12e-18**
-   (the last bit of the printed decimal), with all 40 golden step points
-   still exact. That change is not in the tree yet; until it lands, the
-   assertions are tiered (biome weights against 1e-5, warp sample and
-   tectonic uplift against 1e-6) and the 1e-5 threshold sits only about
-   seven times above the measured worst case, so a genuine regression of
-   that order would still pass. The integer relief (`stepsAt`) is not
-   exposed to any of this — all 40 golden step points match the donor
-   exactly, because the integer clamp absorbs differences this small.
+2. **The biome weights are computed in double precision where the donor
+   computes in single — the residual is now small and pinned by a tight
+   bound.** The residual was real but its cause was *not* the noise port.
+   Measured against the donor's own `tests/golden/world.txt`: with double
+   axis constants the worst biome-weight deviation was **1.4009e-6** (at
+   (15, 75): the donor reports `mtn = 0.38492926955223083`, the port
+   `0.38493067049795376`). The cause is that the donor's GDScript stores
+   `TECTONIC_AXIS` and `AXIS_PERP` in a `Vector2` — whose components are
+   single-precision in a standard Godot build (`0.6000000238418579` for 0.6,
+   confirmed by a donor probe) — while the port used JavaScript doubles for
+   all of it; the domain warp amplifies the difference because the axis
+   constants scale the sample coordinates before two smoothsteps shape the
+   result. **Shipped:** `src/core/world.ts` reads the donor's float32 axes
+   at that use site (`Math.fround` on `TECTONIC_AXIS` and `AXIS_PERP`), which
+   collapses the worst biome-weight residual to **1.5158e-8** — a ~92x
+   collapse — and the assertion tightens from 1e-5 to **1e-7**. The other
+   residuals are unchanged by that change and stay far inside their bounds:
+   the worst tectonic-uplift deviation is **3.329e-8** (bound 1e-6) and the
+   warp sample agrees to **7.129e-29** (bound 1e-6). Rounding the *returned*
+   biome weights to float32 at the `Vector3` boundary as well would drop the
+   biome-weight error to 4.99e-18 and the uplift error to 4.12e-18; that
+   half is deliberately **not** in the tree, because the shared double
+   constants are also used for the village base, where frounding would move
+   `macroSteps` by 4.16e-9 and break the canonical village-base value. The
+   integer relief (`stepsAt`) is not exposed to any of this — all 40 golden
+   step points match the donor exactly, because the integer clamp absorbs
+   differences this small.
 3. **The ocean band's width is now pinned, but only by a unit test — not by
    the contract, not by a golden.** The operator ruling (2026-10-31) keeps the
    margin arithmetic and fixes the width at two cells per side; the contract's
@@ -463,12 +465,12 @@ A null selection hides the panel.
    wide on every side`), which asserts the band floor for every cell within
    one cell of the footprint edge and asserts that every deeper cell is the
    unmodified donor law. A band of three cells per side fails that case.
-4. **Figure height: 0.84 versus the contract's "~0.75".** The frozen part
-   sizes (legs 0.30, torso 0.32, head 0.22) sum to 0.84 world units. The
-   contract's prose says a figure is ~0.75 tall. The sizes are frozen and the
-   implementation keeps them, so the discrepancy is in the prose, not the
-   build; the smoke's pixel probe and its 32x48 box were calibrated against
-   the real 0.84 figure.
+4. **Figure height: 0.84 (resolved 2026-11-03).** The frozen part sizes
+   (legs 0.30, torso 0.32, head 0.22) sum to 0.84 world units; the contract's
+   prose said a figure is ~0.75 tall. The sizes are frozen and the
+   implementation keeps them, so the discrepancy was in the prose, not the
+   build; the contract's prose now says 0.84. The smoke's pixel probe and its
+   32x48 box were calibrated against the real 0.84 figure.
 5. **One camera default set (resolved 2026-10-31).** `OrbitCamera` used to
    carry yaw -0.6, pitch 0.7, distance 36 while `Game` immediately overrode
    pitch and distance to 0.72 and 60, so two "defaults" existed and the
@@ -477,14 +479,15 @@ A null selection hides the panel.
    `DEFAULT_DISTANCE` (60), the class fields take them, `Game` applies the
    same pair, and the smoke restores those values for the `v3-default`
    screenshot — which is therefore the load framing.
-6. **Inspector strings: the wet row's kind is literal.** The wet branch
-   renders the literal `water`, not the selection's `kind` field; the dry
-   branch renders `<kind>` from the field. The two agree in practice because a
-   cell whose `water` flag is set always classifies as `water`, but the
-   contract's description of both rows as `<kind>` is not what the code does
-   for the wet case.
-7. **`kindAt`'s rim rule is stricter than the contract.** The contract orders
-   the classes as `water > shore > village > desert > mountain > plateau > rim
-   > hills > plains` with rim keyed on biome rim weight > 0.5. The
-   implementation adds `steps >= 11` so the low rim reads as grassland rather
-   than bare stone. The ordering is unchanged; the rim predicate is narrower.
+6. **Inspector strings: the wet row's kind is literal (resolved 2026-11-03).**
+   The wet branch renders the literal `water`, not the selection's `kind`
+   field; the dry branch renders `<kind>` from the field. The two agree in
+   practice because a cell whose `water` flag is set always classifies as
+   `water`. The contract's prose now records the literal `water` for the wet
+   row, so the description matches the code.
+7. **`kindAt`'s rim rule is stricter than the contract (resolved
+   2026-11-03).** The contract orders the classes as `water > shore > village
+   > desert > mountain > plateau > rim > hills > plains`. The implementation
+   adds `steps >= 11` to the rim class so the low rim reads as grassland
+   rather than bare stone. The ordering is unchanged; the rim predicate is
+   narrower. The contract's prose now carries the `steps >= 11` condition.

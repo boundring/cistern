@@ -37,12 +37,10 @@ node --test docs/v3/skeleton/tests/
 npm run smoke
 ```
 
-`npm test` runs `npm run build:core && node --test tests/`, so it compiles
-`src/core/**` and `src/types/**` only. The four render-side modules
-(`voxel`, `figures`, `worldrender`, `camera`, `inspector`) import from
-`out/render/**`, which `npm run build` (the full `tsconfig.json`) produces;
-`npm run smoke` builds it. A session implementing a render-side module should
-run `npm run build` before its test.
+`npm test` runs `npm run build && node --test tests/`, so it compiles the whole
+`src/**` tree (the full `tsconfig.json`) before running the suites. The
+render-side modules (`voxel`, `figures`, `worldrender`, `camera`, `inspector`)
+import from `out/render/**`; `npm run build` produces it.
 
 The charter calls the pre-existing suite "13 golden tests". That number is
 the v1 baseline: commit `28f382f` carried 13 cases across four files
@@ -379,7 +377,7 @@ Pinned by `tests/worldrender.test.mjs` case 7.
 ## Measured values this spec pins
 
 Everything below was read from the source or measured against the compiled
-build (`out/`, produced by `npm run build:core` / `npm run build`), not
+build (`out/`, produced by `npm run build`), not
 inferred:
 
 | Value | Where it came from |
@@ -387,7 +385,7 @@ inferred:
 | 864 golden noise samples, 6 configs x 144 lattice points | `tests/golden/noise.txt` |
 | noise seeds 360587568..360587573 | `abs(0x0C157E2026 + salt) % 2147483647` |
 | noise port bit-exact at 864/864, max abs error 0 | measured against the regenerated golden |
-| `biomeWeights` residual 1.401e-6, `tectonicUplift` 3.329e-8, `warpSample` 7.129e-29 | measured by `tests/world.test.mjs` (its own console output) |
+| `biomeWeights` residual 1.516e-8 (float32 axes, `Math.fround`), `tectonicUplift` 3.329e-8, `warpSample` 7.129e-29 | measured by `tests/world.test.mjs` (its own console output) |
 | `tableHeight` 0.5, `villageHeight` 0.8706156071791282, `macroSteps(34,16)` 6.964924857433026 | `out/core/world.js` |
 | `riverX(0)` 76.81075061629795, `riverHalfWidth(0)` 2.7708465483337545 | `out/core/world.js` |
 | grid 68x32, town 34x16, footprint 136x64, village (34,16) | `src/core/terrain.ts` |

@@ -156,8 +156,8 @@ Web-side extensions (documented, applied on top of the law, never inside it):
 - `kindAt` classification order (document it in the file): `water` (below the
   table) > `shore` (at/just above the table) > `village` (inside the village
   flat) > `desert` > `mountain` (biome mtn weight > 0.5) > `plateau` (biome
-  plateau weight > 0.5) > `rim` (biome rim weight > 0.5) > `hills` (steps > 6)
-  > `plains`.
+  plateau weight > 0.5) > `rim` (biome rim weight > 0.5 **and** steps >= 11, so
+  the low rim stays grassland) > `hills` (steps > 6) > `plains`.
 
 ## Frozen: slice C — walk math + voxel figures
 
@@ -194,7 +194,7 @@ export class VoxelFigures {
 
 A figure is box geometry in groups: `root -> body (bob) -> { torso, head, armL, armR,
 legL, legR }`, limbs pivoting at their top so a rotation swings them. Sizes in
-world units (a figure is ~0.75 tall): legs 0.16 x 0.30, torso 0.34 x 0.32,
+world units (a figure is 0.84 tall): legs 0.16 x 0.30, torso 0.34 x 0.32,
 head 0.22 cube, arms 0.12 x 0.30. Colours: the donor billboard palette
 (`player [0.25,0.55,0.95]`, `townsfolk [0.4,0.78,0.62]`) for the garment, darker
 boots, a skin tone for the head; a per-figure tint from `ScatterHash` keyed by
@@ -263,6 +263,9 @@ that already exist in the panel markup:
 `[data-slot="terrain"]` and `[data-slot="figure"]` (the orchestrator adds the
 markup — use these exact slot names). The selection carries:
 
+The terrain row renders the selection's `kind` for a dry cell, and the literal
+`water` for a cell whose `water` flag is set.
+
 ```ts
 export interface Selection {
   x: number; y: number; tile: string; copyKey: string; text: string;
@@ -279,8 +282,8 @@ fields defensively — they may be absent).
 - `npm run typecheck` must pass for your files (the orchestrator's integration may
   be mid-flight; if a file of theirs blocks the build, report it, do not edit it).
 - New non-trivial logic needs a test (`tests/<slice>.test.mjs`, node:test, the
-  repo's style: import from `../out/core/...`, `npm test` compiles
-  `tsconfig.core.json` first).
+  repo's style: import from `../out/core/...`, `npm test` compiles with
+  `npm run build` first).
 - Golden files are donor truth: bake them from a **headless Godot probe**
   (`godot --headless --path <scratch> -s probe_x.gd`), never hand-written. The
   donor repo is READ-ONLY: copy the `.gd` closure into a scratch project under

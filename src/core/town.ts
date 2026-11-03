@@ -6,12 +6,13 @@
  */
 
 import type { Donors } from "../types/donors.js";
+import { DONORS } from "../generated/donors.js";
 import { GodotRng } from "./rng.js";
 
 /** town_map.gd TOWN_FLAVOR_KEY — stream 6, town role 2. */
 export const TOWN_FLAVOR_KEY = (6 << 8) | 2;
-/** TownState.PINNED_SEED. */
-export const TOWN_SEED = 0xc1577eed;
+/** TownState.PINNED_SEED — from the generated donor layer (tools/bake-donors.mjs). */
+export const TOWN_SEED = DONORS.constants.townSeed;
 /** town_state.gd DEFAULT_SPEED: one action per tick at the act threshold. */
 export const DEFAULT_SPEED = 100;
 /** The Dir8 wire strings (intent.rs vocabulary). */

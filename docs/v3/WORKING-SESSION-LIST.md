@@ -47,13 +47,14 @@ and must not change them.
 | `npm run typecheck` | `tsc --noEmit -p tsconfig.json` — the whole `src/` tree. |
 | `npm run build` | `tsc -p tsconfig.json` → `out/`. Required before any render-side test. |
 | `npm run build:core` | `tsc -p tsconfig.core.json` → `out/core/**`, `out/types/**`. |
-| `npm test` | `npm run build:core && node --test tests/`. Compiles **only** `src/core/**` and `src/types/**`. |
+| `npm test` | `npm run build && node --test tests/`. Compiles the whole `src/` tree (`tsconfig.json`). |
 | `node --test tests/<name>.test.mjs` | one file. Needs `out/` populated first. |
 | `npm run smoke` | `npm run build && node tools/smoke.mjs` — the CI-equivalent headless-Chromium run. |
 
-`tsconfig.core.json` includes only `src/core/**/*.ts` and `src/types/**/*.ts`,
-so `npm test` does **not** compile `src/render/**`. Sessions S04–S11 must run
-`npm run build` before their test file will resolve `../out/render/*.js`.
+`npm run build:core` (`tsconfig.core.json`) includes only `src/core/**/*.ts`
+and `src/types/**/*.ts`, so it does **not** compile `src/render/**`. Sessions
+S04–S11 that need a render module should use `npm run build`, which `npm test`
+runs for them.
 
 ### The donor probe recipes
 
@@ -627,3 +628,20 @@ the provenance table names every vendored asset and its licence; the handoff
 records Status, what is done, what is *not* verified, and the next concrete
 action; the six planning artifacts under `docs/v3/` are consistent with the
 code they describe.
+
+---
+
+## Registered, not built (2026-11-03)
+
+Two roadmap items are registered here for cistern-web. Neither is built, and
+neither dependency is installed: the repo still has exactly one dev
+dependency (typescript 5.9.3).
+
+| Item | What it replaces / covers | Effort | Risk |
+|---|---|---|---|
+| `fast-check` 4.10.2 property-based parity harness | The single pinned seed. Reuses `tools/godot-probe/` and `tools/diff-law.mjs` to drive the donor over a seed space and diff it against the port, instead of one pinned golden. | M–L | L–XL if the donor probe cannot be batch-driven (it currently runs one golden vector per invocation). |
+| `Playwright` 1.64.1 | The hand-rolled CDP client in `tools/smoke.mjs`. | M | Low: the smoke's CDP surface is small, but a browser-driver swap must keep the smoke's named assertions and its five screenshots byte-comparable. |
+
+Both are registered against the same rule that governs the rest of this
+plan: the donor stays the authority, and a browser-side harness only checks
+the port against it — it never becomes a second implementation.
