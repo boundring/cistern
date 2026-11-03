@@ -21,9 +21,7 @@ exists.
   stubs), `e43f2cc` (the three new golden test files) and `e6aa809` (the two
   donor probes). The implementation is therefore **committed as of
   2026-10-29 17:50**; `git status` for `src/`, `tests/` and `tools/` is
-  clean. What the status still flags correctly is that the *test files* for
-  A1–A3 and A7–A12 have not landed (see below), and that A5, A6, A10 and A12
-  have gaps in their coverage.
+  clean. As of 2026-11-03 the suite files for A1–A3 and A7–A12 have landed (tests/{figures,voxel,camera,inspector}.test.mjs); only the A7/A12 world-render suite (`tests/worldrender.test.mjs`) is still unwritten, and A10 water animation remains unasserted.
 - **Status: spec only** — planning artefact; no implementation is claimed.
 - A defining test marked **(spec only)** names a case that exists in the
   skeleton stub but whose test file has **not** landed in `tests/` yet.
@@ -82,11 +80,7 @@ These numbers are the operator's, not derived by the build:
 - **A12 (inspector terrain and figure rows)** — the smoke asserts the tile and
   the copy text, not the two new rows.
 
-**Asks whose defining tests have not landed:** A1, A2, A3, A7, A8, A9, A10,
-A11, A12 — their test files (`tests/figures.test.mjs`,
-`tests/voxel.test.mjs`, `tests/worldrender.test.mjs`, `tests/camera.test.mjs`,
-`tests/inspector.test.mjs`) exist only as skeleton stubs. Their
-*implementations* are present in the working tree; their *proofs* are not.
+**Suite coverage (2026-11-03):** A1, A2, A3, A7, A8, A9, A11, A12 have landed suites (tests/{figures,voxel,camera,inspector}.test.mjs). The only suite still unwritten is tests/worldrender.test.mjs (the A7/A12 world-render view); A10 water animation is unasserted.
 
 **Canonical test names that differ from the landed titles** (the assertions
 are equivalent; the strings are not):
